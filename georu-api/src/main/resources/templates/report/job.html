@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title th:text="'이관 결과 보고서 - ' + ${r.job.tableName}">이관 결과 보고서</title>
+  <style th:replace="~{report/_style :: css}"></style>
+</head>
+<body>
+  <h1>이관 결과 보고서</h1>
+  <div class="muted" th:text="'생성 ' + ${#temporals.format(r.generatedAt, 'yyyy-MM-dd HH:mm:ss')} + ' · 환경 ' + ${r.environment} + ' · migrationId ' + ${r.job.migrationId}"></div>
+
+  <h2>요약</h2>
+  <table class="kv">
+    <tr><th>플러그인 / 테이블</th><td><span th:text="${r.job.pluginName}"></span> / <b th:text="${r.job.tableName}"></b></td>
+        <th>상태</th><td><span th:classappend="${r.job.status == 'COMPLETED'} ? 'ok' : (${r.job.status == 'FAILED'} ? 'ng' : 'warn')" th:text="${r.job.status}"></span></td></tr>
+    <tr><th>테스트 모드</th><td><span th:text="${r.testMode}"></span><span th:if="${r.testMaxItems != null}" th:text="' (최대 ' + ${r.testMaxItems} + '건)'"></span></td>
+        <th>실행ID</th><td th:text="${r.job.jobExecutionId}"></td></tr>
+    <tr><th>테넌트</th><td th:text="${r.job.tenantId}"></td>
+        <th>실행자 / 환경</th><td th:text="${r.job.executedBy} + ' / ' + ${r.job.executionEnvironment}"></td></tr>
+    <tr><th>시작 / 종료</th><td th:text="${r.job.startTime != null ? #temporals.format(r.job.startTime, 'yyyy-MM-dd HH:mm:ss') : '-'} + ' → ' + ${r.job.endTime != null ? #temporals.format(r.job.endTime, 'yyyy-MM-dd HH:mm:ss') : '-'}"></td>
+        <th>소요</th><td th:text="${r.job.executionTimeMs != null ? r.job.executionTimeMs + ' ms' : '-'}"></td></tr>
+    <tr><th>읽기(소스)</th><td class="num" th:text="${#numbers.formatInteger(r.job.sourceRecordCount ?: 0, 0, 'COMMA')}"></td>
+        <th>적재(타겟)</th><td class="num"><b th:text="${#numbers.formatInteger(r.job.targetRecordCount ?: 0, 0, 'COMMA')}"></b></td></tr>
+    <tr><th>성공 / 실패 / skip</th><td th:text="${r.job.successCount ?: 0} + ' / ' + ${r.job.failureCount ?: 0} + ' / ' + ${r.job.skippedCount ?: 0}"></td>
+        <th>소스-타겟 차이</th><td class="num" th:text="${(r.job.sourceRecordCount ?: 0) - (r.job.targetRecordCount ?: 0)}"></td></tr>
+    <tr th:if="${r.job.message}"><th>메시지</th><td colspan="3" th:text="${r.job.message}"></td></tr>
+    <tr th:if="${r.job.errorMessage}"><th>오류</th><td colspan="3" class="ng small" th:text="${#strings.abbreviate(r.job.errorMessage, 1500)}"></td></tr>
+  </table>
+
+  <h2>Step</h2>
+  <table>
+    <thead><tr><th>Step</th><th>상태</th><th>exit</th><th class="num">read</th><th class="num">write(큐)</th><th class="num">skip</th><th class="num">commit</th><th class="num">rollback</th><th>카운터</th></tr></thead>
+    <tbody>
+      <tr th:each="s : ${r.steps}">
+        <td th:text="${s.stepName}"></td><td th:text="${s.status}"></td><td th:text="${s.exitCode}"></td>
+        <td class="num" th:text="${s.readCount}"></td><td class="num" th:text="${s.writeCount}"></td><td class="num" th:text="${s.skipCount}"></td>
+        <td class="num" th:text="${s.commitCount}"></td><td class="num" th:text="${s.rollbackCount}"></td>
+        <td class="small"><span th:each="e : ${s.context}" th:text="${e.key} + '=' + ${e.value} + ' '"></span></td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(r.steps)}"><td colspan="9" class="muted">Step 정보 없음</td></tr>
+    </tbody>
+  </table>
+
+  <h2 th:text="'청크 (' + ${#lists.size(r.chunks)} + ', 실패 ' + ${#lists.size(r.failedChunks)} + ')'"></h2>
+  <table>
+    <thead><tr><th>#</th><th>Step</th><th class="num">offset</th><th>상태</th><th class="num">처리</th><th class="num">성공</th><th class="num">오류</th><th class="num">skip</th><th class="num">ms</th><th>오류 메시지</th></tr></thead>
+    <tbody>
+      <tr th:each="c, i : ${r.chunks}" th:if="${i.index < 300}">
+        <td th:text="${c.chunkNumber}"></td><td class="small" th:text="${c.stepName}"></td><td class="num" th:text="${c.chunkOffset}"></td>
+        <td th:classappend="${#strings.toString(c.status) == 'FAILED'} ? 'ng' : ''" th:text="${c.status}"></td>
+        <td class="num" th:text="${c.processedCount}"></td><td class="num" th:text="${c.successCount}"></td><td class="num" th:text="${c.errorCount}"></td>
+        <td class="num" th:text="${c.skipCount}"></td><td class="num" th:text="${c.executionTimeMs}"></td>
+        <td class="small" th:text="${c.errorMessage != null ? #strings.abbreviate(c.errorMessage, 200) : ''}"></td>
+      </tr>
+      <tr th:if="${#lists.size(r.chunks) > 300}"><td colspan="10" class="muted" th:text="'이하 ' + (${#lists.size(r.chunks)} - 300) + '건 생략 (XLSX/CSV 참고)'"></td></tr>
+      <tr th:if="${#lists.isEmpty(r.chunks)}"><td colspan="10" class="muted">청크 기록 없음</td></tr>
+    </tbody>
+  </table>
+
+  <h2 th:text="'오류 로그 (' + ${#lists.size(r.errorLogs)} + ')'"></h2>
+  <table th:if="${!#lists.isEmpty(r.errorLogs)}">
+    <thead><tr><th>시각</th><th>단계</th><th>메시지</th><th>예외</th></tr></thead>
+    <tbody>
+      <tr th:each="l, i : ${r.errorLogs}" th:if="${i.index < 100}">
+        <td class="small" th:text="${l.logTime != null ? #temporals.format(l.logTime, 'MM-dd HH:mm:ss') : ''}"></td>
+        <td class="small" th:text="${l.step}"></td>
+        <td class="small" th:text="${#strings.abbreviate(l.message, 300)}"></td>
+        <td class="small ng" th:text="${l.exceptionMessage != null ? #strings.abbreviate(l.exceptionMessage, 300) : ''}"></td>
+      </tr>
+    </tbody>
+  </table>
+  <div th:if="${#lists.isEmpty(r.errorLogs)}" class="muted">오류 로그 없음</div>
+
+  <h2 th:text="'작업 로그 (' + ${#lists.size(r.logs)} + ')'"></h2>
+  <table>
+    <thead><tr><th>시각</th><th>레벨</th><th>단계</th><th>메시지</th></tr></thead>
+    <tbody>
+      <tr th:each="l, i : ${r.logs}" th:if="${i.index < 200}">
+        <td class="small" th:text="${l.logTime != null ? #temporals.format(l.logTime, 'MM-dd HH:mm:ss') : ''}"></td>
+        <td class="small" th:classappend="${l.logLevel == 'ERROR'} ? 'ng' : ''" th:text="${l.logLevel}"></td>
+        <td class="small" th:text="${l.step} + (${l.subStep != null} ? '/' + ${l.subStep} : '')"></td>
+        <td class="small" th:text="${#strings.abbreviate(l.message, 400)}"></td>
+      </tr>
+      <tr th:if="${#lists.size(r.logs) > 200}"><td colspan="4" class="muted" th:text="'이하 ' + (${#lists.size(r.logs)} - 200) + '건 생략 (CSV 참고)'"></td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('DDL → 자바 모델')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>DDL → 자바 모델</h1><p class="page-desc">CREATE TABLE 문으로 DTO 클래스를 만듭니다 · 코드 생성기와 같은 타입 규칙 · 브라우저에서만 처리</p></div>
+    <div th:replace="~{ui/layout :: ddlTabs}"></div>
+    <div class="split">
+        <div class="card">
+            <div class="card-head">
+                <h2>DDL 입력</h2>
+                <div class="inline"><label class="small">DBMS <select id="dialect"><option value="auto">자동 감지</option><option>Oracle</option><option>MySQL</option><option>MSSQL</option><option>PostgreSQL</option></select></label>
+                    <button class="btn sm" id="clear" type="button">지우기</button></div>
+            </div>
+            <div class="mt-8 inline small"><button class="btn sm" id="sample" type="button" title="예제 DDL 을 넣고 바로 생성 - 이 DDL 이면 이렇게 나온다">예제 ▾</button><span class="muted">타입 규칙 · 관련 규칙은 <a href="#" data-panel-open="help">? 도움말</a></span></div>
+            <textarea id="ddl" class="mono" style="width:100%;height:32vh;margin-top:8px;font-size:12px" placeholder="CREATE TABLE ... ( ... );  여러 테이블 가능"></textarea>
+            <h2 class="mt-12">생성 옵션</h2>
+            <div class="f split r11" style="gap:8px">
+                <div class="field"><label>종류</label><select id="kind"><option value="target">Target DTO (Writer 입력)</option><option value="source">Source DTO (Reader 출력)</option><option value="plain">일반 DTO</option></select></div>
+                <div class="field"><label>클래스 접미어 <span class="muted">(비우면 종류 기본값)</span></label><input id="suffix" placeholder="TargetDto / SourceDto / Dto"></div>
+                <div class="field full"><label>패키지</label><input id="pkg" value="com.example.migration.target.dto"></div>
+                <div class="field"><label>테이블 접두어 제거 <span class="muted">(쉼표 구분)</span></label><input id="prefixStrip" placeholder="예: tb_, fb_"></div>
+                <div class="field"><label>날짜·시각 컬럼 타입</label><select id="dateAs"><option value="LocalDateTime">LocalDateTime / LocalDate (DB 그대로)</option><option value="String">String (Source SQL 에서 TO_CHAR 로 문자 변환한 경우)</option></select></div>
+                <div class="field full"><label class="check"><input type="checkbox" id="lombok" checked> Lombok (@Data @Builder @NoArgsConstructor @AllArgsConstructor) <span class="muted">· 끄면 getter/setter 생성</span></label></div>
+            </div>
+            <div class="mt-10 inline"><button class="btn primary" id="run" type="button">생성</button><span class="small muted">Ctrl+Enter</span></div>
+        </div>
+        <div class="card">
+            <div class="card-head">
+                <h2>생성 결과 <span class="small muted" id="meta"></span></h2>
+                <div class="inline"><select id="tableSel"></select><button class="btn primary sm" id="copy" type="button">복사</button><button class="btn sm" id="download" type="button" title=".java 파일로 내려받기">다운로드</button><button class="btn sm" id="downloadAll" type="button" title="모든 테이블을 하나의 텍스트로 (파일 구분 주석)">전체 다운로드</button></div>
+            </div>
+            <div id="warn"></div>
+            <pre id="out" class="mono codebox">왼쪽에 DDL 을 넣고 생성을 누르세요.</pre>
+        </div>
+    </div>
+</main>
+<script th:src="@{/ui-assets/ddl-parser.js}"></script>
+<script th:src="@{/ui-assets/ddl-codegen.js}"></script>
+<script th:src="@{/ui-assets/ddl-samples.js}"></script>
+<script>
+(function () {
+  const { esc, toast, $ } = UI; const P = window.DdlParser, G = window.DdlCodegen;
+  // 입력 DDL 을 브라우저에 공유: 다른 DDL 도구로 가도 같은 입력이 남는다 (저장소 아님)
+  const SHARE_KEY = 'ui.ddl.input';
+  try { const sv = localStorage.getItem(SHARE_KEY); if (sv && !$('#ddl').value) $('#ddl').value = sv; } catch (e) { /* ignore */ }
+  $('#ddl').addEventListener('change', () => { try { localStorage.setItem(SHARE_KEY, $('#ddl').value); } catch (e) { /* ignore */ } });
+  let result = null, outputs = [];
+  const KIND_PKG = { target: 'target.dto', source: 'source.dto', plain: 'dto' };
+  $('#kind').onchange = () => { const v = $('#pkg').value; const m = /^(.*plugins\.[a-z0-9]+)\.(target\.dto|source\.dto|dto)$/.exec(v); if (m) $('#pkg').value = m[1] + '.' + KIND_PKG[$('#kind').value]; };
+  function opts() { return { kind: $('#kind').value, suffix: $('#suffix').value.trim() || undefined, pkg: $('#pkg').value.trim() || 'com.georu.dto', prefixStrip: $('#prefixStrip').value.trim(), dateAs: $('#dateAs').value, lombok: $('#lombok').checked }; }
+  function run() {
+    const sql = $('#ddl').value; try { localStorage.setItem(SHARE_KEY, sql); } catch (e) { /* ignore */ } if (!sql.trim()) { toast('DDL 을 넣어 주세요', 'err'); return; }
+    try { result = P.parse(sql, { dialect: $('#dialect').value }); } catch (e) { $('#warn').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; return; }
+    const o = opts(); outputs = result.tables.map(t => Object.assign({ table: t.name }, G.generateDto(t, Object.assign({ dialect: result.dialect }, o))));
+    $('#tableSel').innerHTML = outputs.map((x, i) => `<option value="${i}">${esc(x.table)} → ${esc(x.className)}</option>`).join('');
+    $('#warn').innerHTML = result.warnings.length ? `<details class="mt-6 alert warn"><summary>읽지 못한 부분 ${result.warnings.length}건</summary><ul class="small">${result.warnings.slice(0, 30).map(w => `<li>${esc(w)}</li>`).join('')}</ul></details>` : '';
+    $('#meta').textContent = `${result.dialect} · 테이블 ${result.tables.length}개`;
+    show();
+    if (outputs.length) toast(`클래스 ${outputs.length}개 생성`, 'ok');
+  }
+  function current() { return outputs[Number($('#tableSel').value || 0)]; }
+  function show() { const c = current(); $('#out').textContent = c ? c.code : '읽은 테이블이 없습니다.'; }
+  async function copyText(t) { try { await navigator.clipboard.writeText(t); toast('복사됨', 'ok'); } catch (e) { toast('클립보드 복사 실패 - 결과 영역에서 직접 복사하세요', 'err'); } }
+  function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+  $('#run').onclick = run; $('#tableSel').onchange = show;
+  $('#copy').onclick = () => { const c = current(); if (c) copyText(c.code); };
+  $('#download').onclick = () => { const c = current(); if (c) download(c.fileName, c.code); };
+  $('#downloadAll').onclick = () => { if (!outputs.length) return; download('dto-all.java.txt', outputs.map(x => '// ===== ' + x.fileName + ' =====\n' + x.code).join('\n\n')); };
+  $('#clear').onclick = () => { $('#ddl').value = ''; result = null; outputs = []; $('#out').textContent = '왼쪽에 DDL 을 넣고 생성을 누르세요.'; $('#tableSel').innerHTML = ''; $('#meta').textContent = ''; $('#warn').innerHTML = ''; };
+  $('#ddl').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); } });
+  window.DdlSamples.pop($('#sample'), window.DdlSamples.samples.ddl, (smp) => { $('#ddl').value = smp.sql; $('#dialect').value = smp.dialect || 'auto'; run(); });
+})();
+</script>
+</body>
+</html>

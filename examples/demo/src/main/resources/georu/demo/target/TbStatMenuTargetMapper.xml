@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_stat_menu : 메뉴통계 (업무 04 통계) / 자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.stats.TbStatMenuTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbStatMenuTargetDto">
+        INSERT INTO `demo_tobe`.`tb_stat_menu` (
+              `STAT_MENU_ID`    <!-- BIGINT 메뉴통계ID -->
+            , `STAT_YM`    <!-- VARCHAR(6) 통계연월 -->
+            , `MENU_CD`    <!-- VARCHAR(20) 메뉴코드 -->
+            , `DEVICE_CD`    <!-- VARCHAR(10) 기기 -->
+            , `HIT_CNT`    <!-- BIGINT 클릭수 -->
+            , `MEMBER_HIT_CNT`    <!-- BIGINT 회원클릭 -->
+            , `GUEST_HIT_CNT`    <!-- BIGINT 비회원클릭 -->
+            , `INDATE`    <!-- VARCHAR(14) 등록일시 -->
+        ) VALUES (
+              #{statMenuId}
+            , #{statYm}
+            , #{menuCd}
+            , #{deviceCd}
+            , #{hitCnt}
+            , #{memberHitCnt}
+            , #{guestHitCnt}
+            , #{indate}
+        )
+        <!-- PK 있음. 재실행은 제품 정책상 "기존 데이터 있으면 경고 후 중단" → 데모 리셋 SQL(21_demo_tobe_reset.sql) 후 재실행 -->
+    </insert>
+
+</mapper>

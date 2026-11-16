@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Target] tb_member_point - target-m(tb_member_point) 와 target-1(tb_member_point_dw) 이 같이 쓴다 -->
+<mapper namespace="georu.demo.multi.TbMemberPointTargetMapper">
+    <insert id="insertData" parameterType="com.georu.examples.demo.multi.dto.TbMemberPointDto">
+        INSERT INTO tb_member_point (MEMBER_ID, MEMBER_NM, BRANCH_CD, BRANCH_NM, POINT_BAL)
+        VALUES (#{memberId}, #{memberNm}, #{branchCd}, #{branchNm}, #{pointBal})
+    </insert>
+</mapper>

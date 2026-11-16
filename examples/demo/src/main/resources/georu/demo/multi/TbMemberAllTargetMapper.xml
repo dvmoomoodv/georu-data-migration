@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Target] target-1 demo_dw.tb_member_all -->
+<mapper namespace="georu.demo.multi.TbMemberAllTargetMapper">
+    <insert id="insertData" parameterType="com.georu.examples.demo.multi.dto.TbMemberAllDto">
+        INSERT INTO tb_member_all (SRC_CD, MEMBER_ID, LOGIN_ID, MEMBER_NM, EMAIL, GRADE_CD, JOIN_DATE)
+        VALUES (#{srcCd}, #{memberId}, #{loginId}, #{memberNm}, #{email}, #{gradeCd}, #{joinDate})
+    </insert>
+</mapper>

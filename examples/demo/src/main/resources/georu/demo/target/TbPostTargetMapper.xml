@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_post : 게시글 (업무 03 게시판) / 자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.board.TbPostTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbPostTargetDto">
+        INSERT INTO `demo_tobe`.`tb_post` (
+              `POST_ID`    <!-- BIGINT 게시글ID -->
+            , `BOARD_ID`    <!-- INT 게시판ID -->
+            , `TITLE`    <!-- VARCHAR(200) 제목 -->
+            , `CONTENT`    <!-- LONGTEXT 본문 -->
+            , `WRITER_ID`    <!-- INT 작성자 -->
+            , `VIEW_CNT`    <!-- INT 조회수 -->
+            , `NOTICE_YN`    <!-- CHAR(1) 공지여부 -->
+            , `SECRET_YN`    <!-- CHAR(1) 비밀글 -->
+            , `STATUS`    <!-- VARCHAR(10) 상태 -->
+            , `INUSERID`    <!-- VARCHAR(40) 등록자 -->
+            , `INDATE`    <!-- VARCHAR(14) 등록일시 -->
+            , `LUSERID`    <!-- VARCHAR(40) 수정자 -->
+            , `LDATE`    <!-- VARCHAR(14) 수정일시 -->
+        ) VALUES (
+              #{postId}
+            , #{boardId}
+            , #{title}
+            , #{content}
+            , #{writerId}
+            , #{viewCnt}
+            , #{noticeYn}
+            , #{secretYn}
+            , #{status}
+            , #{inuserid}
+            , #{indate}
+            , #{luserid}
+            , #{ldate}
+        )
+        <!-- PK 있음. 재실행은 제품 정책상 "기존 데이터 있으면 경고 후 중단" → 데모 리셋 SQL(21_demo_tobe_reset.sql) 후 재실행 -->
+    </insert>
+
+</mapper>

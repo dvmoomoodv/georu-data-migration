@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('사용자 관리')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>사용자 · 권한</h1><p class="page-desc">총관리자만 · 사용자 계정을 만들고 권한을 정합니다</p></div>
+    <div th:replace="~{ui/layout :: userTabs}"></div>
+    <div class="split r54">
+        <div class="card">
+            <div class="card-head"><h2>사용자 <span class="small muted" id="summary"></span></h2>
+                <div class="inline"><button class="btn primary sm" id="btnNew" type="button">+ 사용자 추가</button></div></div>
+            <div id="list" class="scroll-y"><div class="empty loading">불러오는 중…</div></div>
+        </div>
+        <div class="stack">
+            <div class="card" id="formCard" data-collapse="newUser">
+                <h2 id="formTitle">사용자 추가</h2>
+                <form class="f" id="userForm" onsubmit="return false" autocomplete="off">
+                    <div class="field"><label for="uId">아이디 <span class="muted">(영문 · 숫자 · . _ - 2~50자)</span></label><input id="uId" maxlength="50" autocomplete="off"></div>
+                    <div class="field"><label for="uName">이름 <span class="muted">(화면 · 실행자 표시)</span></label><input id="uName" maxlength="100"></div>
+                    <div class="field full"><label for="uRole">권한</label><select id="uRole"></select><div class="small muted" id="uRoleDesc"></div></div>
+                    <div class="field" id="pwBox"><label for="uPw">초기 비밀번호 <span class="muted">(8자 이상, 첫 로그인 때 바꾸게 됩니다)</span></label><input id="uPw" type="password" autocomplete="new-password" minlength="8"></div>
+                    <div class="field" id="pwBox2"><label for="uPw2">초기 비밀번호 확인</label><input id="uPw2" type="password" autocomplete="new-password" minlength="8"></div>
+                    <div class="full inline"><button class="btn primary" id="btnSave" type="button">만들기</button><button class="btn" id="btnCancel" type="button" hidden>취소</button><span class="small muted" id="saveStatus"></span></div>
+                </form>
+            </div>
+            <div class="card" id="pwCard" hidden>
+                <h2>비밀번호 초기화 <span class="small muted mono" id="pwWho"></span></h2>
+                <form class="f" onsubmit="return false" autocomplete="off">
+                    <div class="field"><label for="rPw">새 비밀번호 <span class="muted">(8자 이상, 다음 로그인 때 바꾸게 됩니다)</span></label><input id="rPw" type="password" autocomplete="new-password" minlength="8"></div>
+                    <div class="field"><label for="rPw2">새 비밀번호 확인</label><input id="rPw2" type="password" autocomplete="new-password" minlength="8"></div>
+                    <div class="full inline"><button class="btn primary" id="btnPwSave" type="button">초기화</button><button class="btn" id="btnPwCancel" type="button">취소</button></div>
+                </form>
+            </div>
+        </div>
+    </div>
+</main>
+<script>
+(function () {
+  const { get, post, del, api, esc, fmtDate, toast, $, confirmModal } = UI;
+  let users = [], roles = [], editing = null, pwTarget = null;
+
+  async function load() {
+    try {
+      [users, roles] = await Promise.all([get('/api/users'), get('/api/roles')]);
+      users = users || []; roles = roles || [];
+      renderRoles(); render();
+    } catch (e) { $('#list').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+
+  function status(u) {
+    if (!u.enabled) return '<span class="badge STOPPED">사용 중지</span>';
+    if (u.locked) return `<span class="badge FAILED" title="로그인 5회 실패">잠김 ${u.lockedMinutes}분</span>`;
+    if (u.mustChangePassword) return '<span class="badge WARN" title="다음 로그인 때 비밀번호 변경">변경 대기</span>';
+    return '<span class="badge COMPLETED">사용</span>';
+  }
+
+  function render() {
+    $('#summary').textContent = `${users.length}명`;
+    if (!users.length) { $('#list').innerHTML = '<div class="empty">사용자가 없습니다</div>'; return; }
+    // 행 동작은 아이콘 버튼 (todo-task 33 T13 · G4). 사용 중지 / 다시 사용은 상태를 바꾸는 일이라 글자로 둔다
+    const ib = UI.iconBtn;
+    $('#list').innerHTML = '<table class="list"><tr><th>아이디</th><th>이름</th><th>권한</th><th>상태</th><th>마지막 로그인</th><th>작업</th></tr>' + users.map(u => {
+      const total = u.totalAdmin, id = esc(u.username);
+      const acts = total
+        ? '<span class="small muted">총관리자 (내 계정에서 비밀번호)</span>'
+        : `<span class="row-acts">${ib(`data-edit="${id}"`, 'edit', '고치기')}${ib(`data-pw="${id}"`, 'key', '비밀번호 초기화')}`
+          + (u.locked ? ib(`data-unlock="${id}"`, 'unlock', '잠금 풀기') : '')
+          + ib(`data-del="${id}"`, 'trash', '삭제', 'danger')
+          + ` <button class="btn sm" data-enable="${id}" data-on="${u.enabled ? '0' : '1'}">${u.enabled ? '사용 중지' : '다시 사용'}</button></span>`;
+      return `<tr><td class="mono">${id}</td><td>${u.name ? `<span class="by-cell">${UI.avatar(u.name, 'xs')}<span class="cut s" title="${esc(u.name)}">${esc(u.name)}</span></span>` : '<span class="muted">-</span>'}</td><td>${total ? '<b>관리자</b>' : esc(u.roleName)}</td><td>${status(u)}</td>`
+        + `<td class="small">${u.lastLoginAt ? fmtDate(u.lastLoginAt) : '<span class="muted">-</span>'}</td><td class="nowrap">${acts}</td></tr>`;
+    }).join('') + '</table>';
+    document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => startEdit(users.find(u => u.username === b.dataset.edit)));
+    document.querySelectorAll('[data-pw]').forEach(b => b.onclick = () => startPw(b.dataset.pw));
+    document.querySelectorAll('[data-unlock]').forEach(b => b.onclick = () => act(() => post('/api/users/' + encodeURIComponent(b.dataset.unlock) + '/unlock'), '잠금을 풀었습니다'));
+    document.querySelectorAll('[data-enable]').forEach(b => b.onclick = async () => {
+      const on = b.dataset.on === '1';
+      if (!on && !await confirmModal('사용 중지', `<b>${esc(b.dataset.enable)}</b> 를 사용 중지합니다. 로그인해 있으면 다음 요청에서 로그아웃됩니다. 언제든 다시 사용으로 되돌릴 수 있습니다.`, '사용 중지')) return;
+      act(() => api('PUT', '/api/users/' + encodeURIComponent(b.dataset.enable) + '/enabled', { enabled: on }), on ? '다시 쓸 수 있게 했습니다' : '사용 중지했습니다');
+    });
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => {
+      const id = b.dataset.del;
+      if (!await confirmModal('사용자 삭제', `<b>${esc(id)}</b> 계정을 지웁니다. 되돌릴 수 없습니다 (실행 기록의 실행자 이름은 남습니다). 잠깐 막기만 하려면 사용 중지를 쓰세요.`, '삭제', id)) return;
+      act(() => del('/api/users/' + encodeURIComponent(id)), '사용자를 지웠습니다');
+    });
+  }
+
+  /** 권한 고르기: 관리자 권한은 총관리자 전용이라 목록에서 뺀다 */
+  function renderRoles() {
+    const keep = $('#uRole').value;
+    $('#uRole').innerHTML = roles.filter(r => !r.admin).map(r => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join('');
+    if (keep && roles.some(r => r.id === keep && !r.admin)) $('#uRole').value = keep;
+    else if (roles.some(r => r.id === 'VIEWER')) $('#uRole').value = 'VIEWER';
+    roleDesc();
+  }
+  function roleDesc() {
+    const r = roles.find(x => x.id === $('#uRole').value);
+    $('#uRoleDesc').textContent = r ? (r.description || '') + ` · 유휴 잠금 ${r.idleLockMinutes ? r.idleLockMinutes + '분' : '끔'}` : '';
+  }
+  $('#uRole').onchange = roleDesc;
+
+  async function act(fn, ok) {
+    try { await fn(); toast(ok, 'ok'); await load(); } catch (e) { toast(e.plainMessage || e.message, 'err'); }
+  }
+
+  function resetForm() {
+    editing = null;
+    $('#formTitle').textContent = '사용자 추가'; $('#btnSave').textContent = '만들기'; $('#btnCancel').hidden = true;
+    $('#uId').disabled = false; $('#uId').value = ''; $('#uName').value = ''; $('#uPw').value = ''; $('#uPw2').value = '';
+    $('#pwBox').hidden = false; $('#pwBox2').hidden = false; $('#saveStatus').textContent = '';
+    renderRoles();
+  }
+  function startEdit(u) {
+    if (!u) return;
+    editing = u.username;
+    $('#formTitle').textContent = '사용자 고치기'; $('#btnSave').textContent = '저장'; $('#btnCancel').hidden = false;
+    $('#uId').value = u.username; $('#uId').disabled = true; $('#uName').value = u.name || '';
+    $('#pwBox').hidden = true; $('#pwBox2').hidden = true;
+    $('#uRole').value = u.roleId; roleDesc();
+    $('#formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function startPw(id) {
+    pwTarget = id; $('#pwWho').textContent = id; $('#rPw').value = ''; $('#rPw2').value = ''; $('#pwCard').hidden = false; $('#rPw').focus();
+  }
+
+  $('#btnNew').onclick = () => { resetForm(); $('#uId').focus(); };
+  $('#btnCancel').onclick = resetForm;
+  $('#btnPwCancel').onclick = () => { pwTarget = null; $('#pwCard').hidden = true; };
+  $('#btnSave').onclick = async () => {
+    const body = { name: $('#uName').value.trim(), roleId: $('#uRole').value };
+    if (!body.roleId) { toast('권한을 고르세요 (권한 탭에서 먼저 만드세요)', 'err'); return; }
+    $('#btnSave').disabled = true;
+    try {
+      if (editing) {
+        await api('PUT', '/api/users/' + encodeURIComponent(editing), body);
+        toast('고쳤습니다 (그 사용자의 다음 요청부터)', 'ok');
+      } else {
+        body.username = $('#uId').value.trim(); body.password = $('#uPw').value;
+        if (!/^[A-Za-z0-9._-]{2,50}$/.test(body.username)) { toast('아이디는 영문 · 숫자 · . _ - 2~50자', 'err'); return; }
+        if (body.password.length < 8) { toast('초기 비밀번호는 8자 이상', 'err'); return; }
+        if (body.password !== $('#uPw2').value) { toast('초기 비밀번호 확인이 다릅니다', 'err'); return; }
+        await post('/api/users', body);
+        toast(`${body.username} 를 만들었습니다. 정한 비밀번호를 사용자에게 따로 전하세요`, 'ok');
+      }
+      resetForm(); await load();
+    } catch (e) { toast(e.plainMessage || e.message, 'err'); }
+    finally { $('#btnSave').disabled = false; }
+  };
+  $('#btnPwSave').onclick = async () => {
+    const pw = $('#rPw').value;
+    if (pw.length < 8) { toast('새 비밀번호는 8자 이상', 'err'); return; }
+    if (pw !== $('#rPw2').value) { toast('새 비밀번호 확인이 다릅니다', 'err'); return; }
+    try {
+      await post('/api/users/' + encodeURIComponent(pwTarget) + '/password', { password: pw });
+      toast('비밀번호를 초기화했습니다. 다음 로그인 때 바꾸게 됩니다', 'ok');
+      pwTarget = null; $('#pwCard').hidden = true; await load();
+    } catch (e) { toast(e.plainMessage || e.message, 'err'); }
+  };
+  load();
+})();
+</script>
+</body>
+</html>

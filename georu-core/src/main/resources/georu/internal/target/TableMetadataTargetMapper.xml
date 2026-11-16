@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.georu.core.internal.common.mapper.target.TableMetadataTargetMapper">
+
+    <!-- 테이블 존재 여부 확인 -->
+    <select id="checkTableExists" resultType="int">
+        SELECT COUNT(1)
+        FROM information_schema.tables 
+        WHERE table_schema = DATABASE()
+          AND table_name = #{tableName}
+    </select>
+
+    <!-- 테이블 컬럼 정보 조회 -->
+    <select id="getTableColumns" resultType="map">
+        SELECT 
+            COLUMN_NAME as columnName,
+            DATA_TYPE as dataType,
+            IS_NULLABLE as isNullable,
+            COLUMN_DEFAULT as columnDefault,
+            CHARACTER_MAXIMUM_LENGTH as maxLength,
+            NUMERIC_PRECISION as numericPrecision,
+            NUMERIC_SCALE as numericScale,
+            COLUMN_TYPE as columnType,
+            COLUMN_KEY as columnKey,
+            EXTRA as extra,
+            COLUMN_COMMENT as columnComment,
+            ORDINAL_POSITION as ordinalPosition
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = #{tableName}
+        ORDER BY ORDINAL_POSITION
+    </select>
+
+    <!-- 테이블 인덱스 정보 조회 -->
+    <select id="getTableIndexes" resultType="map">
+        SELECT 
+            INDEX_NAME as indexName,
+            COLUMN_NAME as columnName,
+            NON_UNIQUE as nonUnique,
+            SEQ_IN_INDEX as seqInIndex,
+            INDEX_TYPE as indexType,
+            COMMENT as comment
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE()
+          AND table_name = #{tableName}
+        ORDER BY INDEX_NAME, SEQ_IN_INDEX
+    </select>
+
+    <!-- 테이블 기본키 정보 조회 -->
+    <select id="getTablePrimaryKeys" resultType="map">
+        SELECT 
+            COLUMN_NAME as columnName,
+            ORDINAL_POSITION as ordinalPosition
+        FROM information_schema.key_column_usage
+        WHERE table_schema = DATABASE()
+          AND table_name = #{tableName}
+          AND constraint_name = 'PRIMARY'
+        ORDER BY ORDINAL_POSITION
+    </select>
+
+    <!-- 테이블 외래키 정보 조회 -->
+    <select id="getTableForeignKeys" resultType="map">
+        SELECT 
+            kcu.CONSTRAINT_NAME as constraintName,
+            kcu.COLUMN_NAME as columnName,
+            kcu.REFERENCED_TABLE_NAME as referencedTableName,
+            kcu.REFERENCED_COLUMN_NAME as referencedColumnName,
+            rc.UPDATE_RULE as updateRule,
+            rc.DELETE_RULE as deleteRule
+        FROM information_schema.key_column_usage kcu
+        JOIN information_schema.referential_constraints rc 
+          ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+         AND kcu.TABLE_SCHEMA = rc.CONSTRAINT_SCHEMA
+        WHERE kcu.table_schema = DATABASE()
+          AND kcu.table_name = #{tableName}
+          AND kcu.REFERENCED_TABLE_NAME IS NOT NULL
+        ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION
+    </select>
+
+    <!-- 테이블 통계 정보 조회 -->
+    <select id="getTableStatistics" resultType="map">
+        SELECT 
+            t.TABLE_ROWS as tableRows,
+            t.DATA_LENGTH as dataLength,
+            t.INDEX_LENGTH as indexLength,
+            t.DATA_FREE as dataFree,
+            t.AUTO_INCREMENT as autoIncrement,
+            t.CREATE_TIME as createTime,
+            t.UPDATE_TIME as updateTime,
+            t.TABLE_COMMENT as tableComment,
+            t.ENGINE as engine,
+            t.TABLE_COLLATION as tableCollation,
+            ROUND((t.DATA_LENGTH + t.INDEX_LENGTH) / 1024 / 1024, 2) as tableSizeMB
+        FROM information_schema.tables t
+        WHERE t.table_schema = DATABASE()
+          AND t.table_name = #{tableName}
+    </select>
+
+    <!-- 데이터베이스의 모든 테이블 목록 조회 -->
+    <select id="getAllTables" resultType="map">
+        SELECT 
+            TABLE_NAME as tableName,
+            TABLE_TYPE as tableType,
+            ENGINE as engine,
+            TABLE_ROWS as tableRows,
+            ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 2) as tableSizeMB,
+            CREATE_TIME as createTime,
+            UPDATE_TIME as updateTime,
+            TABLE_COMMENT as tableComment
+        FROM information_schema.tables
+        WHERE table_schema = DATABASE()
+          AND table_type = 'BASE TABLE'
+        ORDER BY TABLE_NAME
+    </select>
+
+    <!-- 테이블 생성 스크립트 조회 (MySQL용) -->
+    <!-- <select id="getTableCreateScript" resultType="map">
+        SHOW CREATE TABLE #{tableName}
+    </select> -->
+
+</mapper>

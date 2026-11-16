@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_faq : 자주 묻는 질문 (업무 04 공지) / 이관 상태: 수행 -->
+<mapper namespace="georu.demo.notice.TbFaqTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbFaqTargetDto">
+        INSERT INTO `demo_tobe`.`tb_faq` (
+              `FAQ_ID`    <!-- INT FAQ ID -->
+            , `CATEGORY_CD`    <!-- VARCHAR(20) 분류 -->
+            , `QUESTION`    <!-- VARCHAR(500) 질문 -->
+            , `ANSWER`    <!-- VARCHAR(2000) 답변 -->
+            , `SORT_NO`    <!-- INT 정렬순서 -->
+            , `USE_YN`    <!-- CHAR(1) 사용여부 1/0 -->
+            , `INUSERID`    <!-- VARCHAR(40) 등록자 -->
+            , `INDATE`    <!-- VARCHAR(14) 등록일시 -->
+            , `LUSERID`    <!-- VARCHAR(40) 수정자 -->
+            , `LDATE`    <!-- VARCHAR(14) 수정일시 -->
+        ) VALUES (
+              #{faqId}
+            , #{categoryCd}
+            , #{question}
+            , #{answer}
+            , #{sortNo}
+            , #{useYn}
+            , #{inuserid}
+            , #{indate}
+            , #{luserid}
+            , #{ldate}
+        )
+    </insert>
+
+</mapper>

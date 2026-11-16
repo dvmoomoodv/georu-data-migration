@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Source] 지사 회원 (탈퇴 제외). source-1. stg_member_br(2:1 합치기)와 tb_br_member(2:2)가 같이 쓴다 -->
+<mapper namespace="georu.demo.multi.StgMemberBrSourceMapper">
+    <sql id="where">
+        WHERE A."STATUS" &lt;&gt; 'D'
+    </sql>
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*) FROM "DEMO_BR"."BR_MEMBER" A <include refid="where"/>
+    </select>
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto" resultType="com.georu.examples.demo.multi.dto.BrMemberSourceDto">
+        SELECT A."MEMBER_ID", A."LOGIN_ID", A."MEMBER_NM", A."EMAIL"
+             , REPLACE(A."PHONE", '-', '') AS "PHONE"
+             , A."BRANCH_CD", A."GRADE_CD", A."STATUS"
+             , TO_CHAR(A."JOIN_DT", 'YYYYMMDDHH24MISS') AS "JOIN_DATE"
+          FROM "DEMO_BR"."BR_MEMBER" A
+        <include refid="where"/>
+         ORDER BY A."MEMBER_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+</mapper>

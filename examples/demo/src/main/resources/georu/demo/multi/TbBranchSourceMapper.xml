@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Source] 2:1 테이블별 소스: 지점 코드표. source-1 (지사 DB, DEMO_BR 계정) 에 실린다 - 손으로 씀 -->
+<mapper namespace="georu.demo.multi.TbBranchSourceMapper">
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*) FROM "DEMO_BR"."BR_BRANCH"
+    </select>
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto" resultType="com.georu.examples.demo.multi.dto.BrBranchDto">
+        SELECT "BRANCH_CD", "BRANCH_NM", "REGION", "USE_YN"
+          FROM "DEMO_BR"."BR_BRANCH"
+         ORDER BY "BRANCH_CD"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+</mapper>

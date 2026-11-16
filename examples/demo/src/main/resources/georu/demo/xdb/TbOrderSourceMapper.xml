@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Source] source-2 PostgreSQL demo_pg.shop_order. tb_order(전체 → target-2) 와 tb_order_dw(params.status = DONE → target-1) 가 같이 쓴다 -->
+<mapper namespace="georu.demo.xdb.TbOrderSourceMapper">
+    <sql id="where">
+        <where>
+            <if test="params != null and params.status != null">a.status = #{params.status}</if>
+        </where>
+    </sql>
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*) FROM shop_order a <include refid="where"/>
+    </select>
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto" resultType="com.georu.examples.demo.xdb.dto.TbOrderDto">
+        SELECT a.order_id
+             , a.customer_id
+             , a.order_amt
+             , to_char(a.ordered_at, 'YYYYMMDDHH24MISS') AS order_date
+             , a.status
+          FROM shop_order a
+        <include refid="where"/>
+         ORDER BY a.order_id
+         LIMIT #{_pagesize} OFFSET #{_skiprows}
+    </select>
+</mapper>

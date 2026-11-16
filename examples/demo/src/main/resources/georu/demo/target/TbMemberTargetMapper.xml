@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_member : 회원 (업무 02 회원관리) / 자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.member.TbMemberTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbMemberTargetDto">
+        INSERT INTO `demo_tobe`.`tb_member` (
+              `MEMBER_ID`    <!-- INT 회원ID -->
+            , `LOGIN_ID`    <!-- VARCHAR(50) 로그인ID -->
+            , `MEMBER_NM`    <!-- VARCHAR(50) 회원명 -->
+            , `PASSWORD_HASH`    <!-- VARCHAR(128) 비밀번호해시 -->
+            , `GENDER`    <!-- CHAR(1) 성별 -->
+            , `BIRTH_YMD`    <!-- VARCHAR(8) 생년월일 -->
+            , `EMAIL`    <!-- VARCHAR(100) 이메일 -->
+            , `PHONE`    <!-- VARCHAR(20) 전화 -->
+            , `GRADE_CD`    <!-- VARCHAR(10) 등급코드 -->
+            , `STATUS`    <!-- VARCHAR(10) 상태 -->
+            , `JOIN_DATE`    <!-- VARCHAR(14) 가입일시 -->
+            , `LAST_LOGIN_DATE`    <!-- VARCHAR(14) 최근로그인 -->
+            , `POINT`    <!-- INT 포인트 -->
+            , `INUSERID`    <!-- VARCHAR(40) 등록자 -->
+            , `INDATE`    <!-- VARCHAR(14) 등록일시 -->
+            , `LUSERID`    <!-- VARCHAR(40) 수정자 -->
+            , `LDATE`    <!-- VARCHAR(14) 수정일시 -->
+        ) VALUES (
+              #{memberId}
+            , #{loginId}
+            , #{memberNm}
+            , #{passwordHash}
+            , #{gender}
+            , #{birthYmd}
+            , #{email}
+            , #{phone}
+            , #{gradeCd}
+            , #{status}
+            , #{joinDate}
+            , #{lastLoginDate}
+            , #{point}
+            , #{inuserid}
+            , #{indate}
+            , #{luserid}
+            , #{ldate}
+        )
+        <!-- PK 있음. 재실행은 제품 정책상 "기존 데이터 있으면 경고 후 중단" → 데모 리셋 SQL(21_demo_tobe_reset.sql) 후 재실행 -->
+    </insert>
+
+</mapper>

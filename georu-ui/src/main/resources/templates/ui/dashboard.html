@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('대시보드')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<div th:replace="~{ui/layout :: gate}"></div>
+<main>
+    <div class="page-head"><h1>대시보드</h1><p class="page-desc" id="updatedAt"></p></div>
+    <div id="alerts"></div>
+    <div id="startHint"></div>
+    <div class="grid c4 kpi">
+        <div class="card"><span class="stat-ico" data-ico="activity"></span><div class="k">실행 중</div><div class="v" id="ovRunning">-</div></div>
+        <div class="card tone-ok"><span class="stat-ico ok" data-ico="check"></span><div class="k">완료</div><div class="v" id="ovCompleted">-</div></div>
+        <div class="card tone-bad"><span class="stat-ico bad" data-ico="x"></span><div class="k">실패</div><div class="v" id="ovFailed">-</div></div>
+        <div class="card"><span class="stat-ico info" data-ico="percent"></span><div class="k">성공률</div><div class="v" id="ovRate">-</div></div>
+    </div>
+    <div class="card" id="env" data-collapse="env" data-collapse-sum="#envFlow,#envProfile">
+        <div class="card-head"><h2>이관 환경 <span class="small muted" id="envFlow"></span></h2><span class="small" id="envProfile"></span></div>
+        <div id="envBody"><div class="empty small loading">불러오는 중…</div></div>
+        <div class="hint">소스·타겟은 DataSource 이름(source-m·target-m …), DB 종류는 JDBC URL 로 정해집니다. 실행 전에 소스·타겟이 맞는지 확인하세요.</div>
+    </div>
+    <div class="card" data-collapse="load" data-collapse-sum="#ldCpu,#ldHeap">
+        <h2>시스템 부하 <span class="small muted">현재 값 · 선은 최근 24시간 (5분 주기)</span> <a class="small" th:href="@{/ui/system}">추이 자세히</a></h2>
+        <div class="grid c4" id="load">
+            <div class="stat"><span class="k">CPU (앱 / 시스템)</span><span class="v" id="ldCpu">-</span><div class="spark" id="spCpu"></div></div>
+            <div class="stat"><span class="k">힙 사용률</span><span class="v" id="ldHeap">-</span><span class="sub" id="ldHeapSub"></span><div class="spark" id="spHeap"></div></div>
+            <div class="stat"><span class="k">스레드</span><span class="v" id="ldThreads">-</span><div class="spark" id="spThreads"></div></div>
+            <div class="stat"><span class="k">커넥션 풀 (사용 중 / 최대)</span><div id="ldPools" class="mt-4 mono">-</div></div>
+        </div>
+    </div>
+    <div class="grid c2 align-top">
+        <div class="card">
+            <h2>실행 중인 작업 <a class="small" th:href="@{/ui/running}">전체 보기</a></h2>
+            <div id="running"><div class="empty loading">조회 중…</div></div>
+        </div>
+        <div class="card" data-collapse="db">
+            <h2>데이터베이스 상태</h2>
+            <div id="db"><div class="empty loading">조회 중…</div></div>
+        </div>
+        <div class="card span-all">
+            <h2>최근 실행 이력 <a class="small" th:href="@{/ui/history}">전체 보기</a> <details class="dd card-menu"><summary title="보고서 · 내려받기" aria-label="보고서 · 내려받기"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg></summary><div class="dd-menu" role="menu"><div class="dd-head"><b>최근 7일 요약</b><span>실행 이력 보고서</span></div><a href="/api/report/summary?format=pdf" target="_blank" role="menuitem"><span data-ico="file" data-ico-class="ico sm"></span>PDF 보고서</a><a href="/api/report/summary?format=xlsx" role="menuitem"><span data-ico="download" data-ico-class="ico sm"></span>XLSX 내려받기</a><hr><a th:href="@{/ui/history}" role="menuitem"><span data-ico="clock" data-ico-class="ico sm"></span>이력 전체 보기</a></div></details></h2>
+            <div id="recent"><div class="empty loading">조회 중…</div></div>
+        </div>
+    </div>
+</main>
+<script>
+(function () {
+  const { get, fmtDate, fmtMs, num, badge, esc, progress, poll, $ } = UI;
+  // 처음 시작 안내: 앱이 더한 안내서(guides/index-app.md)가 있으면 함께 안내 (닫으면 이 브라우저에서는 다시 안 뜸)
+  async function loadStartHint() {
+    try {
+      if (localStorage.getItem('ui.startHint.closed') === '1') return;
+      const guides = await UI.appGuides();
+      const box = $('#startHint'); if (!box) return;
+      // 환영 띠 (todo-task 33 T4): 앱 안내서는 appGuides() 가 준 것만 버튼으로
+      const art = '<svg class="banner-art" viewBox="0 0 150 110" aria-hidden="true"><rect x="18" y="20" width="96" height="64" rx="8" fill="rgba(255,255,255,.16)"/>'
+        + '<rect x="30" y="34" width="40" height="6" rx="3" fill="#fff" opacity=".85"/><rect x="30" y="46" width="62" height="5" rx="2.5" fill="#fff" opacity=".5"/>'
+        + '<rect x="30" y="56" width="52" height="5" rx="2.5" fill="#fff" opacity=".5"/><rect x="30" y="66" width="30" height="8" rx="4" fill="#FFBC2B"/>'
+        + '<circle cx="118" cy="78" r="20" fill="#fff" opacity=".95"/><path d="M109 78l6 6 12-12" stroke="#605DFF" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'
+        + '<circle cx="128" cy="22" r="6" fill="#FFBC2B"/><circle cx="12" cy="92" r="4" fill="#fff" opacity=".6"/></svg>';
+      box.innerHTML = `<div class="banner"><div class="banner-txt"><h3>처음이신가요?</h3>
+        <p>이 프로그램이 무엇인지, 처음 10분에 무엇을 누르면 되는지 한 장으로 정리했습니다.</p>
+        <div class="banner-act"><a class="btn white" href="/ui/start">시작하기</a>${guides.map(g => ` <a class="btn" href="/ui/guide?name=${encodeURIComponent(g.file)}">${esc(g.title)}</a>`).join('')}</div></div>
+        ${art}<button class="banner-close" type="button" id="startHintClose" title="이 브라우저에서 다시 보지 않기" aria-label="닫기">×</button></div>`;
+      $('#startHintClose').onclick = () => { try { localStorage.setItem('ui.startHint.closed', '1'); } catch (e) { /* ignore */ } box.innerHTML = ''; };
+    } catch (e) { /* 안내는 선택 사항 */ }
+  }
+  async function loadOverview() {
+    try {
+      const o = await get('/api/status/overview');
+      $('#ovRunning').textContent = num(o.runningJobs); $('#ovCompleted').textContent = num(o.completedJobs);
+      $('#ovFailed').textContent = num(o.failedJobs); $('#ovRate').textContent = o.successRate ?? '-';
+      $('#updatedAt').textContent = '갱신 ' + fmtDate(o.timestamp) + ' · 시스템 ' + (o.systemStatus || '-');
+    } catch (e) { $('#alerts').innerHTML = `<div class="alert err">요약 조회 실패: ${esc(e.message)}</div>`; }
+  }
+  async function loadRunning() {
+    try {
+      const list = await get('/api/status/running') || [];
+      if (!list.length) { $('#running').innerHTML = '<div class="empty">실행 중인 작업이 없습니다 <a class="btn sm" href="/ui/execute">테이블 이관 실행</a></div>'; return; }
+      $('#running').innerHTML = `<table class="list"><tr><th>플러그인</th><th>테이블</th><th>테넌트</th><th>모드</th><th>상태</th><th>경과</th></tr>` +
+        list.map(j => `<tr><td>${esc(j.domain)}</td><td>${esc(j.tableName)}</td><td class="small mono">${esc(j.tenantId || '-')}</td><td>${badge(j.testMode || 'NORMAL')}</td><td>${badge(j.status)}</td><td>${fmtMs(j.executionTimeMs)}</td></tr>`).join('') + '</table>';
+    } catch (e) { $('#running').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  async function loadDb() {
+    try {
+      const d = await get('/api/status/database');
+      const rows = Object.entries(d).filter(([k, v]) => v && typeof v === 'object' && 'healthy' in v);
+      $('#db').innerHTML = `<table class="list"><tr><th>DB</th><th>타입</th><th>상태</th><th>응답</th><th>풀(활성/최대)</th></tr>` +
+        rows.map(([k, v]) => `<tr><td><b>${esc(k)}</b></td><td>${esc(v.type)}</td><td>${badge(v.healthy ? 'UP' : 'DOWN')}</td><td>${esc(v.responseTime || '-')}</td><td>${v.activeConnections ?? '-'} / ${v.maxConnections ?? '-'}</td></tr>`).join('') +
+        `</table><div class="mt-6 small muted">운영저장소(H2) ${d.operationHealthy ? '정상' : '<b class="t-danger">이상</b>'} · 전체 ${d.overallHealthy ? '정상' : '일부 DOWN (해당 DB 를 쓰는 Job 은 대기)'}</div>`;
+    } catch (e) { $('#db').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  async function loadRecent() {
+    try {
+      const h = await get('/api/status/history?page=0&size=8');
+      const list = h.content || [];
+      if (!list.length) { $('#recent').innerHTML = '<div class="empty">아직 실행 이력이 없습니다 <a class="btn sm" href="/ui/start">시작하기</a> <a class="btn sm" href="/ui/execute">테이블 이관 실행</a></div>'; return; }
+      $('#recent').innerHTML = `<table class="list"><tr><th>실행ID</th><th>플러그인</th><th>테이블</th><th>테넌트</th><th>모드</th><th>상태</th><th>시작</th><th class="num">소요</th><th class="num">처리</th></tr>` +
+        list.map(j => `<tr class="clickable" onclick="location.href='/ui/history?migrationId=${encodeURIComponent(j.migrationId || '')}&jobExecutionId=${j.jobExecutionId}'">
+          <td>${j.jobExecutionId}</td><td>${esc(j.domain)}</td><td>${esc(j.tableName)}</td><td class="small mono">${esc(j.tenantId || '-')}</td><td>${badge(j.testMode || 'NORMAL')}</td><td>${badge(j.status)}</td>
+          <td>${UI.fmtShort(j.startTime)}</td><td class="num">${fmtMs(j.durationMs)}</td><td class="num">${num(j.recordsProcessed)}</td></tr>`).join('') + '</table>';
+    } catch (e) { $('#recent').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  // 시스템 부하: 현재 값 30초, 24시간 추이 5분
+  const pctTxt = (v) => v == null ? '-' : Math.round(v) + '%';
+  async function loadLoad() {
+    try {
+      const n = await get('/api/status/metrics/now');
+      $('#ldCpu').textContent = pctTxt(n.processCpu) + ' / ' + pctTxt(n.systemCpu);
+      $('#ldHeap').textContent = pctTxt(n.heapUsage); $('#ldHeapSub').textContent = num(n.heapUsedMb) + ' / ' + num(n.heapMaxMb) + ' MB';
+      $('#ldThreads').textContent = num(n.threadCount);
+      const pools = Object.entries(n.pools || {});
+      $('#ldPools').innerHTML = pools.length ? pools.map(([k, p]) => `<div>${esc(k)} <b>${p.active}</b> / ${p.max} <span class="muted">(열림 ${p.total})</span></div>`).join('') : '-';
+    } catch (e) { $('#ldCpu').textContent = '조회 실패'; }
+  }
+  async function loadTrend() {
+    try {
+      const h = await get('/api/status/metrics/history?hours=24') || [];
+      const s = (key) => [{ name: key, points: h.map(x => ({ t: x.collectedAt, v: x[key] })) }];
+      const to = new Date(), from = new Date(to.getTime() - 24 * 3600 * 1000);
+      UI.lineChart($('#spCpu'), s('processCpu'), { spark: true, height: 34, max: 100, from, to });
+      UI.lineChart($('#spHeap'), s('heapUsage'), { spark: true, height: 34, max: 100, from, to });
+      UI.lineChart($('#spThreads'), s('threadCount'), { spark: true, height: 34, from, to });
+    } catch (e) { /* 이력 테이블이 아직 없으면 생략 */ }
+  }
+  loadLoad(); setInterval(loadLoad, 30000); loadTrend(); setInterval(loadTrend, 5 * 60 * 1000);
+  loadStartHint();
+  poll(async () => { await Promise.all([loadOverview(), loadRunning(), loadRecent()]); }, 5000);
+  // 이관 환경 (설정값이라 한 번만)
+  UI.env().then(e => {
+    $('#envFlow').textContent = e.flow;
+    $('#envProfile').innerHTML = e.production ? '<span class="badge err">⚠️ 운영 (' + esc(e.profile) + ')</span>' : '프로파일 <b>' + esc(e.profile) + '</b>';
+    $('#envBody').innerHTML = UI.envTable(e);
+  }).catch(err => { $('#envBody').innerHTML = `<div class="alert err">${esc(err.message)}</div>`; });
+  loadDb(); setInterval(loadDb, 30000);
+})();
+</script>
+</body>
+</html>

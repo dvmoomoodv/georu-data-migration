@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('테이블 이관 실행')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<div th:replace="~{ui/layout :: gate}"></div>
+<main>
+    <div class="page-head"><h1>테이블 이관 실행</h1><p class="page-desc">테이블 하나를 시험 모드로 돌려 보거나 실제로 이관 · 한 번에 한 이관만</p></div>
+    <div id="envStrip"></div>
+    <div id="runningWarn"></div>
+    <div class="split r54">
+        <div>
+        <div class="tabs" role="tablist"><button type="button" class="active" data-tab="tabForm">실행 폼</button><button type="button" data-tab="tabQueue">실행 목록 <span class="cnt" id="tabQueueCount">0</span></button></div>
+        <div id="tabForm">
+            <form class="steps" id="form" onsubmit="return false">
+            <section class="card step" id="stepTarget" data-collapse="target" data-collapse-sum="#pluginName,#tableName"><div class="step-h"><span class="gf-n">1</span><h2>대상</h2><span class="small muted">플러그인 · 테이블</span></div>
+            <div class="f">
+                <div class="field"><label>플러그인</label>
+                    <select id="pluginName">
+                        <option value="">선택</option>
+                        <option th:each="e : ${catalog}" th:value="${e.key}" th:text="${e.key} + ' (' + ${#lists.size(e.value)} + ')'"></option>
+                    </select></div>
+                <div class="field"><label>테이블 <span class="muted" id="tableCount"></span></label>
+                    <div class="inline" style="flex-wrap:nowrap"><input id="tableName" list="tableList" placeholder="플러그인을 먼저 선택" autocomplete="off" style="flex:1">
+                    <button class="btn sm" id="addQueue" type="button" title="실행 목록에 추가">+ 목록</button></div>
+                    <datalist id="tableList"></datalist>
+                    <div class="mt-4 small" id="mapStatus"></div></div>
+            </div></section>
+            <section class="card step" id="stepMode" data-collapse="mode" data-collapse-sum="input[name=testMode]:checked"><div class="step-h"><span class="gf-n">2</span><h2>모드</h2><span class="small muted">기본 WRITER_TEST · 위험한 순서로 오른쪽</span></div>
+                <div class="choice modes" role="radiogroup" aria-label="테스트 모드">
+                    <label><input type="radio" name="testMode" value="READER_TEST"> READER_TEST <span class="muted small">읽기만 · 기본 5건</span></label>
+                    <label><input type="radio" name="testMode" value="PROCESSOR_TEST"> PROCESSOR_TEST <span class="muted small">변환 검증 · 적재 없음</span></label>
+                    <label><input type="radio" name="testMode" value="WRITER_TEST" checked> WRITER_TEST <span class="muted small">실제 적재 ≤100건 · 등록자 MIG-TEST</span></label>
+                    <label class="danger"><span class="risk-tag">실제 이관</span><input type="radio" name="testMode" value="NORMAL"> NORMAL <span class="muted small">전체 데이터를 타겟에 적재</span></label>
+                </div>
+                <div class="mt-8" id="autoPcLine"></div>
+            </section>
+            <section class="card step" id="stepOpts" data-collapse="opts" data-collapse-sum="#chunkSize"><div class="step-h"><span class="gf-n">3</span><h2>조건</h2><span class="small muted">비워 두면 기본값 · 값을 넣은 항목은 진하게</span></div>
+            <div class="f">
+                <div class="field"><label>테스트 최대 건수 <span class="muted">(1~100, 비우면 모드 기본값)</span></label><input id="testMaxItems" type="number" min="1" max="100" placeholder="READER 5 / 그 외 100"></div>
+                <div class="field"><label>청크 크기</label><input id="chunkSize" type="number" min="1" max="10000" value="200"></div>
+            </div>
+            <div class="opts mt-8">
+                <details data-opt="tenant"><summary>테넌트 <span class="opt-val" id="optTenant"></span></summary>
+                    <div class="mt-8 tenant5"><input id="t1" value="DEFAULT" placeholder="그룹" title="tenantLevel1 (그룹)"><input id="t2" value="DEFAULT" placeholder="계열사" title="tenantLevel2 (계열사)"><input id="t3" value="DEFAULT" placeholder="사업부" title="tenantLevel3 (사업부)"><input id="t4" value="DEFAULT" placeholder="부서" title="tenantLevel4 (부서)"><input id="t5" value="DEFAULT" placeholder="팀" title="tenantLevel5 (팀)"></div><div class="hint">그룹 · 계열사 · 사업부 · 부서 · 팀 - 소스에 단위 컬럼이 없으면 회사명으로 모두 채웁니다</div></details>
+                <details data-opt="period"><summary>기간 · 날짜 분할 <span class="opt-val" id="optPeriod"></span></summary>
+                    <div class="mt-8 f">
+                        <div class="field"><label class="check"><input type="checkbox" id="enableTimeWindow"> 기간 조건 사용</label></div>
+                        <div class="field"><label>시작일 <span class="muted">(포함)</span></label><input id="startDate" placeholder="YYYYMMDD"></div>
+                        <div class="field"><label>종료일 <span class="muted">(포함)</span></label><input id="endDate" placeholder="YYYYMMDD"></div>
+                        <div class="field"><label class="check"><input type="checkbox" id="enableDateDivision"> 날짜 분할 실행</label></div>
+                        <div class="field"><label>분할 단위 <span class="muted">(예: 1d, 2w, 1m, 1y)</span></label><input id="dateDivideUnit" placeholder="1m"></div>
+                        <div class="field"><label>구간이 실패하면</label><select id="onUnitFailure"><option value="STOP">남은 구간 멈춤 (기본)</option><option value="CONTINUE">남은 구간 계속</option></select></div>
+                        <div class="field full small muted">날짜는 소스 SQL 과 같은 YYYYMMDD(종료일 포함)로 맞춰 보냅니다. 분할 실행은 구간마다 Job 1개이고, 결과는 전체 성공 / 부분 성공 / 실패와 성공·실패·미실행 횟수로 남습니다.</div>
+                    </div></details>
+                <details id="attrDetails" data-opt="attr"><summary>추가 속성 <span class="opt-val" id="attrFilled"></span></summary>
+                    <div class="mt-6 small muted">attribute1~25. 테이블별 특화 설정으로 플러그인이 해석합니다. 값이 있는 칸만 요청에 들어갑니다.</div>
+                    <div class="mt-8 f" id="attrBox"></div>
+                    <div class="mt-8 inline"><button class="btn sm" id="attrMore" type="button">+ 속성 추가</button><span class="small muted" id="attrCount"></span></div>
+                    </details>
+                <details data-opt="cron"><summary>스케줄 <span class="opt-val" id="optCron"></span></summary>
+                    <div class="mt-8 f">
+                        <div class="field"><label>Cron (6자리, 예: 0 0 2 * * ?) · 넣으면 즉시 실행 대신 예약</label><div class="inline"><input id="cronExpression" style="flex:1"><button class="btn sm" id="cronCheck" type="button">검증</button></div><span class="small muted" id="cronResult"></span></div>
+                        <div class="field"><label>스케줄 이름</label><input id="scheduleName"></div>
+                    </div></details>
+            </div>
+            </section>
+            <section class="card step step-guard" id="guardBox" style="display:none"><div class="step-h"><span class="gf-n">4</span><h2>실행 전 확인</h2><span class="small muted">NORMAL 만 · 제품은 데이터를 지우지 않습니다</span></div>
+                    <div>
+                        <label class="check"><input type="checkbox" id="ignoreExistingData"> 기존 데이터가 있어도 적재 <span class="muted">(ignoreExistingData · 쿼리가 UPSERT·INSERT IGNORE 일 때)</span></label><br>
+                        <th:block th:if="${precheckAuto}">
+                        <label class="check"><input type="checkbox" id="skipPrecheck"> 자동 실행 전 점검 끄기 <span class="muted">(skipPrecheck)</span></label><br>
+                        <label class="check"><input type="checkbox" id="ignorePrecheckErrors"> 점검 차단 항목을 무시하고 적재 <span class="t-danger">(ignorePrecheckErrors · 권장하지 않음)</span></label>
+                        </th:block>
+                        <div class="mt-8"><b class="small">확인 순서</b> <span class="small muted">실행 버튼을 누르면 서버가 이 순서로 확인합니다 (막히면 빨간 단계)</span><div id="guardFlow" class="mt-6"></div></div>
+                        <div class="mt-4 small muted">기존 데이터가 있으면 기본은 경고 후 중단합니다. 정리는 <a href="/ui/guide?name=manual-cleanup" target="_blank">수작업 정리 안내서</a>를 따라 직접 하세요.</div>
+                    </div></section>
+            <div class="runbar" id="runBar">
+                <div class="runbar-sum" id="runSum" aria-live="polite"></div>
+                <button class="btn" id="pasteJson" type="button">JSON 붙여넣기</button>
+                <button class="btn" id="copyJson" type="button">JSON 복사</button>
+                <button class="btn" id="copyCurl" type="button">curl 복사</button>
+                <button class="btn primary" id="submit" type="button" data-write>지금 실행</button>
+            </div>
+            </form>
+        </div>
+        <div id="tabQueue" style="display:none">
+        <div class="card">
+            <div class="card-head"><h2>실행 목록 <span class="small muted">(이 브라우저가 순서대로 보냄 · 창을 닫으면 멈춤)</span></h2>
+                <div class="inline"><button class="btn primary sm" id="runQueue" data-write>목록 순서대로 실행</button><button class="btn sm" id="stopQueue" disabled>중단</button><button class="btn sm" id="clearQueue">비우기</button><button class="btn sm" id="toScenario" type="button" title="지금 목록의 플러그인·테이블·옵션을 시나리오 설계 화면으로 옮깁니다 (목록은 그대로)">이 목록을 시나리오로 설계 →</button></div></div>
+            <div class="small muted mt-8">이 브라우저가 앞 Job 이 끝나길 기다렸다 다음 요청을 보낸다 (창을 닫으면 멈춤) · 실제 이관 · 반복 실행은 <a href="/ui/scenario">시나리오 이관 실행</a> · 차이는 <a href="#" data-panel-open="help">? 도움말</a></div>
+            <div id="queue" class="mt-8"><div class="empty small">테이블을 선택하고 "+ 목록" 을 누르면 추가됩니다. 현재 폼의 모드/옵션이 항목마다 저장됩니다.</div></div>
+        </div>
+        </div>
+        </div>
+        <div class="sticky-col stack">
+        <div class="card">
+            <div class="card-head"><h2>진행 현황</h2><span class="inline"><span class="small muted" id="trackMeta"></span><button class="btn sm" id="btnRecent" type="button" title="최근 실행 (누르면 이력 상세)">최근 실행 ▾</button></span></div>
+            <div id="track"><div id="trackIdle"><div class="small muted" style="padding:2px 0 8px">실행하면 여기에 진행률과 결과가 표시됩니다 (텔레그램 알림과 같은 내용).</div></div></div>
+        </div>
+        </div>
+    </div>
+    <aside class="sp" data-panel="request" data-title="요청 JSON" data-width="560" data-more-desc="이 폼이 API 로 보내는 내용 (읽기 전용 · 폼을 바꾸면 바로 바뀜)" data-dock-label="요청 JSON" data-dock-icon="code">
+        <div class="inline" style="justify-content:space-between"><span class="small muted">API 로 보내는 내용 · 읽기 전용 · 폼을 바꾸면 바로 바뀝니다</span>
+            <span class="inline"><button class="btn sm" id="copyUrl" type="button">주소 복사</button><button class="btn sm" id="copyPreview" type="button">JSON 복사</button></span></div>
+        <div class="api-line"><span class="method">POST</span><span class="url" id="previewUrl"></span></div>
+        <div class="small muted" id="previewNote"></div>
+        <pre id="preview">{}</pre>
+    </aside>
+</main>
+<style>/* 단계형 폼: ① 대상 ② 모드 ③ 조건 ④ 실행 전 확인(NORMAL 만) + 아래 고정 실행 바. 번호 원은 공통 .gf-n */
+    form.steps{display:flex;flex-direction:column;gap:10px}
+    .step-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
+    .step-h h2{margin:0}
+    .step-h .small{margin-left:auto}
+    .step-h .gf-n{background:var(--text);color:var(--card)}
+    .step.done .gf-n{background:var(--ok)}
+    .step-guard{border-color:var(--c-fca5a5)}
+    .step-guard .gf-n{background:var(--danger)}
+    .choice.modes{grid-template-columns:repeat(4,minmax(0,1fr))}
+    @media (max-width:1280px){.choice.modes{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    .choice.modes label{position:relative;padding-top:9px;padding-bottom:9px}
+    .choice.modes label.danger{border-color:var(--c-fca5a5)}
+    .risk-tag{position:absolute;top:-8px;right:8px;font-size:10.5px;font-weight:600;line-height:16px;padding:0 6px;border-radius:4px;background:var(--danger);color:var(--card)}
+    .opts{display:flex;flex-direction:column;gap:6px}
+    .opts>details{border:1px solid var(--line);border-radius:6px;padding:6px 10px;background:var(--card)}
+    .opts>details[open]{padding-bottom:10px}
+    .opts>details>summary{color:var(--text);font-size:12.5px}
+    .opts>details.has-val{border-color:var(--primary)}
+    .opts>details.has-val>summary{font-weight:600}
+    .opt-val{margin-left:6px;font-family:var(--mono);font-size:12px;font-weight:400;color:var(--primary)}
+    .opt-val:empty{display:none}
+    .runbar{position:sticky;bottom:0;z-index:3;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 12px;background:var(--card);border:1px solid var(--line);border-radius:6px;box-shadow:0 -4px 12px var(--c-a-31-35-40-04)}
+    .runbar.normal{border-color:var(--danger);box-shadow:0 -4px 12px var(--c-a-31-35-40-04),inset 3px 0 0 var(--danger)}
+    .runbar-sum{flex:1;min-width:200px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+    .btn.danger-solid,.btn.danger-solid:hover{background:var(--danger);border-color:var(--danger);color:var(--card)}
+    .btn.danger-solid:hover{background:var(--c-a40e26)}
+</style>
+<script th:inline="javascript">
+(function () {
+  const CATALOG = /*[[${catalog}]]*/ {};
+  const IS_PRD = /*[[${isProduction}]]*/ false;
+  const PRECHECK_AUTO = /*[[${precheckAuto}]]*/ false;
+  const { get, post, esc, badge, confirmModal, toast, fmtDate, fmtMs, num, progress, $ } = UI;
+  let queueRunning = false, queueStop = false;
+  const v = (id) => $('#' + id).value.trim();
+  const checked = (id) => $('#' + id).checked;
+  const QKEY = 'ui.execute.queue';
+  const ATTR_MAX = 25, ATTR_MIN = 5;   // 서버(TableMigrationRequest)는 attribute1~25 를 받는다
+  const API_PATH = '/api/migrate/table';
+
+  // ---------- 추가 속성 칸 (처음 5칸, 필요하면 25칸까지) ----------
+  let attrShown = 0;
+  function showAttrs(n) {
+    n = Math.max(ATTR_MIN, Math.min(ATTR_MAX, n));
+    for (let i = attrShown + 1; i <= n; i++) {
+      const d = document.createElement('div'); d.className = 'field';
+      d.innerHTML = `<label>attribute${i}</label><input id="attribute${i}" maxlength="500">`;
+      $('#attrBox').appendChild(d);
+    }
+    attrShown = Math.max(attrShown, n);
+    $('#attrMore').style.display = attrShown >= ATTR_MAX ? 'none' : '';
+    $('#attrCount').textContent = `${attrShown} / ${ATTR_MAX}칸`;
+  }
+  const attrVal = (i) => { const el = $('#attribute' + i); return el ? el.value.trim() : ''; };
+  showAttrs(ATTR_MIN);
+  $('#attrMore').onclick = () => { const first = attrShown + 1; showAttrs(attrShown + 5); $('#attribute' + first).focus(); };
+
+  // ---------- 폼 ----------
+  // 테이블 이관 상태 (플러그인 코드의 TableOptions.state). 대기 · 제외는 모든 모드에서 실행할 수 없다 (서버 실행 전 확인이 막고, 화면은 미리 알린다)
+  const STATE_LABEL = { ACTIVE: '수행', HOLD: '대기', EXCLUDED: '이관 제외' };
+  let tableStates = {};
+  async function loadStates(plugin) {
+    tableStates = {};
+    if (!plugin) return;
+    try { ((await get('/api/ui/mapping-status?pluginName=' + encodeURIComponent(plugin))).tables || []).forEach(t => tableStates[t.tableName] = { state: t.state || 'ACTIVE', reason: t.stateReason }); }
+    catch (e) { /* 상태를 못 읽어도 실행 전 확인이 막는다 */ }
+  }
+  const stateOf = (t) => (tableStates[t] && tableStates[t].state) || 'ACTIVE';
+  const stateText = (t) => STATE_LABEL[stateOf(t)] + (tableStates[t] && tableStates[t].reason ? ' · ' + tableStates[t].reason : '');
+  function fillTables() {
+    const tables = CATALOG[v('pluginName')] || [];
+    $('#tableList').innerHTML = tables.map(t => `<option value="${esc(t)}"${stateOf(t) !== 'ACTIVE' ? ` label="${esc(stateText(t))} (실행 불가)"` : ''}>`).join('');
+    $('#tableCount').textContent = tables.length ? `(${tables.length}개)` : '';
+    $('#tableName').placeholder = tables.length ? '테이블명 입력/선택' : '이 플러그인의 테이블 목록을 찾지 못함, 직접 입력';
+  }
+  $('#pluginName').onchange = async () => { fillTables(); build(); await loadStates(v('pluginName')); fillTables(); build(); };
+  function build() {
+    const mode = document.querySelector('input[name=testMode]:checked').value;
+    const req = { pluginName: v('pluginName'), tableName: v('tableName'),
+      tenantLevel1: v('t1'), tenantLevel2: v('t2'), tenantLevel3: v('t3'), tenantLevel4: v('t4'), tenantLevel5: v('t5'),
+      chunkSize: Number(v('chunkSize') || 200), testMode: mode };
+    if (mode !== 'NORMAL' && v('testMaxItems')) req.testMaxItems = Number(v('testMaxItems'));
+    if (checked('enableTimeWindow')) { req.enableTimeWindow = true; if (v('startDate')) req.startDate = v('startDate'); if (v('endDate')) req.endDate = v('endDate'); }
+    if (checked('enableDateDivision')) { req.enableDateDivision = true; if (v('dateDivideUnit')) req.dateDivideUnit = v('dateDivideUnit'); req.onUnitFailure = $('#onUnitFailure').value; }
+    let filled = 0;
+    for (let i = 1; i <= ATTR_MAX; i++) if (attrVal(i)) { req['attribute' + i] = attrVal(i); filled++; }
+    const attrText = filled ? `${filled}개 입력됨` : '';
+    if (v('cronExpression')) { req.cronExpression = v('cronExpression'); req.executeImmediately = false; if (v('scheduleName')) req.scheduleName = v('scheduleName'); }
+    $('#guardBox').style.display = mode === 'NORMAL' ? '' : 'none';
+    const skipPc = !!($('#skipPrecheck') && checked('skipPrecheck'));
+    $('#guardFlow').innerHTML = UI.guardFlow({ auto: PRECHECK_AUTO, mode, skip: skipPc });
+    $('#autoPcLine').innerHTML = UI.autoPrecheckLine(UI.autoPrecheckState({ auto: PRECHECK_AUTO, mode, skip: skipPc }))
+      + (v('cronExpression') && mode === 'NORMAL' && PRECHECK_AUTO && !skipPc ? ' <span class="small">· 스케줄이면 <b>주기마다</b> 실행 직전에 점검합니다</span>' : '');
+    if (mode === 'NORMAL') {
+      if (checked('ignoreExistingData')) req.ignoreExistingData = true;
+      if ($('#skipPrecheck') && checked('skipPrecheck')) req.skipPrecheck = true;
+      if ($('#ignorePrecheckErrors') && checked('ignorePrecheckErrors')) req.ignorePrecheckErrors = true;
+    }
+    stepUi(req, mode, skipPc, attrText);
+    $('#previewUrl').textContent = location.origin + API_PATH;
+    const by = UI.executedBy.get();
+    $('#previewNote').textContent = (req.cronExpression ? 'cron 이 있어 즉시 실행하지 않고 스케줄로 등록됩니다 (executeImmediately=false) · ' : '')
+      + 'Content-Type: application/json · 실행자 헤더 X-Executed-By: ' + (by || '(비어 있음)');
+    $('#preview').textContent = JSON.stringify(req, null, 2);
+    return req;
+  }
+  /** 단계 표시 · 선택 조건 요약 · 아래 실행 바 · 실행 버튼 (NORMAL 이면 빨간 "NORMAL 실행", cron 이면 "스케줄 등록") */
+  function stepUi(req, mode, skipPc, attrText) {
+    const t = req.tableName;   // 목록에 있고 실행할 수 있는(ACTIVE) 테이블일 때만 ① 완료
+    $('#stepTarget').classList.toggle('done', !!(t && (CATALOG[req.pluginName] || []).includes(t) && stateOf(t) === 'ACTIVE'));
+    const lv = [1, 2, 3, 4, 5].map(i => req['tenantLevel' + i] || '(빈 값)');   // 단계 위치가 보이게 다섯 단계를 모두, 모두 DEFAULT 면 비움
+    const opt = (key, text) => { const el = $('#' + key); el.textContent = text; el.closest('details').classList.toggle('has-val', !!text); };
+    const period = [req.enableTimeWindow ? `${req.startDate || '…'} ~ ${req.endDate || '…'}` : '', req.enableDateDivision ? `${req.dateDivideUnit || '1m'} 분할` : ''].filter(Boolean).join(' · ');
+    opt('optTenant', lv.every(t => t === 'DEFAULT') ? '' : lv.join('.'));
+    opt('optPeriod', period);
+    opt('optCron', req.cronExpression || '');
+    opt('attrFilled', attrText);
+    const normal = mode === 'NORMAL', sb = $('#submit');
+    sb.textContent = req.cronExpression ? (normal ? 'NORMAL 스케줄 등록' : '스케줄 등록') : (normal ? 'NORMAL 실행' : '지금 실행');
+    sb.classList.toggle('primary', !normal); sb.classList.toggle('danger-solid', normal);
+    $('#runBar').classList.toggle('normal', normal);
+    const target = req.pluginName && req.tableName ? `<span class="mono">${esc(req.pluginName)} · <b>${esc(req.tableName)}</b></span>` : '<span class="muted">대상을 고르세요</span>';
+    const extra = esc(UI.requestSummary(req));   // 이력 · 실행 현황 표와 같은 요약
+    $('#runSum').innerHTML = `${target} ${badge(mode)} <span class="small muted">${extra}</span> ${UI.autoPrecheckBadge(UI.autoPrecheckState({ auto: PRECHECK_AUTO, mode, skip: skipPc }))}`;
+  }
+  function applyJson(req) {
+    const set = (id, val) => { const el = $('#' + id); if (el && val !== undefined && val !== null) el.value = val; };
+    if (req.pluginName) { $('#pluginName').value = req.pluginName; fillTables(); loadStates(req.pluginName).then(() => { fillTables(); build(); }); }
+    set('tableName', req.tableName);
+    set('t1', req.tenantLevel1); set('t2', req.tenantLevel2); set('t3', req.tenantLevel3); set('t4', req.tenantLevel4); set('t5', req.tenantLevel5);
+    set('chunkSize', req.chunkSize); set('testMaxItems', req.testMaxItems);
+    const mode = String(req.testMode || 'WRITER_TEST').toUpperCase(); const r = document.querySelector(`input[name=testMode][value="${mode}"]`); if (r) r.checked = true;
+    $('#enableTimeWindow').checked = !!req.enableTimeWindow; set('startDate', req.startDate); set('endDate', req.endDate);
+    $('#enableDateDivision').checked = !!req.enableDateDivision; set('dateDivideUnit', req.dateDivideUnit);
+    $('#onUnitFailure').value = String(req.onUnitFailure || 'STOP').toUpperCase() === 'CONTINUE' ? 'CONTINUE' : 'STOP';
+    let lastAttr = 0;
+    for (let i = 1; i <= ATTR_MAX; i++) if (req['attribute' + i] != null && req['attribute' + i] !== '') lastAttr = i;
+    showAttrs(lastAttr);
+    for (let i = 1; i <= attrShown; i++) $('#attribute' + i).value = req['attribute' + i] ?? '';
+    if (lastAttr) $('#attrDetails').open = true;
+    set('cronExpression', req.cronExpression); set('scheduleName', req.scheduleName);
+    $('#ignoreExistingData').checked = !!req.ignoreExistingData;
+    if ($('#skipPrecheck')) $('#skipPrecheck').checked = !!req.skipPrecheck;
+    if ($('#ignorePrecheckErrors')) $('#ignorePrecheckErrors').checked = !!req.ignorePrecheckErrors;
+    build(); refreshMapStatus();
+  }
+
+  // ---------- 미완 코드 현황 (빌드 시 스캔 + 최근 점검의 빠진 NOT NULL 컬럼) ----------
+  let mapTimer = null, mapLast = null;
+  const TYPE_LABEL = { SOURCE_UNDEFINED: '원천 미지정(실행 차단)', COLUMN_TODO: '컬럼 매핑 TODO', PK_TODO: 'PK TODO', SORT_KEY_TODO: '정렬키 TODO', TODO: '기타 TODO', MISSING_NOT_NULL_COLUMN: 'INSERT 에 빠진 NOT NULL 컬럼' };
+  function refreshMapStatus() {
+    clearTimeout(mapTimer);
+    mapTimer = setTimeout(async () => {
+      const plugin = v('pluginName'), table = v('tableName');
+      $('#submit').disabled = false; $('#submit').title = '';
+      if (!plugin || !table || table.includes(',') || table.includes(' ')) { $('#mapStatus').innerHTML = ''; mapLast = null; return; }
+      try {
+        const s = await get(`/api/ui/mapping-status?pluginName=${encodeURIComponent(plugin)}&tableName=${encodeURIComponent(table)}`);
+        mapLast = s;
+        if (s.state && s.state !== 'ACTIVE') {
+          const why = `${STATE_LABEL[s.state]} 테이블은 모든 모드(시험 모드 포함)에서 실행할 수 없습니다. 상태는 플러그인 코드의 TableOptions.state 로 바꿉니다`;
+          $('#submit').disabled = true; $('#submit').title = why;
+          $('#mapStatus').innerHTML = `<span class="badge ${esc(s.state)}">${esc(STATE_LABEL[s.state])}</span> ${s.stateReason ? esc(s.stateReason) + ' · ' : ''}<span class="muted">${esc(why)}</span>`
+            + (s.state === 'HOLD' && (s.incompleteCount || s.blocked) ? ` <a href="#" id="mapOpen" class="small">매핑 현황 보기</a>` : '');
+          const mo = $('#mapOpen'); if (mo) mo.onclick = (e) => { e.preventDefault(); showMapStatus(mapLast); };
+          return;
+        }
+        const cls = s.blocked ? 'BLOCKED' : (s.incompleteCount ? 'WARNING' : 'COMPLETED');
+        const label = s.blocked ? '원천 미지정 · 실행 차단' : (s.incompleteCount ? `미완 ${num(s.incompleteCount)}건` : '미완 없음');
+        $('#mapStatus').innerHTML = `<a href="#" id="mapOpen"><span class="badge ${cls}">${esc(label)}</span></a> <span class="muted">검토 완료 ${num(s.reviewedCount)}건</span>`;
+        $('#mapOpen').onclick = (e) => { e.preventDefault(); showMapStatus(mapLast); };
+      } catch (e) { $('#mapStatus').innerHTML = ''; }
+    }, 400);
+  }
+  function showMapStatus(s) {
+    if (!s) return;
+    const counts = Object.entries(s.counts || {}).map(([k, n]) => `<li>${esc(TYPE_LABEL[k] || k)} <b>${num(n)}</b>건</li>`).join('') || '<li>없음</li>';
+    const issues = (s.issues || []).slice(0, 80).map(i => `<tr><td>${esc(TYPE_LABEL[i.type] || i.type)}</td><td class="small mono">${esc(i.file)}${i.line ? ':' + i.line : ''}</td><td class="small mono" style="white-space:pre-wrap">${esc(i.text)}</td></tr>`).join('');
+    const reviewed = (s.reviewed || []).slice(0, 50).map(r => `<tr><td class="small mono">${esc(r.file)}:${r.line}</td><td class="small">${esc(r.reason)}</td></tr>`).join('');
+    UI.confirmModal(`미완 코드 · ${s.tableName}`, `<ul class="small">${counts}</ul>
+      <div class="small muted">위치는 유형별 최대 20개만 표시합니다. 검토를 마치고 그대로 두기로 한 줄에는 주석 <code>@mig-ok: 사유</code> 를 적으면 미완 집계에서 빠집니다 (다시 빌드 필요).</div>
+      ${issues ? `<div style="max-height:320px;overflow:auto;margin-top:8px"><table><tr><th>유형</th><th>위치</th><th>내용</th></tr>${issues}</table></div>` : ''}
+      ${reviewed ? `<details class="mt-8"><summary>검토 완료 (${num(s.reviewedCount)})</summary><table><tr><th>위치</th><th>사유</th></tr>${reviewed}</table></details>` : ''}`, '닫기');
+  }
+  $('#tableName').addEventListener('input', refreshMapStatus);
+  $('#pluginName').addEventListener('change', refreshMapStatus);
+
+  $('#form').addEventListener('input', build); $('#form').addEventListener('change', build);
+  $('#cronCheck').onclick = async () => {
+    try { const r = await get('/api/migrate/schedules/validate-cron?cronExpression=' + encodeURIComponent(v('cronExpression')));
+      $('#cronResult').textContent = r.valid ? '유효. 다음 실행: ' + fmtDate(r.nextExecutionTime) : '유효하지 않음: ' + (r.message || ''); }
+    catch (e) { $('#cronResult').textContent = e.message; }
+  };
+  $('#pasteJson').onclick = async () => {
+    const bg = document.createElement('div'); bg.className = 'modal-bg open';
+    bg.innerHTML = `<div class="modal"><h2>JSON 붙여넣기</h2><div class="small muted">POST /api/migrate/table 에 보내던 JSON 을 그대로 넣으면 폼에 채워집니다.</div>
+      <textarea id="jsonIn" style="width:100%;height:220px;margin-top:8px" class="mono"></textarea>
+      <div class="inline" style="justify-content:flex-end;margin-top:10px"><button class="btn" id="jc">취소</button><button class="btn primary" id="jo">적용</button></div></div>`;
+    document.body.appendChild(bg); bg.querySelector('#jsonIn').focus();
+    bg.querySelector('#jc').onclick = () => bg.remove();
+    bg.querySelector('#jo').onclick = () => { try { applyJson(JSON.parse(bg.querySelector('#jsonIn').value)); bg.remove(); toast('폼에 적용했습니다', 'ok'); } catch (e) { toast('JSON 파싱 실패: ' + e.message, 'err'); } };
+  };
+  const copy = async (text, label) => { try { await navigator.clipboard.writeText(text); toast(label + ' 복사됨', 'ok'); } catch (e) { toast('클립보드 복사 실패 (HTTPS/localhost 에서만 동작)', 'err'); } };
+  $('#copyJson').onclick = () => copy(JSON.stringify(build(), null, 2), 'JSON');
+  $('#copyPreview').onclick = () => copy(JSON.stringify(build(), null, 2), 'JSON');
+  $('#copyUrl').onclick = () => copy(location.origin + API_PATH, 'API 주소');
+  $('#copyCurl').onclick = () => { const by = UI.executedBy.get(); copy(`curl -s -X POST ${location.origin}${API_PATH} -H 'Content-Type: application/json'${by ? ` -H 'X-Executed-By: ${by}'` : ''} -d '${JSON.stringify(build())}'`, 'curl'); };
+
+  // ---------- 실행/추적 ----------
+  async function runningCount() { try { return ((await get('/api/status/running')) || []).length; } catch (e) { return 0; } }
+  let gateBusy = false;
+  async function refreshWarn() {
+    const g = await UI.gate();
+    gateBusy = !!g.busy;
+    $('#runningWarn').innerHTML = gateBusy ? `<div class="alert err">단일 실행 규칙: 다른 이관이 끝날 때까지 새 실행은 거절(409)됩니다. 실행 목록은 현재 작업이 끝나면 자동으로 다음을 제출합니다.</div>` : '';
+    if (!queueRunning) { $('#submit').disabled = gateBusy; $('#runQueue').disabled = gateBusy; }
+  }
+  function validate(req) { if (!req.pluginName || !req.tableName) { toast('플러그인과 테이블을 입력하세요', 'err'); return false; } return true; }
+  async function confirmRun(req, extraHtml) {
+    const n = (await UI.gate()).busy ? 1 : 0;
+    let html = `<table><tr><th>플러그인</th><td>${esc(req.pluginName)}</td></tr><tr><th>테이블</th><td><b>${esc(req.tableName)}</b></td></tr><tr><th>모드</th><td>${badge(req.testMode)}${req.testMaxItems ? ' 최대 ' + req.testMaxItems + '건' : ''}</td></tr><tr><th>프로파일</th><td>${esc(IS_PRD ? 'prd' : '비운영')}</td></tr>`
+      + `<tr><th>자동 점검</th><td>${UI.autoPrecheckLine(UI.autoPrecheckState({ auto: PRECHECK_AUTO, mode: req.testMode, skip: !!req.skipPrecheck }))}</td></tr></table>${extraHtml || ''}`;
+    if (req.testMode === 'NORMAL' && req.ignorePrecheckErrors) html += `<div class="mt-8 alert err"><b>점검 차단 무시(ignorePrecheckErrors)</b>를 골랐습니다. 길이 초과 · NOT NULL 위반 값이 그대로 적재될 수 있습니다. 본 이관에서는 쓰지 않는 것이 원칙입니다.</div>`;
+    if (n) html += `<div class="mt-8 alert err">다른 이관이 실행 중입니다. 지금 보내면 409 로 거절됩니다.</div>`;
+    if (req.testMode === 'NORMAL') html += `<div class="mt-8 alert err">NORMAL 은 전체 데이터를 실제로 이관합니다. 테스트가 아닙니다.</div>`;
+    if (req.cronExpression) html += `<div class="mt-8 alert info">cron 이 있어 즉시 실행하지 않고 스케줄로 등록합니다.</div>`;
+    return confirmModal('실행 확인', html, '실행', (req.testMode === 'NORMAL' && IS_PRD) ? req.tableName : null);
+  }
+  /** 제출 → {migrationId, groupId, jobExecutionId, scheduled} */
+  async function submit(req) {
+    const r = await post('/api/migrate/table', req);
+    const status = r && r.status;
+    const groupId = r && r.groupId;   // 날짜 분할 실행 (DIV-). 진행은 실행 그룹 API 로 본다
+    const scheduled = !groupId && (!!req.cronExpression || status === 'SCHEDULED' || !(r && r.jobExecutionId));   // jobExecutionId 는 즉시 실행 시 migration_jobs PK(0 이면 스케줄)
+    return { migrationId: r && r.migrationId, groupId, status, raw: r, scheduled };
+  }
+  /** 날짜 분할 실행(그룹)을 끝날 때까지 추적. 종료 시 resolve(그룹 결과를 job 모양으로) */
+  function trackDivide(req, sub, seq) {
+    $('#trackMeta').innerHTML = `<span class="mono">${esc(sub.groupId)}</span>`;
+    const draw = (d) => {
+      if (seq !== trackSeq || !d) return;
+      $('#track').innerHTML = `<div class="mb-6 small muted">날짜 분할 실행 · ${esc(req.pluginName)} <b>${esc(req.tableName)}</b> · ${esc(req.startDate || '')} ~ ${esc(req.endDate || '')} · ${esc(req.dateDivideUnit || '1m')}</div>` + UI.groupView(d, { stopButton: true });
+      UI.bindGroupStop($('#track'));
+    };
+    return UI.trackGroup(sub.groupId, draw).then(d => {
+      draw(d);
+      const g = (d && d.group) || {};
+      return d ? { status: g.status === 'COMPLETED' ? 'COMPLETED' : (g.status === 'PARTIAL' ? 'FAILED' : g.status), targetRecordCount: g.processedCount, failureCount: g.unitFailed, skippedCount: g.unitNotRun, groupId: g.groupId } : null;
+    });
+  }
+  let trackSeq = 0;   // 새 track() 이 시작되면 이전 추적은 화면 갱신을 멈춘다 (타이머는 각자 보유)
+  /** 한 작업을 끝날 때까지 추적. 종료 시 resolve(job). 스케줄 등록이면 추적하지 않고 null */
+  function track(req, sub) {
+    const seq = ++trackSeq;
+    const startedAt = Date.now();
+    if (sub.groupId) return trackDivide(req, sub, seq);
+    $('#trackMeta').innerHTML = sub.migrationId ? `<span class="mono">${esc(sub.migrationId)}</span>` : '';
+    if (sub.scheduled || !sub.migrationId) {
+      $('#track').innerHTML = `<div class="alert info">${sub.scheduled ? '스케줄로 등록되었습니다. 실행 시점에 <a href="/ui/running">실행 현황</a>과 <a href="/ui/history">이력</a>에서 확인하세요.' : '접수되었지만 migrationId 가 없어 추적할 수 없습니다.'}</div><pre>${esc(JSON.stringify(sub.raw, null, 2))}</pre>`;
+      return Promise.resolve(null);
+    }
+    return new Promise((resolve) => {
+      let lastErr = 0, busy = false, timer = null;
+      const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+      const tick = async () => {
+        if (busy) return; busy = true;
+        try {
+          const d = await get('/api/ui/jobs/' + encodeURIComponent(sub.migrationId) + '?logLimit=15');
+          lastErr = 0;
+          const jj = d.job || {};
+          let pr = null;   // 처리 속도·예상 종료 (청크 기록은 15초마다)
+          try { pr = await UI.pace({ migrationId: sub.migrationId, pluginName: req.pluginName, tableName: req.tableName,
+            tenant: [req.tenantLevel1, req.tenantLevel2, req.tenantLevel3, req.tenantLevel4, req.tenantLevel5].join('.'), testMode: req.testMode, testMaxItems: req.testMaxItems, readerTotal: d.progress && d.progress.readerTotalCount,
+            startTime: jj.startTime, elapsedMs: jj.executionTimeMs != null && d.terminal ? jj.executionTimeMs : Date.now() - startedAt, terminal: d.terminal, status: jj.status }); } catch (e) { /* 속도 표시만 생략 */ }
+          if (seq === trackSeq) render(req, sub, d, startedAt, pr);
+          if (d.terminal) { stop(); resolve(d.job); }
+        } catch (e) { if (++lastErr > 5) { if (seq === trackSeq) $('#track').innerHTML = `<div class="alert err">추적 실패: ${esc(e.message)}</div>`; stop(); resolve(null); } }
+        finally { busy = false; }
+      };
+      tick(); timer = setInterval(tick, 2000);
+    });
+  }
+  /** 실행 전 확인에서 차단된 요청 (409). 사유·기존 건수·조치 방법을 보여준다 */
+  function renderBlocked(req, data) {
+    const d = (data && data.details) || {};
+    const reasonLabel = { EXISTING_DATA: '기존 데이터', PRECHECK: '실행 전 점검', INCOMPLETE_CODE: '미완 코드', DEPRECATED_OPTION: '지원하지 않는 옵션', TABLE_EXCLUDED: '이관 제외 테이블', TABLE_ON_HOLD: '대기 테이블' }[d.blockedReason] || d.blockedReason || '-';
+    let html = `<div class="alert err"><b>⛔ 차단 (${esc(reasonLabel)})</b> ${esc(req.pluginName)} · <b>${esc(req.tableName)}</b> ${badge(req.testMode || 'NORMAL')}<br>${esc(data && data.message)}</div><table>`;
+    if (d.targetTable) html += `<tr><th>타겟</th><td class="mono">${esc(d.targetTable)}</td></tr>`;
+    if (d.existingCount) html += `<tr><th>기존 건수</th><td><b>${esc(d.existingCount)}</b></td></tr>`;
+    if (d.lastSampleRun) html += `<tr><th>마지막 샘플 실행</th><td>${esc(d.lastSampleRun)} <span class="small muted">(WRITER_TEST 적재분일 수 있음)</span></td></tr>`;
+    if (d.precheckRunId) html += `<tr><th>실행 전 점검</th><td>차단 ${num(d.precheckBlock)} · 경고 ${num(d.precheckWarn)} · <a href="/ui/precheck?runId=${encodeURIComponent(d.precheckRunId)}">결과 보기</a>${(d.precheckBlockTypes || []).length ? '<br><span class="small">' + d.precheckBlockTypes.map(esc).join(' · ') + '</span>' : ''}</td></tr>`;
+    if ((d.incompleteLocations || []).length) html += `<tr><th>위치</th><td class="small mono">${d.incompleteLocations.map(esc).join('<br>')}</td></tr>`;
+    html += '</table>';
+    const helpAnchor = { EXISTING_DATA: 'existing-data', PRECHECK: 'precheck', INCOMPLETE_CODE: 'incomplete-code', SEQUENCE_POLICY: 'sequence-policy', DEPRECATED_OPTION: 'where-to-look', TABLE_EXCLUDED: 'table-state', TABLE_ON_HOLD: 'table-state' }[d.blockedReason] || 'where-to-look';
+    if ((d.actions || []).length) html += `<div class="mt-8"><b class="small">조치 방법</b><ol class="small">${d.actions.map(a => `<li>${esc(a)}</li>`).join('')}</ol><a class="btn sm primary" href="/ui/guide?name=troubleshooting#${helpAnchor}" target="_blank">사유별 조치 안내서</a> ${d.blockedReason === 'EXISTING_DATA' ? '<a class="btn sm" href="/ui/guide?name=manual-cleanup" target="_blank">수작업 정리 안내서</a>' : ''}</div>`;
+    else html += `<div class="mt-8"><a class="btn sm" href="/ui/guide?name=troubleshooting#${helpAnchor}" target="_blank">사유별 조치 안내서</a></div>`;
+    if ((d.notices || []).length) html += `<div class="mt-6 small muted">${d.notices.map(esc).join('<br>')}</div>`;
+    html += `<details open class="mt-8"><summary class="small"><b>어느 단계에서 막혔나</b></summary><div class="mt-6">${UI.guardFlow({ auto: PRECHECK_AUTO, mode: req.testMode || 'NORMAL', skip: !!req.skipPrecheck, blocked: d.blockedReason })}</div></details>`;
+    $('#trackMeta').innerHTML = data && data.migrationId ? `<span class="mono">${esc(data.migrationId)}</span>` : '';
+    $('#track').innerHTML = html;
+  }
+  /** 완료 판정 (건수 비교·경고 사유) 행 */
+  function verdictRows(j) {
+    if (j.verdictSource == null && !j.warning) return '';
+    const skip = j.countCheck === 'SKIP';
+    let rows = `<tr><th>소스 / 필터 / 처리</th><td>${num(j.verdictSource)} / ${num(j.verdictFilter)} / <b>${num(j.verdictProcessed)}</b> ${skip ? '<span class="small muted">(건수 비교 제외 테이블)</span>' : `· 차이 <b${j.verdictDiff ? ' class="t-danger"' : ''}>${num(j.verdictDiff)}</b>`}</td></tr>`;
+    if (j.targetBefore != null || j.targetAfter != null) rows += `<tr><th>타겟 적재 전 → 후</th><td>${num(j.targetBefore)} → ${num(j.targetAfter)}</td></tr>`;
+    if (j.warning && j.warningReasons) rows += `<tr><th>경고 사유</th><td class="small kv-warn">${esc(j.warningReasons)}</td></tr>`;
+    return rows;
+  }
+  function render(req, sub, d, startedAt, pr) {
+    const j = d.job || {}, p = d.progress, st = (j.status || '').toUpperCase();
+    const elapsed = j.executionTimeMs != null && d.terminal ? j.executionTimeMs : (Date.now() - startedAt);
+    const ok = st === 'COMPLETED', failed = st === 'FAILED', mode = (req.testMode || 'NORMAL');
+    const warn = ok && j.warning, blocked = st === 'BLOCKED';
+    let head = d.terminal ? (warn ? `<div class="alert warn"><b>⚠️ 완료(경고)</b> ${esc(req.pluginName)} · <b>${esc(req.tableName)}</b> ${badge(mode)} <span class="small">건수 차이 등 확인이 필요합니다. 아래 경고 사유를 보세요.</span></div>`
+                                : ok ? `<div class="alert ok"><b>✅ 완료</b> ${esc(req.pluginName)} · <b>${esc(req.tableName)}</b> ${badge(mode)}</div>`
+                                : `<div class="alert err"><b>${blocked ? '⛔ 차단' : '❌ ' + esc(st || '실패')}</b> ${esc(req.pluginName)} · <b>${esc(req.tableName)}</b> ${badge(mode)}${blocked && j.message ? '<br>' + esc(j.message) : ''}</div>`)
+                           : `<div class="alert info"><b>⏳ ${esc(st || '접수')}</b> ${esc(req.pluginName)} · <b>${esc(req.tableName)}</b> ${badge(mode)} · 단계 ${esc(j.currentStep || '-')}${j.currentSubStep ? ' / ' + esc(j.currentSubStep) : ''}</div>`;
+    // 진행률: 처리 건수 / 예상 전체 건수 (청크 수 비율은 분모가 실행 중에 늘어 쓰지 않는다)
+    let summary = `${UI.paceBar(pr, d.terminal)}
+      <table>
+        <tr><th>상태</th><td>${UI.statusBadge(st || '-', j.warning)} <span class="small muted">실행ID ${esc(j.jobExecutionId ?? '-')}</span></td></tr>
+        <tr><th>읽기(소스)</th><td>${num(j.sourceRecordCount)}</td></tr>
+        <tr><th>적재(타겟)</th><td><b>${num(j.targetRecordCount)}</b>${mode === 'WRITER_TEST' ? ' <span class="small muted">등록자 MIG-TEST</span>' : ''}${(mode === 'READER_TEST' || mode === 'PROCESSOR_TEST') ? ' <span class="small muted">적재 없음(모드)</span>' : ''}</td></tr>
+        <tr><th>실패 / skip</th><td>${num(j.failureCount)} / ${num(j.skippedCount)}</td></tr>
+        ${d.terminal ? verdictRows(j) : ''}
+        <tr><th>소요</th><td>${fmtMs(elapsed)}${p && p.totalChunks ? ` · 청크 ${p.completedChunks}개 완료${p.processingChunks ? ', 처리 중 ' + p.processingChunks : ''}${p.failedChunks ? ', 실패 ' + p.failedChunks : ''}` : ''}</td></tr>
+        ${UI.paceRows(pr, d.terminal)}
+        <tr><th>시작 / 종료</th><td class="small">${fmtDate(j.startTime)} → ${fmtDate(j.endTime)}</td></tr>
+        ${j.message ? `<tr><th>메시지</th><td class="small">${esc(j.message)}</td></tr>` : ''}
+        ${j.errorMessage ? `<tr><th>오류</th><td class="small mono" style="color:var(--danger);white-space:pre-wrap">${esc(String(j.errorMessage).slice(0, 600))}</td></tr>` : ''}
+      </table>`;
+    let actions = '';
+    if (d.terminal) {
+      actions = `<div class="mt-8 inline">
+        <a class="btn sm" href="/ui/history?migrationId=${encodeURIComponent(sub.migrationId)}${j.jobExecutionId != null ? '&jobExecutionId=' + esc(j.jobExecutionId) : ''}">이력 상세</a>
+        <a class="btn sm" href="/api/report/jobs/${encodeURIComponent(sub.migrationId)}?format=pdf" target="_blank">결과 PDF</a>
+        <a class="btn sm" href="/api/report/jobs/${encodeURIComponent(sub.migrationId)}?format=xlsx">결과 XLSX</a>
+        ${mode === 'WRITER_TEST' && (j.targetRecordCount || 0) > 0 ? `<a class="btn sm" href="/ui/guide?name=manual-cleanup" title="제품은 데이터를 지우지 않습니다. 등록자 MIG-TEST 행은 안내서에 따라 직접 정리하세요">MIG-TEST 정리 안내</a>` : ''}
+        ${mode !== 'NORMAL' && ok ? `<button class="btn sm" id="promoteNormal" data-write ${queueRunning ? 'disabled' : ''}>같은 조건으로 NORMAL 실행</button>` : ''}
+        ${failed ? `<button class="btn sm" id="rerun" data-write ${queueRunning ? 'disabled' : ''}>다시 실행</button>` : ''}
+      </div>`;
+    }
+    const logs = (d.logs || []).slice().reverse();
+    const logHtml = logs.length ? `<details open class="mt-8"><summary>작업 로그 (${logs.length})</summary><table class="small list"><tr><th>시각</th><th>단계</th><th>메시지</th></tr>` +
+      logs.map(l => `<tr><td class="nowrap mono">${fmtDate(l.time)}</td><td>${l.level === 'ERROR' ? badge('FAILED') : ''}${esc(l.step)}${l.subStep ? '/' + esc(l.subStep) : ''}</td><td style="white-space:pre-wrap;word-break:break-all">${esc(l.message)}${l.exception ? '<br><span class="t-danger">' + esc(l.exception) + '</span>' : ''}</td></tr>`).join('') + '</table></details>' : '';
+    $('#track').innerHTML = head + summary + actions + logHtml;
+    const pn = $('#promoteNormal'); if (pn) pn.onclick = () => { const r2 = { ...req, testMode: 'NORMAL' }; delete r2.testMaxItems; applyJson(r2); runOne(r2); };
+    const rr = $('#rerun'); if (rr) rr.onclick = () => runOne(req);
+  }
+  async function runOne(req) {
+    if (!validate(req)) return null;
+    if (!await confirmRun(req)) return null;
+    $('#submit').disabled = true;
+    try {
+      const sub = await submit(req); toast(sub.scheduled ? '스케줄로 등록했습니다' : '이관 요청을 접수했습니다', 'ok'); refreshWarn();
+      return await track(req, sub);
+    } catch (e) {
+      if (e.data && e.data.status === 'BLOCKED') { renderBlocked(req, e.data); toast(e.plainMessage || e.message, 'err'); refreshWarn(); return null; }
+      $('#track').innerHTML = `<div class="alert err">요청 실패: ${esc(e.message)}</div>`; toast(e.message, 'err'); return null;
+    }
+    finally { $('#submit').disabled = false; }
+  }
+  $('#submit').onclick = () => runOne(build());
+
+  // ---------- 실행 목록 → 시나리오 설계 ----------
+  // 목록 항목의 요청을 시나리오 정의로 옮긴다. 공통 = 첫 항목의 테넌트·청크, 단계 = 플러그인·테이블 + 공통과 다른 값만
+  function queueToScenario() {
+    if (!queue.length) { toast('실행 목록이 비어 있습니다', 'err'); return; }
+    const first = queue[0].req;
+    const common = {};
+    ['tenantLevel1', 'tenantLevel2', 'tenantLevel3', 'tenantLevel4', 'tenantLevel5'].forEach(k => { if (first[k]) common[k] = first[k]; });
+    if (first.chunkSize) common.chunkSize = first.chunkSize;
+    const skip = new Set(['pluginName', 'tableName', 'testMode', 'testMaxItems', 'executedBy', 'batchId', 'cronExpression', 'scheduleName', 'executeImmediately', 'enableDateDivision', 'dateDivideUnit', 'onUnitFailure', 'startDate', 'endDate', 'enableTimeWindow']);
+    const steps = queue.map(q => {
+      const r = q.req, st = { plugin: r.pluginName, table: r.tableName }, o = {};
+      Object.keys(r).forEach(k => { if (skip.has(k) || r[k] == null || r[k] === '' || r[k] === false) return; if (common[k] !== r[k]) o[k] = r[k]; });
+      if (r.enableDateDivision && r.startDate && r.endDate) { st.divide = { unit: r.dateDivideUnit || '1m', startDate: r.startDate, endDate: r.endDate }; if (r.onUnitFailure) st.onUnitFailure = String(r.onUnitFailure).toUpperCase(); }
+      else { if (r.startDate) o.startDate = r.startDate; if (r.endDate) o.endDate = r.endDate; if (r.enableTimeWindow) o.enableTimeWindow = true; }
+      if (Object.keys(o).length) st.options = o;
+      return st;
+    });
+    const def = { name: '실행 목록에서 만든 시나리오', profiles: [], onUnitFailure: 'STOP', onStepStop: 'STOP_ALL', common, steps };
+    try { sessionStorage.setItem('ui.scenario.design', JSON.stringify(def)); } catch (e) { toast('브라우저 저장소를 쓸 수 없습니다', 'err'); return; }
+    location.href = '/ui/scenario-design?mode=new';
+  }
+  $('#toScenario').onclick = queueToScenario;
+
+  // ---------- 실행 목록 ----------
+  let queue = []; queueStop = false;
+  try { queue = JSON.parse(localStorage.getItem(QKEY) || '[]'); } catch (e) { queue = []; }
+  queue.forEach(q => { if (q.state === 'RUNNING') q.state = 'WAITING'; });   // 실행 중 새로고침한 항목은 다시 실행 가능
+  const saveQueue = () => { try { localStorage.setItem(QKEY, JSON.stringify(queue)); } catch (e) { /* ignore */ } };
+  // 탭: 실행 폼 / 실행 목록
+  function showTab(id) { document.querySelectorAll('.tabs [data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === id)); ['tabForm', 'tabQueue'].forEach(t => { $('#' + t).style.display = t === id ? '' : 'none'; }); try { localStorage.setItem('ui.execute.tab', id); } catch (e) { /* ignore */ } }
+  document.querySelectorAll('.tabs [data-tab]').forEach(b => b.onclick = () => showTab(b.dataset.tab));
+  try { const t0 = localStorage.getItem('ui.execute.tab'); if (t0 === 'tabQueue') showTab('tabQueue'); } catch (e) { /* ignore */ }
+  function renderQueue() {
+    $('#tabQueueCount').textContent = String(queue.length);
+    if (!queue.length) { $('#queue').innerHTML = '<div class="empty small">테이블을 선택하고 "+ 목록" 을 누르면 추가됩니다. 현재 폼의 모드/옵션이 항목마다 저장됩니다.</div>'; return; }
+    $('#queue').innerHTML = `<table class="list"><tr><th>#</th><th>플러그인</th><th>테이블</th><th>모드</th><th>상태</th><th>결과</th><th></th></tr>` + queue.map((q, i) => `<tr>
+      <td>${i + 1}</td><td class="small">${esc(q.req.pluginName)}</td><td><b>${esc(q.req.tableName)}</b></td><td>${badge(q.req.testMode)}${q.req.testMaxItems ? ' <span class="small">' + q.req.testMaxItems + '</span>' : ''}</td>
+      <td>${UI.statusBadge(q.state || 'WAITING', q.result && q.result.warning)}</td><td class="small wrap">${q.result ? `적재 ${num(q.result.targetRecordCount)} / 실패 ${num(q.result.failureCount)} / skip ${num(q.result.skippedCount)}${q.result.warning ? ' <span class="t-warn">경고</span>' : ''} ${q.migrationId ? `<a href="/ui/history?migrationId=${encodeURIComponent(q.migrationId)}">상세</a>` : ''}` : (q.error ? `<span class="t-danger">${esc(q.error)}</span>` : '')}</td>
+      <td><button class="btn sm" data-load="${i}" title="폼에 불러오기">폼</button> <button class="btn sm" data-del="${i}">삭제</button></td></tr>`).join('') + '</table>';
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { if (queueRunning) return; queue.splice(Number(b.dataset.del), 1); saveQueue(); renderQueue(); });
+    document.querySelectorAll('[data-load]').forEach(b => b.onclick = () => applyJson(queue[Number(b.dataset.load)].req));
+  }
+  $('#addQueue').onclick = () => {
+    const req = build(); if (!validate(req)) return;
+    const tables = v('tableName').split(/[\s,]+/).filter(Boolean);   // "a, b c" 처럼 여러 개도 허용
+    const blocked = tables.filter(t => stateOf(t) !== 'ACTIVE');
+    if (blocked.length) { toast(`실행할 수 없는 테이블입니다: ${blocked.map(t => t + ' (' + STATE_LABEL[stateOf(t)] + ')').join(', ')}`, 'err'); return; }
+    tables.forEach(t => queue.push({ req: { ...req, tableName: t }, state: 'WAITING' }));
+    saveQueue(); renderQueue(); toast(`${tables.length}건 추가 · 실행 목록 탭에서 순서대로 실행`, 'ok'); $('#tableName').value = ''; build();
+  };
+  $('#clearQueue').onclick = () => { if (queueRunning) return; queue = []; saveQueue(); renderQueue(); };
+  $('#stopQueue').onclick = () => { queueStop = true; toast('현재 작업이 끝나면 멈춥니다'); };
+  $('#runQueue').onclick = async () => {
+    const todo = queue.filter(q => q.state === 'WAITING' || q.state === 'FAILED' || q.state === 'ERROR' || q.state === 'BLOCKED');
+    if (!todo.length) { toast('실행할 항목이 없습니다 (WAITING/FAILED/BLOCKED 만 실행)', 'err'); return; }
+    const modes = [...new Set(todo.map(q => q.req.testMode))];
+    const html = `<div>${todo.length}개 테이블을 순서대로 실행합니다. 각 작업이 끝나야 다음을 제출합니다.</div>
+      <ul class="small">${todo.map(q => `<li>${esc(q.req.pluginName)} · <b>${esc(q.req.tableName)}</b> ${badge(q.req.testMode)} ${UI.autoPrecheckBadge(UI.autoPrecheckState({ auto: PRECHECK_AUTO, mode: q.req.testMode, skip: !!q.req.skipPrecheck }))}</li>`).join('')}</ul>
+      ${todo.some(q => q.req.testMode === 'NORMAL') && PRECHECK_AUTO ? '<div class="small muted">NORMAL 항목은 <b>테이블마다</b> 실행 직전에 자동 점검합니다. 차단이 나오면 그 항목에서 목록 실행이 멈춥니다.</div>' : ''}
+      ${modes.includes('NORMAL') ? '<div class="alert err">NORMAL 항목이 포함되어 있습니다. 실제 이관됩니다.</div>' : ''}`;
+    if (!await confirmModal('목록 실행', html, '실행', (modes.includes('NORMAL') && IS_PRD) ? 'NORMAL' : null)) return;
+    showTab('tabQueue');
+    queueRunning = true; queueStop = false; $('#runQueue').disabled = true; $('#stopQueue').disabled = false; $('#submit').disabled = true;
+    // 묶음 실행 ID: 테이블별 완료 알림 대신 끝날 때 요약 1회 (경고·실패·차단은 즉시 알림)
+    const batchId = 'UI-' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) + '-' + Math.random().toString(36).slice(2, 6);
+    let submitted = 0;
+    for (const q of todo) {
+      if (queueStop) break;
+      q.state = 'RUNNING'; q.error = null; q.result = null; renderQueue();
+      const req = { ...q.req, batchId };
+      try {
+        // 단일 실행 규칙: 이전 Job 종료 직후 게이트 해제까지 최대 30초 대기 후 제출
+        for (let w = 0; w < 30 && (await UI.gate()).busy; w++) { await new Promise(r => setTimeout(r, 1000)); }
+        submitted++;
+        const sub = await submit(req); q.migrationId = sub.migrationId; saveQueue();
+        const job = await track(req, sub);
+        q.result = job; q.state = job ? (String(job.status).toUpperCase() === 'COMPLETED' ? 'COMPLETED' : String(job.status).toUpperCase()) : 'UNKNOWN';
+      } catch (e) {
+        if (e.data && e.data.status === 'BLOCKED') { q.state = 'BLOCKED'; q.error = e.plainMessage || e.message; q.migrationId = e.data.migrationId; renderBlocked(req, e.data); }
+        else { q.state = 'ERROR'; q.error = e.message; }
+      }
+      saveQueue(); renderQueue();
+      // 완료(경고)·차단은 계속 진행하고 끝날 때 요약으로 모아 본다. 실패만 멈춘다 (뒤 테이블이 의존할 수 있음)
+      if (!['COMPLETED', 'UNKNOWN', 'BLOCKED'].includes(q.state)) { toast(`${q.req.tableName} ${q.state}. 목록 실행을 멈춥니다`, 'err'); break; }
+    }
+    queueRunning = false; $('#runQueue').disabled = false; $('#stopQueue').disabled = true; $('#submit').disabled = false; refreshWarn();
+    if (submitted) {
+      try {
+        const s = await post(`/api/ui/batches/${encodeURIComponent(batchId)}/finish?title=${encodeURIComponent('실행 목록 ' + submitted + '개')}`);
+        toast(`목록 실행 종료 · 완료 ${s.completed} / 경고 ${s.warnings} / 실패 ${s.failed} / 차단 ${s.blocked}`, (s.warnings + s.failed + s.blocked) ? 'err' : 'ok');
+      } catch (e) { toast('목록 실행 종료 (요약 알림 실패: ' + e.message + ')'); }
+    } else toast('목록 실행 종료');
+  };
+
+  /** 최근 실행 10건 (누르면 이력 상세) */
+  UI.popover($('#btnRecent'), { label: '최근 실행', empty: '아직 실행 기록이 없습니다', footer: '<a href="/ui/history">이력 전체 보기</a>',
+    load: async () => (await get('/api/report/jobs?limit=10') || []).map(j => ({
+      html: `<div class="inline" style="justify-content:space-between"><b class="small">${esc(j.tableName)}</b><span>${badge(j.tags || 'NORMAL')} ${UI.statusBadge(j.status, j.warning)}</span></div>
+        <div class="small muted">${esc(j.pluginName || '')} · ${UI.fmtShort(j.endTime || j.startTime)}</div>`,
+      title: '이력 상세 열기',
+      pick: () => { location.href = '/ui/history?migrationId=' + encodeURIComponent(j.migrationId); }
+    })) });
+  // ---------- 초기화 ----------
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('pluginName')) { $('#pluginName').value = qp.get('pluginName'); fillTables(); loadStates(qp.get('pluginName')).then(() => { fillTables(); build(); }); }
+  // 테이블 현황 등에서 넘긴 테넌트 "L1.L2.L3.L4.L5" → 테넌트 5칸 (비면 기존 값 유지)
+  if (qp.get('tenant')) qp.get('tenant').split('.').slice(0, 5).forEach((v, i) => { if (v) $('#t' + (i + 1)).value = v; });
+  if (qp.get('tableName')) $('#tableName').value = qp.get('tableName');
+  // 이력·실행 현황의 "이 조건으로 다시 실행" → 요청 JSON 을 폼에 채움 (실행은 사용자가 직접)
+  if (qp.get('prefill')) {
+    try {
+      const j = sessionStorage.getItem('ui.execute.prefill'); sessionStorage.removeItem('ui.execute.prefill');
+      if (j) { applyJson(JSON.parse(j)); toast('이전 실행 조건을 폼에 채웠습니다. 모드를 확인하고 실행하세요', 'ok'); }
+    } catch (e) { toast('이전 실행 조건을 읽지 못했습니다: ' + e.message, 'err'); }
+    history.replaceState(null, '', location.pathname);
+  }
+  build(); renderQueue(); refreshWarn(); refreshMapStatus(); setInterval(refreshWarn, 10000);
+  if (qp.get('migrationId')) {   // 결과 다시 보기 딥링크
+    const mid = qp.get('migrationId');
+    get('/api/ui/jobs/' + encodeURIComponent(mid)).then(d => { const j = d.job || {};
+      track({ pluginName: j.pluginName || qp.get('pluginName') || '', tableName: j.tableName || qp.get('tableName') || '', testMode: qp.get('testMode') || 'NORMAL' }, { migrationId: mid, scheduled: false, raw: null });
+    }).catch(e => toast(e.message, 'err'));
+  }
+})();
+</script>
+</body>
+</html>

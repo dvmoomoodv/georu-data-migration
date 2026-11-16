@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_faq : 자주 묻는 질문 ← ASIS(Oracle) NTC_FAQ
+     이관 상태: 수행 - DemoNoticePlugin -->
+<mapper namespace="georu.demo.notice.TbFaqSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."NTC_FAQ" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbFaqSourceDto">
+        SELECT
+              A."FAQ_ID" AS "FAQ_ID"    <!-- FAQ ID INT -->
+            , A."CATEGORY_CD" AS "CATEGORY_CD"    <!-- 분류 VARCHAR(20) -->
+            , A."QUESTION" AS "QUESTION"    <!-- 질문 VARCHAR(500) -->
+            , A."ANSWER" AS "ANSWER"    <!-- 답변 VARCHAR(2000) TODO ← HTML 태그 제거 여부 · @mig-ok: TOBE 에디터가 HTML 그대로 표시 (2026-11-03 확인) -->
+            , A."SORT_NO" AS "SORT_NO"    <!-- 정렬순서 INT -->
+            , DECODE(A."USE_YN", 'Y', '1', '0') AS "USE_YN"    <!-- 사용여부 1/0 CHAR(1) -->
+            , A."REG_ID" AS "INUSERID"    <!-- 등록자 -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 -->
+            , A."MOD_ID" AS "LUSERID"    <!-- 수정자 -->
+            , TO_CHAR(A."MOD_DATE", 'YYYYMMDDHH24MISS') AS "LDATE"    <!-- 수정일시 -->
+          FROM "DEMO"."NTC_FAQ" A
+        <include refid="where"/>
+         ORDER BY A."FAQ_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

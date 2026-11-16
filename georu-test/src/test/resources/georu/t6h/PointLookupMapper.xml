@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="georu.t6h.PointLookupMapper">
+  <select id="selectByKeys" resultType="map">SELECT MEMBER_ID, PT FROM POINT WHERE MEMBER_ID IN
+    <foreach collection="keys" item="k" open="(" separator="," close=")">#{k}</foreach></select>
+</mapper>

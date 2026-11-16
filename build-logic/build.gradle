@@ -1,0 +1,10 @@
+// 공통 빌드 규칙 (precompiled script plugin): georu.java-library, georu.boot-app
+plugins {
+    id 'groovy-gradle-plugin'
+}
+
+dependencies {
+    // spring-boot 는 spring-boot-admin 과 접두어가 겹쳐 그룹 접근자가 되므로 asProvider() 로 읽는다
+    implementation "org.springframework.boot:spring-boot-gradle-plugin:${libs.versions.spring.boot.asProvider().get()}"
+    implementation "io.spring.gradle:dependency-management-plugin:${libs.versions.spring.dependency.management.get()}"
+}

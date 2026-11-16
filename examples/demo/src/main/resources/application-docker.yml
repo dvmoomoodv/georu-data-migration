@@ -1,0 +1,126 @@
+# =============================================================================
+# docker 프로파일 - 로컬 개발 (docker compose 의 oracle / mysql 컨테이너)
+#   호스트(IDE/gradle) 실행 : 기본값 localhost + compose 포트 매핑 (docker/.env)
+#   컨테이너(app) 실행      : compose 가 SOURCE_DB_URL(@//oracle), TARGET_DB_HOST=mysql 등 환경변수 주입
+#   운영저장소              : 내장 H2 파일 (./data/operation, 컨테이너는 /app/data 볼륨)
+#                             DB_CLOSE_ON_EXIT=FALSE: H2 자체 종료 훅이 먼저 DB 를 닫지 않게 한다 (종료 시 Job 상태 정리를 위해. MigrationShutdownHandler)
+#                             AUTO_SERVER 는 쓰지 않는다 (H2 가 DB_CLOSE_ON_EXIT=FALSE 와 함께 허용하지 않음). 앱 실행 중 외부 툴은
+#                             georu.operation.h2-tcp 의 고정 포트 TCP 서버로 접속한다 (jdbc:h2:tcp://localhost:9092/...)
+#   로컬 전용이므로 비밀번호 기본값 허용
+# =============================================================================
+spring:
+  thymeleaf:
+    cache: false                    # 운영 UI 템플릿 즉시 반영
+
+georu:
+  datasource:
+    operation:
+      hikari:
+        jdbc-url: ${OPERATION_DB_URL:jdbc:h2:file:./data/operation/migops;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_ON_EXIT=FALSE}
+        username: ${OPERATION_DB_USERNAME:sa}
+        password: ${OPERATION_DB_PASSWORD:}
+    source-m:
+      hikari:
+        jdbc-url: ${SOURCE_DB_URL:jdbc:oracle:thin:@//localhost:1523/FREEPDB1}   # gvenzl/oracle-free 기본 PDB
+        username: ${SOURCE_DB_USERNAME:migrator}                                  # 앱 접속 계정 (DEMO 스키마 SELECT 권한)
+        password: ${SOURCE_DB_PASSWORD:migrator}
+        maximum-pool-size: 4                                                        # J(1)×2+2
+        minimum-idle: 1
+        leak-detection-threshold: 120000
+    target-m:
+      hikari:
+        jdbc-url: jdbc:mysql://${TARGET_DB_HOST:localhost}:${TARGET_DB_PORT:3308}/${TARGET_DB_NAME:demo_tobe}
+        username: ${TARGET_DB_USERNAME:root}
+        password: ${TARGET_DB_PASSWORD:password}
+        maximum-pool-size: 8                                                        # J(1)×W(4)+2 = 6, 여유 포함
+        minimum-idle: 2
+        leak-detection-threshold: 120000
+    source-1:                            # 여러 DB 예제: 같은 Oracle 의 지사 계정 DEMO_BR
+      enabled: true
+      hikari:
+        jdbc-url: ${SOURCE1_DB_URL:${SOURCE_DB_URL:jdbc:oracle:thin:@//localhost:1523/FREEPDB1}}
+        username: ${SOURCE1_DB_USERNAME:DEMO_BR}
+        password: ${SOURCE1_DB_PASSWORD:demo}
+        maximum-pool-size: 3
+        minimum-idle: 1
+    target-1:                            # 여러 DB 예제: 같은 MySQL 의 분석 DB demo_dw
+      enabled: true
+      hikari:
+        jdbc-url: jdbc:mysql://${TARGET_DB_HOST:localhost}:${TARGET_DB_PORT:3308}/${TARGET1_DB_NAME:demo_dw}
+        username: ${TARGET_DB_USERNAME:root}
+        password: ${TARGET_DB_PASSWORD:password}
+        maximum-pool-size: 6
+        minimum-idle: 1
+    # ---- 여러 DB 예제 demo.xdb: 소스 3대(source-m Oracle · source-2 PostgreSQL · source-3 SQL Server), 타겟 2대(target-m · target-1 MySQL, target-2 MariaDB)
+    #      DEMO_XDB_ENABLED=true 일 때만 만든다 (./run-scripts/run-docker.sh xdb). 드라이버는 build.gradle
+    source-2:                            # PostgreSQL 쇼핑몰 DB demo_pg
+      enabled: ${DEMO_XDB_ENABLED:false}
+      hikari:
+        jdbc-url: ${SOURCE2_DB_URL:jdbc:postgresql://localhost:5434/demo_pg}
+        username: ${SOURCE2_DB_USERNAME:demo}
+        password: ${SOURCE2_DB_PASSWORD:demo}
+        read-only: true
+        maximum-pool-size: 3
+        minimum-idle: 1
+    source-3:                            # SQL Server 물류 DB demo_ms (읽기 전용 계정 migrator)
+      enabled: ${DEMO_XDB_ENABLED:false}
+      hikari:
+        jdbc-url: ${SOURCE3_DB_URL:jdbc:sqlserver://localhost:1434;databaseName=demo_ms;encrypt=false}
+        username: ${SOURCE3_DB_USERNAME:migrator}
+        password: ${SOURCE3_DB_PASSWORD:Migrator!2026}
+        read-only: true
+        maximum-pool-size: 3
+        minimum-idle: 1
+    target-2:                            # MariaDB 통합 DB demo_mart
+      enabled: ${DEMO_XDB_ENABLED:false}
+      hikari:
+        jdbc-url: ${TARGET2_DB_URL:jdbc:mariadb://localhost:3309/demo_mart}
+        username: ${TARGET2_DB_USERNAME:root}
+        password: ${TARGET2_DB_PASSWORD:password}
+        maximum-pool-size: 6
+        minimum-idle: 1
+      sequence:                          # 채번은 자기 DB 의 관리 테이블 (공통값 demo_tobe.tb_sequence 는 MySQL 에 있다)
+        table: demo_mart.tb_sequence
+
+  plugins:
+    demo:
+      enabled: true                      # 데모 플러그인 (DEMO→demo_tobe). source-m + target-m 필요
+      multi:
+        enabled: true                    # 여러 DB 예제 (source-1 지사 DB, target-1 분석 DB)
+      xdb:
+        enabled: ${DEMO_XDB_ENABLED:false}   # 여러 DB 예제 5대 (source-2 PostgreSQL · source-3 SQL Server · target-2 MariaDB)
+  log:
+    level: DEBUG
+    sql-level: DEBUG
+    root-level: INFO
+  operation:
+    schema-init: auto
+    h2-tcp:
+      enabled: ${OPERATION_H2_TCP_ENABLED:true}   # DBeaver: jdbc:h2:tcp://localhost:9093//app/data/operation/migops (컨테이너, 호스트 포트 H2_TCP_PORT) 또는 ./data/operation/migops (호스트 실행)
+      port: ${OPERATION_H2_TCP_PORT:9092}
+      allow-others: ${OPERATION_H2_TCP_ALLOW_OTHERS:false}   # 호스트 실행은 false(로컬만). 컨테이너는 compose 가 true
+  batch:
+    executor:
+      core-pool-size: 1
+      max-pool-size: 1
+    queue:
+      writer-thread-count: 4
+
+  notification:
+    telegram:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,logfile,threaddump,env,loggers,scheduledtasks,mappings,beans,configprops,conditions   # heapdump 는 제외. 서버 진단 화면(/admin)의 기능 범위
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true

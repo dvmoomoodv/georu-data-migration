@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_post_comment : 게시글댓글 (업무 03 게시판) / 자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.board.TbPostCommentTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbPostCommentTargetDto">
+        INSERT INTO `demo_tobe`.`tb_post_comment` (
+              `COMMENT_ID`    <!-- BIGINT 댓글ID -->
+            , `POST_ID`    <!-- BIGINT 게시글ID -->
+            , `PARENT_ID`    <!-- BIGINT 부모댓글ID -->
+            , `WRITER_ID`    <!-- INT 작성자 -->
+            , `CONTENT`    <!-- VARCHAR(2000) 내용 -->
+            , `DEPTH`    <!-- TINYINT 깊이 -->
+            , `STATUS`    <!-- VARCHAR(10) 상태 -->
+            , `INUSERID`    <!-- VARCHAR(40) 등록자 -->
+            , `INDATE`    <!-- VARCHAR(14) 등록일시 -->
+            , `LUSERID`    <!-- VARCHAR(40) 수정자 -->
+            , `LDATE`    <!-- VARCHAR(14) 수정일시 -->
+        ) VALUES (
+              #{commentId}
+            , #{postId}
+            , #{parentId}
+            , #{writerId}
+            , #{content}
+            , #{depth}
+            , #{status}
+            , #{inuserid}
+            , #{indate}
+            , #{luserid}
+            , #{ldate}
+        )
+        <!-- PK 있음. 재실행은 제품 정책상 "기존 데이터 있으면 경고 후 중단" → 데모 리셋 SQL(21_demo_tobe_reset.sql) 후 재실행 -->
+    </insert>
+
+</mapper>

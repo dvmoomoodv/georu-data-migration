@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Source] 2:2 2단계 적재: 운영 DB(target-m) 의 합치기 결과를 다시 읽는다 (TableDef.source("target-m")). MySQL 문법 -->
+<mapper namespace="georu.demo.multi.TbMemberAllSourceMapper">
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*) FROM stg_member_all
+    </select>
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto" resultType="com.georu.examples.demo.multi.dto.StgMemberAllDto">
+        SELECT SRC_CD, MEMBER_ID, LOGIN_ID, MEMBER_NM, EMAIL, PHONE, GRADE_CD, STATUS, JOIN_DATE
+          FROM stg_member_all
+         ORDER BY SRC_CD, MEMBER_ID
+         LIMIT #{_pagesize} OFFSET #{_skiprows}
+    </select>
+</mapper>

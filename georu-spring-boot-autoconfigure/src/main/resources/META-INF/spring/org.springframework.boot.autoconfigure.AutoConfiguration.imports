@@ -1,0 +1,3 @@
+com.georu.autoconfigure.GeoruCoreAutoConfiguration
+com.georu.autoconfigure.GeoruApiAutoConfiguration
+com.georu.autoconfigure.GeoruUiAutoConfiguration

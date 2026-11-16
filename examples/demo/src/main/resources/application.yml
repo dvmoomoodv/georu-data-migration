@@ -1,0 +1,482 @@
+# =============================================================================
+# georu 데모 앱 공통 설정 (Spring Boot 3.2 / Spring Batch 5 / MyBatis 다중 DataSource)
+#
+# 프로파일: docker | dev | prd  (application-{profile}.yml)
+#   - 이 파일에는 환경에 따라 달라지지 않는 것만 둔다. 호스트·포트·계정·비밀번호는 프로파일 yml.
+#   - 프로파일 yml 은 값만 덮어쓴다. 키 구조는 이 파일 한 곳에서 정의한다.
+#   - spring.profiles.active 는 실행 측(compose 환경변수, systemd, IDE)이 지정한다. 미지정 시 docker.
+# 설계 문서: document/docs/APPLICATION-YML-RESTRUCTURE-PLAN.md
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# YAML 앵커 (공통값 1회 정의). Spring 바인딩 대상이 아니며 아래에서 <<: / * 로 참조한다.
+# -----------------------------------------------------------------------------
+x-hikari-common: &hikari-common
+  connection-timeout: 30000              # 풀에서 커넥션 획득 대기(ms). 풀 크기를 맞추면 30s 로 충분
+  validation-timeout: 5000
+  idle-timeout: 600000                   # 10분
+  max-lifetime: 1800000                  # 30분 (DB wait_timeout 보다 짧게)
+  keepalive-time: 300000                 # 5분. 장시간 Job 중 유휴 커넥션 끊김 방지 (max-lifetime 보다 짧게)
+  initialization-fail-timeout: -1        # 풀 생성 시 접속 시도 안 함 → 미기동 DB 가 있어도 기동·health 지연 없음
+  transaction-isolation: TRANSACTION_READ_COMMITTED
+  register-mbeans: true                  # actuator hikaricp.* 메트릭
+  # connection-test-query 는 쓰지 않음 (JDBC4 isValid 사용, Hikari 권장)
+  # leak-detection-threshold 는 docker/dev 프로파일에서만
+
+x-mybatis-common: &mybatis-common
+  map-underscore-to-camel-case: true
+  call-setters-on-nulls: true
+  cache-enabled: false                   # 2차 캐시 미사용 (매퍼에 <cache/> 없음)
+  lazy-loading-enabled: false
+  aggressive-lazy-loading: false
+  default-fetch-size: 1000               # Oracle defaultRowPrefetch 와 동일 유지
+  default-statement-timeout: 3600        # 초. 대량 페이징·COUNT 고려
+  safe-row-bounds-enabled: true
+  local-cache-scope: STATEMENT
+  # jdbc-type-for-null 은 MyBatisFactoryHelper 가 JdbcType.NULL 로 고정
+
+server:
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+
+spring:
+  application:
+    name: georu-demo                     # 서버 진단 화면·지표의 앱 이름
+  profiles:
+    default: docker                      # 프로파일 미지정 시 로컬(docker). 운영은 반드시 SPRING_PROFILES_ACTIVE=prd
+
+
+  servlet:
+    multipart:                           # 엑셀 이관 업로드 (/api/excel-load/files). Boot 기본 1MB 는 너무 작다
+      max-file-size: 50MB
+      max-request-size: 55MB
+
+  # Reader/Writer 의 @BeforeStep 리스너 등록 시 JDK Proxy 클래스로더 문제 회피
+  aop:
+    proxy-target-class: true
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  # 운영 UI 정적 파일(ui.js·ui.css) 내용 해시 버전 - Thymeleaf @{/ui-assets/..} 링크에 해시가 붙어 배포 후 옛 파일을 쓰지 않는다
+  web:
+    resources:
+      chain:
+        strategy:
+          content:
+            enabled: true
+            paths: /ui-assets/**
+
+  # 서버 진단 화면 (Spring Boot Admin) - AdminConsoleConfig. 켜고 끄기는 georu.admin-console.enabled 하나로 한다
+  #   앱 안의 SBA 서버(/admin)에 SBA 클라이언트가 자기 자신을 등록한다. 보이는 기능 = 프로파일의 management 노출 목록
+  boot:
+    admin:
+      context-path: /admin
+      server:
+        enabled: ${georu.admin-console.enabled}
+      client:
+        enabled: ${georu.admin-console.enabled}
+        url: http://localhost:${server.port}/admin
+        period: 30000                    # 자기 등록 갱신 주기(ms)
+        instance:
+          name: ${spring.application.name}
+          service-base-url: http://localhost:${server.port}   # 상태 조회는 같은 컨테이너 안에서
+      monitor:
+        status-interval: 30s             # 상태 조회 주기. 기본 10초보다 느리게
+      notify:
+        mail:
+          enabled: false                 # SBA 자체 알림 끔 (내장형은 앱 다운을 알릴 수 없고 기존 알림과 겹침)
+      ui:
+        title: ${spring.application.name} 서버 진단
+        brand: "<span>${spring.application.name} 서버 진단</span>"
+
+  batch:
+    job:
+      enabled: false                     # CommandLineRunner 비활성 (REST API 로 Job 실행)
+    jdbc:
+      initialize-schema: never           # BATCH_* 는 OperationSchemaInitializer(georu.operation.schema-init) 가 벤더별 DDL 로 생성
+
+
+# =============================================================================
+# 애플리케이션 설정 (georu.*) - 옛 이름 app.* · migration.* · notification.* 도 0.x 동안 읽고 경고 (LegacyPropertyKeysPostProcessor)
+# =============================================================================
+georu:
+  # ---------------------------------------------------------------------------
+  # DataSource - georu.datasource.<이름>. 여기는 벤더별 풀 특성만, 접속정보(jdbc-url/username/password/풀 크기)는 프로파일 yml.
+  #   operation : 운영저장소 (@Primary) - Spring Batch 메타 + 이관 상태  (OperationMapperConfig)
+  #   source-m  : 기본 소스, 읽기 전용                                 (GeoruDataSourceRegistrar)
+  #   target-m  : 기본 타겟, 멀티스레드 배치 Insert                       (GeoruDataSourceRegistrar)
+  #   더 붙이면 source-1·target-1 … (이름 앞부분이 역할, DB 종류는 JDBC URL 로 판단)
+  # ---------------------------------------------------------------------------
+  #   토글: georu.datasource.<이름>.enabled (설정이 있으면 기본 true). 플러그인 토글(georu.plugins.*)과 AND (@ConditionalOnDataSource).
+  #   켜진 플러그인의 @GeoruPlugin(source, target) DataSource 가 없으면 DataSourceTopologyValidator 가 기동 시 실패시킨다
+  #   mybatis: 이 DataSource 의 SqlSessionFactory 설정 (매퍼 XML 위치는 엔진이 역할로 정한다. mapper-locations 로 바꿀 수 있음)
+  datasource:
+    operation:
+      enabled: true                      # 비활성 불가 (운영저장소)
+      hikari:
+        <<: *hikari-common
+        pool-name: ops-pool
+        auto-commit: true
+        maximum-pool-size: 5
+        minimum-idle: 1
+      mybatis:                          # 운영저장소 매퍼 - SQL 은 H2(MODE=MySQL)·MySQL 공통 문법 유지
+        type-aliases-package: com.georu.common.dto
+        configuration: *mybatis-common
+
+    source-m:
+      enabled: true                      # false 면 이 DataSource·매퍼·TX·health 지표를 만들지 않는다
+      hikari:
+        <<: *hikari-common
+        pool-name: source-oracle-pool
+        driver-class-name: oracle.jdbc.OracleDriver
+        read-only: true
+        auto-commit: false
+        data-source-properties:
+          oracle.jdbc.defaultRowPrefetch: 1000
+          oracle.net.CONNECT_TIMEOUT: 30000
+          oracle.jdbc.ReadTimeout: 3600000
+      mybatis:                          # 소스
+        type-aliases-package: com.georu.common.dto
+        configuration: *mybatis-common
+
+    target-m:
+      enabled: true                      # false 면 이 타겟을 쓰는 플러그인을 모두 꺼야 기동한다
+      # sequence:                        # 채번 위치 (생략하면 이 DB 의 georu.sequence.table). core/sequence/README.md 4-1, guides/sequence.md "채번 위치"
+      #   datasource: sequence-m         # 다른 타겟(target-m) 이나 채번 전용 DB(sequence-*)
+      #   table: ...                     # 이 DB 가 채번 DB 일 때 관리 테이블 이름이 공통값(georu.sequence.table)과 다르면. 살아 있는 예는 아래 target-1
+      #   key-prefix: DW.
+      hikari:
+        <<: *hikari-common
+        pool-name: target-mysql-pool
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        auto-commit: false
+        data-source-properties:          # URL 파라미터와 중복 지정 금지 - 여기 한 곳만
+          useSSL: false
+          serverTimezone: Asia/Seoul
+          allowPublicKeyRetrieval: true
+          characterEncoding: UTF-8
+          rewriteBatchedStatements: true # 묶음 INSERT. 클라이언트 prepared 에서만 동작
+          useServerPrepStmts: false      # rewriteBatchedStatements 와 함께 쓰려면 false
+          cachePrepStmts: true
+          prepStmtCacheSize: 250
+          prepStmtCacheSqlLimit: 2048
+          cacheResultSetMetadata: true
+          cacheServerConfiguration: true
+          elideSetAutoCommits: true
+          maintainTimeStats: false
+      mybatis:                          # 타겟
+        type-aliases-package: com.georu.common.dto
+        configuration: *mybatis-common
+
+    # 여러 DB 예제(demo.multi)용. 접속 정보는 docker 프로파일에만 있고 그 프로파일에서만 켠다 (guides/demo.md "여러 DB")
+    source-1:                            # 지사 DB (Oracle DEMO_BR 계정)
+      enabled: false
+      hikari:
+        <<: *hikari-common
+        pool-name: source1-oracle-pool
+        driver-class-name: oracle.jdbc.OracleDriver
+        read-only: true
+        auto-commit: false
+        data-source-properties:
+          oracle.jdbc.defaultRowPrefetch: 1000
+      mybatis:
+        configuration: *mybatis-common
+
+    # sequence-m:                        # 채번 전용 DB 를 둘 때의 예 (데모에는 없음). 타겟 쪽에 sequence.datasource: sequence-m
+    #   hikari: { jdbc-url: ..., username: ..., password: ... }
+    #   sequence:                        # 이 DB 의 관리 테이블 · 열 이름 (없는 값은 georu.sequence.* 공통값)
+    #     table: SEQ_MASTER
+    #     table-name-column: TBL_NM
+    #     column-name-column: COL_NM
+    #     value-column: CUR_VAL
+
+    target-1:                            # 분석 DB (MySQL demo_dw)
+      enabled: false
+      sequence:                          # 이 DB 자체의 관리 테이블. 이름·열이 target-m(demo_tobe.tb_sequence: TABLES/COL/SEQ)과 다른 경우의 예 (demo.multi 의 tb_br_member → BR_MEMBER_SEQ)
+        table: demo_dw.seq_master        # 적지 않은 값(key-case 등)은 georu.sequence.* 공통값
+        table-name-column: TBL_NM
+        column-name-column: COL_NM
+        value-column: CUR_VAL
+        # datasource: target-m           # 대신 target-m 의 tb_sequence 를 같이 쓰려면 위 네 줄 대신 이 두 줄 (관리행 키 DW.TB_BR_MEMBER)
+        # key-prefix: DW.
+      hikari:
+        <<: *hikari-common
+        pool-name: target1-mysql-pool
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        auto-commit: false
+        data-source-properties:
+          useSSL: false
+          serverTimezone: Asia/Seoul
+          allowPublicKeyRetrieval: true
+          characterEncoding: UTF-8
+          rewriteBatchedStatements: true
+          useServerPrepStmts: false
+      mybatis:
+        configuration: *mybatis-common
+
+  # 고객사 이름 - UI 좌상단·탭 제목에 "Georu for <이름>". 없으면 "Georu for dvmoomoodv" (데모는 기본값 그대로)
+  # customer:
+  #   name: acme
+
+  # 플러그인 토글 - false 면 @GeoruPlugin(name) 이 그 이름(또는 첫 마디)인 플러그인을 등록하지 않는다(GeoruPluginRegistrar).
+  # 해당 플러그인 전용 DataSource/매퍼/health 지표(@ConditionalOnProperty)도 생성되지 않는다. 미지정 = true
+  plugins:
+    demo:
+      enabled: true                      # 데모 플러그인 (사내 포털 예제: DEMO(Oracle) → demo_tobe(MySQL)). prd 는 false
+      multi:
+        enabled: false                   # 여러 DB 예제 (source-1·target-1 필요). docker 프로파일에서 켠다
+
+  # 보고서 비동기 zip 내보내기 (ReportExportService) - 파일 보관 위치와 보존 시간
+  report:
+    export-dir: ${APP_EXPORT_DIR:./data/exports}      # 컨테이너는 /app/data/exports (볼륨)
+    export-retention-hours: 72
+    export-max-jobs: 5000
+
+  # 엑셀 이관 (core/excel) - 업로드한 엑셀(TOBE 컬럼 형식)을 테이블 이관 파이프라인(source=EXCEL)으로 적재
+  #   파일은 dir 아래 pending/processing/completed/failed 폴더로 옮겨 가며 관리하고, 대장은 운영 저장소 migration_excel_file (V7)
+  #   업로드 크기 상한은 spring.servlet.multipart.max-file-size. 화면 /ui/excel, API /api/excel-load. document/docs/EXCEL-LOAD-GUIDE.md
+  excel:
+    dir: ${APP_EXCEL_DIR:./data/excel}                 # 컨테이너는 /app/data/excel (data 볼륨)
+    preview-rows: 20                                   # 미리보기 행 수 상한
+    max-issues: 2000                                   # 검증·실행 오류 목록 보관 상한 (행 단위)
+    allowed-extensions: xlsx,csv                       # xls(HSSF) 는 받지 않는다
+    # 크기 제한. xlsx 는 POI 가 워크북 전체를 메모리에 올리고 -XX:+ExitOnOutOfMemoryError 라 큰 파일 하나로 앱이 종료될 수 있다.
+    #   업로드 직후 첫 시트의 셀 수(헤더 포함)를 메모리를 거의 쓰지 않고 세어, 상한을 넘으면 받지 않고 행 범위로 나눠 올리도록 안내한다.
+    #   기본값은 힙 약 2GB(컨테이너 3GB × 70%) 기준 추정값이다. 운영 힙에 맞춰 조정한다. CSV 는 한 줄씩 읽어 메모리 제한이 아니다.
+    xlsx-max-cells: 500000                             # 넘으면 업로드 거부 (EXCEL_TOO_LARGE + 분할 안내)
+    xlsx-recommended-cells: 200000                     # 넘으면 경고. 분할 안내의 파일당 행 수 = 이 값 ÷ 열 수
+    csv-max-rows: 0                                    # 0 = 제한 없음 (업로드 상한만 적용)
+
+  # 헬스 모니터 (HealthMonitorService, 1시간 주기) - DB 연속 실패 N회부터 1회 알림, 복구 시 1회 알림
+  monitor:
+    db-failure-alert-threshold: 3
+
+  # 시스템 지표 이력 (SystemMetricsHistoryService) - 운영 저장소 migration_system_metrics. 시스템 화면·대시보드 그래프
+  metrics-history:
+    enabled: true
+    interval-ms: 300000                  # 5분마다 1행
+    retention-days: 7                    # 그래프 조회 범위·수동 정리 기본 일수. 자동으로 지우지 않음 (정리: 시스템 화면 "운영 기록 정리")
+
+  # 실행 전 점검 (PreRunGuardService) - NORMAL 실행 직전 소스 샘플을 변환해 타겟 컬럼 정의와 대조, 차단 항목이 있으면 쓰기 전에 멈춘다
+  #   기본 켜짐: 개발 · 검증(반복 실행에서 오류를 일찍 잡는다) · 리허설 · 본 이관 · 증분 모두 켜 둔다.
+  #   예외는 실행마다 skipPrecheck=true (같은 빌드로 당일 수동 점검을 통과한 아주 큰 테이블 등). ignorePrecheckErrors 는 본 이관에서 쓰지 않는다.
+  #   점검 API(/api/precheck)와 화면(/ui/precheck, 메뉴 점검·관리 › 실행 전 점검)은 이 설정과 관계없이 쓸 수 있다.
+  precheck:
+    auto-enabled: true
+
+  # 시나리오 이관 진행 알림 (ProductNotifier). 시작 1회 + 단계마다 1회 (날짜 분할 단계도 단계당 1회). 끝의 묶음 요약은 별개로 항상 보낸다
+  #   청크·구간 단위 알림은 묶음 실행 중 보내지 않는다. 단계가 많은 시나리오에서 메시지가 많으면 false
+  product:
+    notice:
+      scenario-step: true
+
+  # 서버 진단 화면 (Spring Boot Admin, /admin) - AdminConsoleConfig. 운영 UI 메뉴 "도구 › 서버 진단" 도 이 값으로 표시한다
+  #   false 면 SBA 서버·클라이언트·메뉴가 모두 없다(/admin 404). 바꾸면 재기동. 환경변수 APP_ADMIN_CONSOLE_ENABLED
+  admin-console:
+    enabled: ${APP_ADMIN_CONSOLE_ENABLED:true}
+
+  # 로그 레벨 3단. logging.level 과 (2단계부터) logback-spring.xml 이 참조. 환경변수 GEORU_LOG_LEVEL / GEORU_LOG_SQL_LEVEL / GEORU_LOG_ROOT_LEVEL
+  log:
+    level: INFO                          # com.georu
+    sql-level: INFO                      # MyBatis / JDBC SQL 로거
+    root-level: INFO
+    retention:                           # LogRetentionPolicy
+      enabled: true
+      cleanup-schedule: "0 0 2 * * ?"
+      batch-size: 1000
+      timeout-minutes: 30
+
+  # 운영저장소 (georu.datasource.operation) - OperationSchemaInitializer
+  operation:
+    schema-init: auto                    # auto: 테이블 없으면 생성 / never: DBA 관리 (prd)
+    chunk-tracking:
+      enabled: true                      # false: migration_chunk_status·청크 로그 DB 기록 생략
+    h2-tcp:                              # OperationH2TcpServerConfig - 외부 툴(DBeaver)용 고정 포트 H2 TCP 서버. 로컬(docker 프로파일)만 켠다
+      enabled: false
+      port: 9092
+      allow-others: false                # true: 다른 호스트 접속 허용 (컨테이너 포트 매핑에 필요)
+
+  # 스마트 재시도 - SmartRetryConfig (prefix georu.retry)
+  retry:
+    enabled: true
+    default-max-attempts: 3
+    default-delay-ms: 1000
+    default-backoff-multiplier: 2.0
+
+  # 배치 실행
+  batch:
+    # 단일 실행 규칙 (ExecutionGate): 이관 실행 단위(테이블·도메인·시나리오 그룹·스케줄·청크 재시도·Excel)는 시스템 전체에서 항상 1개.
+    # 실행 중이면 새 요청은 409 로 거절, cron 은 건너뜀. 실행기 스레드가 1 이 아니면 기동 실패(enforce-pool-size).
+    single-execution:
+      enabled: true
+      enforce-pool-size: true
+      stale-unit-timeout-seconds: 600    # Job 없이 열린 채 이 시간이 지나면 자동 해제(비정상 상황 방어)
+    shutdown:                            # MigrationShutdownHandler - 앱 종료 시 실행 중 Job 정지 요청 → 대기 → 남은 Job FAILED 기록
+      enabled: true
+      stop-wait-seconds: 35              # Writer 진척 없음 판정(georu.batch.queue.shutdown-timeout-seconds 30s)보다 길고 컨테이너 종료 유예(45s)보다 짧게
+    executor:                            # 동시 Job 수 J = 1 고정 (단일 실행 규칙). DB 풀 산정: oracle = J×2+2, mysql = J×W+2
+      core-pool-size: 1
+      max-pool-size: 1
+      queue-capacity: 50
+      thread-name-prefix: "batch-migration-"
+      keep-alive-seconds: 60
+      wait-for-tasks-to-complete-on-shutdown: true
+      await-termination-seconds: 60
+    queue:                               # Queue-only Decoupling: Source Read 와 Target Write 분리, 멀티스레드 Writer
+      enabled: true
+      capacity: 500000                   # Queue 최대 용량
+      flush-size: 5000                   # 스레드당 flush 건수
+      flush-timeout-ms: 10000            # flush 대기 타임아웃 (소량 데이터도 흘려보냄)
+      batch-insert-size: 500             # DB 배치 Insert 단위
+      writer-thread-count: 4             # Writer 스레드 W
+      fail-fast: true                    # Writer 스레드의 flush(DB 적재) 실패를 Step FAILED 로 전파. false 면 로그만 (결과 신뢰 불가)
+      poll-timeout-ms: 100
+      metrics-log-interval-seconds: 10
+      shutdown-timeout-seconds: 30       # Step 종료 시 적재 스레드 대기: 이 시간 동안 적재 진척이 없으면 미적재로 보고 Step FAILED
+      shutdown-max-wait-seconds: 600     # 진척이 있어도 이 시간을 넘기면 미적재로 보고 Step FAILED
+      write-retry-max-attempts: 3        # 적재(flush) 1회 자동 재시도 최대 횟수. 성공하면 다음 flush 는 다시 3회. 0 = 끔
+      write-retry-delay-ms: 5000         # n 번째 재시도는 n × 이 값 대기 (5초 → 10초 → 15초). 데드락·잠금·시간 초과·연결 끊김만 재시도
+
+  # -----------------------------------------------------------------------------
+  # 이관 제어 - MigrationProperties(prefix georu), RunWindowProps, 스케줄러
+  # -----------------------------------------------------------------------------
+  sequence:                              # 시퀀스 채번 (core/sequence/README.md, guides/sequence.md). 관리 테이블명·컬럼명은 yml 로 정한다: 공통은 여기, DB 별은 georu.datasource.<DB>.sequence.*. 코드에는 채번 컬럼(TableOptions)만
+    enabled: true
+    policy: v1                           # 활성 정책 버전 (core.sequence.v1). TableOptions.sequencePolicy / API 로 테이블별 덮어쓰기
+    table: ${MIG_SEQ_TABLE:demo_tobe.tb_sequence}  # 관리 테이블명 (데모 타겟 스키마)
+    table-name-column: ${MIG_SEQ_TABLE_COL:TABLES}
+    column-name-column: ${MIG_SEQ_COLUMN_COL:COL}
+    value-column: ${MIG_SEQ_VALUE_COL:SEQ}
+    key-case: UPPER                      # UPPER | LOWER | AS_IS - 관리 테이블 키 값 대소문자 (TOBE 앱 조회 관례)
+    create-if-missing: true              # 관리행 없으면 initial-value 로 생성
+    initial-value: 0                     # 값 = 마지막 사용 번호. 첫 채번은 1
+    v1:
+      dialect: auto                      # auto | mysql | generic
+      block-size: 1000                   # 일괄 선점 크기. 1 이면 건별 +1 갱신
+      overwrite-existing: false          # DTO 에 값이 있으면 유지
+      lock-timeout-seconds: 10
+      sync-before-run: true              # Step 시작 때 관리 테이블 값을 타겟 MAX 이상으로 맞춘 뒤 채번 (관리행 없음 · NULL 값 · 뒤처짐 대비). false = 관리 테이블 값만
+  chunk:                                 # 청크 대기시간 (부하 조절)
+    page-delay-millis: 500
+    chunk-delay-millis: 500
+    max-delay-millis: 10000
+  run-window:                            # 시간 윈도우 (금지 시간대·요일)
+    enabled: false
+    days: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY]
+    ranges:
+      - "08:00-21:00"                    # 업무시간 금지
+    start_grace: "PT5M"                  # 허용 전환 후 대기 (ISO-8601 Duration)
+    inclusive_end: true
+  scheduler:                             # 자동 재시작 스케줄러
+    enabled: false
+    cron: "0 0/10 * * * *"
+    concurrency: 1
+  idle-shutdown:                         # Job 없으면 자동 종료
+    enabled: false
+    timeout-minutes: 60
+  evening:                               # 저녁시간 스케줄러 (sample 플러그인)
+    enabled: false
+
+  # -----------------------------------------------------------------------------
+  # 알림 - TelegramNotificationService (2단계에서 georu.notification 으로 이동 예정)
+  #   메일 알림은 사용 코드가 없어 제거 (spring.mail 포함). 필요 시 file 플러그인에서 재도입
+  # -----------------------------------------------------------------------------
+  notification:
+    telegram:
+      enabled: true
+      bot-token: ${TELEGRAM_BOT_TOKEN:}
+      chat-id: ${TELEGRAM_CHAT_ID:}
+      api-url: "https://api.telegram.org/bot"
+      timeout-seconds: 30
+      retry-attempts: 3
+    progress:
+      chunk-interval: 25                   # N 청크마다 진행 알림 (0=비활성)
+      notify-on-complete: true
+      notify-on-start: false
+    levels:
+      error: true
+      warning: true
+      info: true
+      chunk-delay: true
+
+# REST API CORS (@Value batch.migration.api.cors.*)
+batch:
+  migration:
+    api:
+      cors:
+        enabled: true
+        allowedOrigins: "*"              # prd 는 명시 도메인
+
+# =============================================================================
+# 로깅 - 레벨은 georu.log.* 로만 제어. 파일 출력은 logback-spring.xml
+# =============================================================================
+logging:
+  level:
+    root: ${georu.log.root-level}
+    "[com.georu]": ${georu.log.level}
+    "[com.georu.core.internal.common.mapper]": ${georu.log.sql-level}
+    "[org.apache.ibatis]": ${georu.log.sql-level}
+    "[org.mybatis]": ${georu.log.sql-level}
+    "[java.sql]": ${georu.log.sql-level}
+    "[org.springframework.jdbc]": ${georu.log.sql-level}
+    "[SQL_LOGGER]": ${georu.log.sql-level}               # SqlLoggingInterceptor (파라미터 로그, INFO 로 찍힘) - sql-level 로 함께 제어
+    "[org.springframework.jdbc.core.StatementCreatorUtils]": ${georu.log.sql-level}   # logback 의 TRACE 고정 덮어쓰기
+    "[org.springframework.batch]": INFO
+    "[com.zaxxer.hikari]": INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} | %-5level | [%thread] | %logger{36} | %msg%n"
+
+# =============================================================================
+# Actuator - 공통은 최소 노출. docker/dev 프로파일에서 확장
+#   /actuator/health       전체 (HikariCPMonitoringConfig 의 DataSource 지표 포함, 미기동 DB 있으면 DOWN)
+#   /actuator/health/live  생존 (ping) - 컨테이너·LB 헬스체크용
+#   /actuator/health/ready 준비 (운영저장소) - 소스/타겟은 Job 실행 시 검증
+# =============================================================================
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,logfile
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when_authorized
+      show-components: always            # 구성요소(운영 저장소·oracle·mysql 등) UP/DOWN 은 항상 보인다. 상세 값은 show-details 를 따름
+      group:
+        live:
+          include: ping
+        ready:
+          include: operation
+    # 힙 덤프는 모든 프로파일에서 끈다 - 메모리에 DB 비밀번호·이관 중인 데이터가 들어 있고 인증이 없다.
+    # 필요하면 컨테이너 안에서 jcmd <pid> GC.heap_dump 로 받는다
+    heapdump:
+      enabled: false
+    # 설정값은 이름만 보이고 값은 가린다 (Boot 3 기본값을 명시해 둔다. 서버 진단 화면의 Environment 에도 적용)
+    env:
+      show-values: never
+    configprops:
+      show-values: never
+    # 로그 파일 (서버 진단 화면 Logfile 탭). logback-spring.xml 이 ${logging.file.path:logs}/application.log 에 쓴다
+    logfile:
+      external-file: ${logging.file.path:logs}/application.log
+  # /actuator/info - 빌드 정보(build-info), Java·OS, 이관 설정 요약(MigrationInfoContributor)
+  info:
+    java:
+      enabled: true
+    os:
+      enabled: true
+  health:
+    db:
+      enabled: false                     # 자동 DataSource 지표 대신 HikariCPMonitoringConfig 지표 사용
+    mail:
+      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+# =============================================================================
+# Swagger(OpenAPI) - 켜고 끄기는 프로파일 yml. 서버 진단 화면(Spring Boot Admin)의 내부 API 는 문서에서 뺀다
+# =============================================================================
+springdoc:
+  paths-to-exclude: /admin/**

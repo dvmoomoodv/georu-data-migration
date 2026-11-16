@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+<head>
+  <meta charset="UTF-8" />
+  <title>이관 기간 요약 보고서</title>
+  <style th:replace="~{report/_style :: css}"></style>
+</head>
+<body>
+  <h1>이관 기간 요약 보고서</h1>
+  <div class="muted" th:text="'기간 ' + ${#temporals.format(s.from, 'yyyy-MM-dd HH:mm')} + ' ~ ' + ${#temporals.format(s.to, 'yyyy-MM-dd HH:mm')} + ' · 플러그인 ' + ${s.pluginFilter ?: '전체'} + ' · 생성 ' + ${#temporals.format(s.generatedAt, 'yyyy-MM-dd HH:mm:ss')} + ' · 환경 ' + ${s.environment}"></div>
+
+  <h2>전체 요약</h2>
+  <table class="kv">
+    <tr><th>Job 수</th><td th:text="${s.totalJobs}"></td><th>완료 / 실패 / 기타</th><td><span class="ok" th:text="${s.completedJobs}"></span> / <span class="ng" th:text="${s.failedJobs}"></span> / <span th:text="${s.otherJobs}"></span></td></tr>
+    <tr><th>성공률</th><td th:text="${s.successRate} + ' %'"></td><th>총 소요</th><td th:text="${s.totalTimeMs} + ' ms'"></td></tr>
+    <tr><th>총 읽기(소스)</th><td class="num" th:text="${#numbers.formatInteger(s.totalSource, 0, 'COMMA')}"></td><th>총 적재(타겟)</th><td class="num"><b th:text="${#numbers.formatInteger(s.totalTarget, 0, 'COMMA')}"></b></td></tr>
+    <tr><th>총 실패 / skip</th><td th:text="${s.totalFailure} + ' / ' + ${s.totalSkip}"></td><th>소스-타겟 차이</th><td class="num" th:classappend="${s.totalSource - s.totalTarget != 0} ? 'warn' : ''" th:text="${#numbers.formatInteger(s.totalSource - s.totalTarget, 0, 'COMMA')}"></td></tr>
+  </table>
+
+  <h2 th:text="'테이블별 결과 (' + ${#lists.size(s.tables)} + ')'"></h2>
+  <table>
+    <thead><tr><th>플러그인</th><th>테이블</th><th class="num">Job</th><th class="num">완료</th><th class="num">실패</th><th class="num">읽기</th><th class="num">적재</th><th class="num">차이</th><th class="num">실패건</th><th class="num">skip</th><th>마지막</th><th>모드</th><th>마지막 오류</th></tr></thead>
+    <tbody>
+      <tr th:each="t : ${s.tables}">
+        <td class="small" th:text="${t.pluginName}"></td><td><b th:text="${t.tableName}"></b></td>
+        <td class="num" th:text="${t.jobs}"></td><td class="num ok" th:text="${t.completed}"></td><td class="num" th:classappend="${t.failed > 0} ? 'ng' : ''" th:text="${t.failed}"></td>
+        <td class="num" th:text="${#numbers.formatInteger(t.source, 0, 'COMMA')}"></td><td class="num" th:text="${#numbers.formatInteger(t.target, 0, 'COMMA')}"></td>
+        <td class="num" th:classappend="${t.diff != 0} ? 'warn' : ''" th:text="${t.diff}"></td>
+        <td class="num" th:text="${t.failure}"></td><td class="num" th:text="${t.skip}"></td>
+        <td class="small"><span th:classappend="${t.lastStatus == 'COMPLETED'} ? 'ok' : (${t.lastStatus == 'FAILED'} ? 'ng' : '')" th:text="${t.lastStatus}"></span><br/><span th:text="${t.lastRun != null ? #temporals.format(t.lastRun, 'MM-dd HH:mm') : ''}"></span></td>
+        <td class="small" th:text="${t.lastTestMode}"></td>
+        <td class="small ng" th:text="${t.lastError != null ? #strings.abbreviate(t.lastError, 160) : ''}"></td>
+      </tr>
+      <tr th:if="${#lists.isEmpty(s.tables)}"><td colspan="13" class="muted">기간 내 Job 없음</td></tr>
+    </tbody>
+  </table>
+
+  <h2 th:text="'Job 목록 (' + ${#lists.size(s.jobs)} + ')'"></h2>
+  <table>
+    <thead><tr><th>실행ID</th><th>플러그인</th><th>테이블</th><th>모드</th><th>상태</th><th>시작</th><th class="num">ms</th><th class="num">읽기</th><th class="num">적재</th><th class="num">실패</th><th class="num">skip</th></tr></thead>
+    <tbody>
+      <tr th:each="j, i : ${s.jobs}" th:if="${i.index < 500}">
+        <td th:text="${j.jobExecutionId}"></td><td class="small" th:text="${j.pluginName}"></td><td th:text="${j.tableName}"></td><td class="small" th:text="${j.tags}"></td>
+        <td th:classappend="${j.status == 'COMPLETED'} ? 'ok' : (${j.status == 'FAILED'} ? 'ng' : '')" th:text="${j.status}"></td>
+        <td class="small" th:text="${j.startTime != null ? #temporals.format(j.startTime, 'MM-dd HH:mm:ss') : ''}"></td>
+        <td class="num" th:text="${j.executionTimeMs}"></td><td class="num" th:text="${j.sourceRecordCount}"></td><td class="num" th:text="${j.targetRecordCount}"></td>
+        <td class="num" th:text="${j.failureCount}"></td><td class="num" th:text="${j.skippedCount}"></td>
+      </tr>
+      <tr th:if="${#lists.size(s.jobs) > 500}"><td colspan="11" class="muted" th:text="'이하 ' + (${#lists.size(s.jobs)} - 500) + '건 생략 (XLSX/CSV 참고)'"></td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

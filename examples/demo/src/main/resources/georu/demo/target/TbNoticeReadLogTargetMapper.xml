@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_notice_read_log : 공지 읽음 이력 (업무 04 공지) / 이관 상태: 이관 제외 -->
+<mapper namespace="georu.demo.notice.TbNoticeReadLogTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbNoticeReadLogTargetDto">
+        INSERT INTO `demo_tobe`.`tb_notice_read_log` (
+              `READ_ID`    <!-- BIGINT 읽음ID -->
+            , `NOTICE_ID`    <!-- INT 공지ID -->
+            , `MEMBER_ID`    <!-- INT 회원ID -->
+            , `READ_DATE`    <!-- VARCHAR(14) 읽은 일시 -->
+        ) VALUES (
+              #{readId}
+            , #{noticeId}
+            , #{memberId}
+            , #{readDate}
+        )
+    </insert>
+
+</mapper>

@@ -1,0 +1,107 @@
+# =============================================================================
+# 테스트 환경 설정 (청크 리딩 테스트 전용)
+# =============================================================================
+
+# 테스트 환경 공통 설정
+spring:
+  application:
+    name: georu-test
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: never
+
+# MyBatis 설정
+# mybatis:
+#   mapper-locations: classpath:mapper/**/*.xml
+#   type-aliases-package: com.georu.chunk
+#   configuration:
+#     map-underscore-to-camel-case: true
+#     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 청크 테스트 설정
+# chunk:
+#   test:
+#     default-size: 100
+#     max-size: 5000
+#     timeout-seconds: 30
+#     log-performance: true
+
+# 파일 마이그레이션 설정 (테스트용 더미값)
+# file:
+#   migration:
+#     source:
+#       path: /tmp/test/source
+#     target:
+#       path: /tmp/test/target
+#     buffer-size: 8192
+#     create-directories: true
+#     validate-checksum: false
+#     max-file-size: 104857600
+#     allowed-extensions: jpg,jpeg,png,pdf,txt
+#     logging:
+#       enabled: false
+#       base-path: /tmp/test/logs
+#       max-file-size: 104857600
+#       max-history: 30
+#       compression: false
+#       json: false
+
+# 로깅 설정
+logging:
+  level:
+    com.georu.chunk: INFO  # 청크 테스트 로그를 INFO로 설정하여 명확히 표시
+    org.springframework.test: WARN  # Spring 테스트 로그는 경고만
+    org.apache.ibatis: DEBUG  # MyBatis 로그를 DEBUG로 설정하여 SQL 쿼리 확인
+    org.springframework.jdbc: DEBUG  # JDBC 로그를 DEBUG로 설정
+    com.zaxxer.hikari: INFO  # HikariCP 로그를 INFO로 설정하여 연결 상태 확인
+    root: WARN  # 기본 로그 레벨을 WARN으로 설정
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level [%logger{20}] %msg%n"
+
+---
+# =============================================================================
+# Local 프로파일 (Docker 환경)
+# =============================================================================
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  # Local Docker 데이터소스
+#   datasource:
+#     mysql:
+#       jdbc-url: jdbc:mysql://localhost:3306/batch_db?useSSL=false&serverTimezone=Asia/Seoul&allowPublicKeyRetrieval=true&rewriteBatchedStatements=true
+#       username: root
+#       password: root123
+#       driver-class-name: com.mysql.cj.jdbc.Driver
+#       hikari:
+#         maximum-pool-size: 10
+#         minimum-idle: 3
+#         connection-timeout: 10000
+#         idle-timeout: 300000
+#         max-lifetime: 600000
+
+---
+# =============================================================================
+# Dev 프로파일 (개발서버 환경)
+# =============================================================================
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  # Dev 서버 데이터소스
+#   datasource:
+#     mysql:
+#       jdbc-url: jdbc:mysql://${DB_HOST:localhost}:3306/batch_db?useSSL=true&serverTimezone=Asia/Seoul&rewriteBatchedStatements=true
+#       username: ${DB_USERNAME}
+#       password: ${DB_PASSWORD}
+#       driver-class-name: com.mysql.cj.jdbc.Driver
+#       hikari:
+#         maximum-pool-size: 20
+#         minimum-idle: 5
+#         connection-timeout: 15000
+#         idle-timeout: 600000
+#         max-lifetime: 1800000

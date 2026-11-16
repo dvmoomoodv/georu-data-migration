@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_stat_daily : 일별통계 ← ASIS(Oracle) STAT_DAILY_VISIT : 일별 방문 통계 (매핑 추정, 미확정)
+     자동 매핑 7 / 수기 매핑 2 (TOBE 컬럼 9, apply_demo_mapping.py 적용)
+     자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.stats.TbStatDailySourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+        <if test="startDate != null and startDate != ''">AND A."STAT_DT" &gt;= TO_DATE(#{startDate}, 'YYYYMMDD')</if>
+        <if test="endDate != null and endDate != ''">AND A."STAT_DT" &lt; TO_DATE(#{endDate}, 'YYYYMMDD') + 1</if>
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."STAT_DAILY_VISIT" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbStatDailySourceDto">
+        SELECT
+              NULL AS "STAT_ID"    <!-- 통계ID BIGINT ← 시퀀스 채번 (TOBE 대리키) -->
+            , TO_CHAR(A."STAT_DT", 'YYYYMMDD') AS "STAT_YMD"    <!-- 통계일 VARCHAR(8) ← STAT_DT (수기) -->
+            , A."BOARD_ID" AS "BOARD_ID"    <!-- 게시판ID INT ← BOARD_ID (이름 일치 자동, 의미 확인) -->
+            , A."VISIT_CNT" AS "VISIT_CNT"    <!-- 방문수 INT ← VISIT_CNT (이름 일치 자동, 의미 확인) -->
+            , A."UNIQUE_VISIT_CNT" AS "UNIQUE_VISIT_CNT"    <!-- 순방문수 INT ← UNIQUE_VISIT_CNT (이름 일치 자동, 의미 확인) -->
+            , A."POST_CNT" AS "POST_CNT"    <!-- 게시글수 INT ← POST_CNT (이름 일치 자동, 의미 확인) -->
+            , A."COMMENT_CNT" AS "COMMENT_CNT"    <!-- 댓글수 INT ← COMMENT_CNT (이름 일치 자동, 의미 확인) -->
+            , A."AVG_STAY_SEC" AS "AVG_STAY_SEC"    <!-- 평균체류초 DECIMAL(8,2) ← AVG_STAY_SEC (이름 일치 자동, 의미 확인) -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 VARCHAR(14) ← REG_DATE (감사 컬럼) -->
+          FROM "DEMO"."STAT_DAILY_VISIT" A
+        <include refid="where"/>
+         ORDER BY A."STAT_DT", A."BOARD_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

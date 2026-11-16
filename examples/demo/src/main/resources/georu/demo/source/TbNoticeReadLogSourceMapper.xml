@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_notice_read_log : 공지 읽음 이력 ← ASIS(Oracle) NTC_READ_LOG
+     이관 상태: 이관 제외 (TOBE 에서 읽음 이력을 보관하지 않음) - DemoNoticePlugin -->
+<mapper namespace="georu.demo.notice.TbNoticeReadLogSourceMapper">
+
+    <!-- 이관 제외 테이블이라 원천을 정하지 않았다 (WHERE 1 = 0). 제외 상태에서는 미완 집계 · 실행 차단에 잡히지 않는다 -->
+    <sql id="where">
+        WHERE 1 = 0
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."NTC_READ_LOG" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbNoticeReadLogSourceDto">
+        SELECT
+              A."READ_ID" AS "READ_ID"    <!-- 읽음ID BIGINT -->
+            , A."NOTICE_ID" AS "NOTICE_ID"    <!-- 공지ID INT -->
+            , A."MEMBER_ID" AS "MEMBER_ID"    <!-- 회원ID INT -->
+            , TO_CHAR(A."READ_DT", 'YYYYMMDDHH24MISS') AS "READ_DATE"    <!-- 읽은 일시 VARCHAR(14) -->
+          FROM "DEMO"."NTC_READ_LOG" A
+        <include refid="where"/>
+         ORDER BY A."READ_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

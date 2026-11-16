@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('테이블 현황')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<div th:replace="~{ui/layout :: gate}"></div>
+<main>
+    <div class="page-head"><h1>테이블 현황</h1><p class="page-desc">테이블마다 매핑 상태와 마지막 실행 결과 · 미완 코드는 빌드할 때 스캔한 결과 <span id="scanAt"></span></p></div>
+    <div class="grid c6 kpi" id="cards">
+        <div class="card clickable" data-card="all" title="조건을 지우고 전체 보기"><span class="stat-ico" data-ico="table"></span><div class="k">테이블</div><div class="v" id="cAll">-</div><div class="kpi-bar" id="cBar" aria-hidden="true"></div></div>
+        <div class="card clickable tone-bad" data-card="blocked" title="원천 미지정(WHERE 1 = 0) → 실행 차단 (수행 테이블만 셉니다)"><span class="stat-ico bad" data-ico="block"></span><div class="k">실행 차단 (원천 미지정)</div><div class="v" id="cBlocked">-</div></div>
+        <div class="card clickable tone-warn" data-card="todo" title="차단은 아니지만 미완 코드(TODO)가 남은 테이블 (수행 테이블만 셉니다)"><span class="stat-ico warn" data-ico="code"></span><div class="k">미완 코드 남음</div><div class="v" id="cTodo">-</div></div>
+        <div class="card clickable tone-ok" data-card="ok" title="마지막 실행이 완료(경고 포함)"><span class="stat-ico ok" data-ico="check"></span><div class="k">마지막 실행 완료</div><div class="v" id="cOk">-</div></div>
+        <div class="card clickable tone-bad" data-card="ng" title="마지막 실행이 실패 또는 실행 전 차단"><span class="stat-ico bad" data-ico="x"></span><div class="k">마지막 실행 실패·차단</div><div class="v" id="cNg">-</div></div>
+        <div class="card clickable" data-card="none" title="선택한 모드로 한 번도 실행하지 않은 테이블"><span class="stat-ico gray" data-ico="clock"></span><div class="k">미실행</div><div class="v" id="cNone">-</div></div>
+    </div>
+    <div class="card">
+        <div class="card-head"><h2>테이블 목록 <span class="small muted" id="summary"></span></h2>
+            <div class="inline">
+                <button class="btn sm" id="reload" type="button" title="매핑 상태와 실행 이력을 다시 불러옵니다">다시 불러오기</button>
+                <button class="btn sm" id="copy" type="button" title="지금 보이는 목록을 탭으로 구분해 복사 (엑셀에 붙여 넣기)">목록 복사</button>
+                <button class="btn sm primary" id="todoOpen" type="button" title="지금 보이는 테이블 중 미완이 남은 테이블의 위치(file:line)를 한 목록으로 모읍니다">미완 위치 모아 보기</button>
+            </div></div>
+        <div class="toolbar toolbar-2">
+            <div class="inline toolbar-row">
+            <input class="w-md ico-search" id="fQ" placeholder="테이블명 검색" autocomplete="off">
+            <select id="fPlugin" title="플러그인"><option value="">전체 플러그인</option>
+                <option th:each="e : ${catalog}" th:value="${e.key}" th:text="${e.key} + ' (' + ${#lists.size(e.value)} + ')'"></option></select>
+            <select id="fMap" title="매핑 상태"><option value="">전체 매핑</option><option value="blocked">실행 차단</option><option value="todo">미완 남음</option><option value="clean">미완 없음</option></select>
+            <select id="fRun" title="마지막 실행 결과"><option value="">전체 결과</option><option value="none">미실행</option><option value="ok">완료</option><option value="warn">완료(경고)</option><option value="ng">실패·차단</option><option value="running">실행 중</option><option value="other">기타(중지 등)</option></select>
+            <select id="fMode" title="어떤 모드의 실행을 마지막 실행으로 볼지"><option value="NORMAL">NORMAL 실행 기준</option><option value="">모든 모드 기준</option><option>WRITER_TEST</option><option>PROCESSOR_TEST</option><option>READER_TEST</option></select>
+            <select id="fTenant" style="max-width:220px" title="테넌트 - 고른 테넌트(와 그 아래 계층)의 실행만 마지막 실행으로 봅니다. 실행 이력에 나온 테넌트가 목록에 뜹니다"><option value="">전체 테넌트</option></select>
+            <button class="btn sm ghost push" id="reset" type="button">조건 지우기</button>
+            </div>
+            <div class="inline toolbar-row">
+            <span class="small muted">이관 상태</span>
+            <span class="inline" id="fState" title="이관 상태 - 플러그인 코드의 TableOptions.state 로 정합니다 (화면에서 바꿀 수 없음)">
+                <label class="check" title="수행: 지금처럼 매핑 확인 · 실행"><input type="checkbox" data-state="ACTIVE" checked> 수행 <b id="sACTIVE">-</b></label>
+                <label class="check" title="대기: 목록 · 매핑 현황에 보이지만 실행할 수 없음 (위 건수 · 미완 모아 보기에서 빠짐)"><input type="checkbox" data-state="HOLD" checked> <span class="badge HOLD">대기</span> <b id="sHOLD">-</b></label>
+                <label class="check" title="이관 제외: 매핑 대상(@mig-ok · TODO 집계)에서 빠지고 실행할 수 없음"><input type="checkbox" data-state="EXCLUDED" checked> <span class="badge EXCLUDED">이관 제외</span> <b id="sEXCLUDED">-</b></label>
+            </span>
+            </div>
+        </div>
+        <div id="list" class="scroll-y"><div class="empty loading">불러오는 중…</div></div>
+    </div>
+    <aside class="sp" data-panel="todo" data-title="미완 위치" data-width="75%" data-dock-label="미완 위치" data-dock-icon="block">
+        <div class="inline" style="justify-content:space-between"><span class="small muted" id="todoMeta"></span>
+            <button class="btn sm" id="todoCopy" type="button" title="걸러진 위치를 탭으로 구분해 복사 (엑셀에 붙여 넣기)">위치 복사</button></div>
+        <div class="small muted">지금 보이는 목록 기준으로 모았습니다. 목록 조건을 바꾸면 닫고 다시 모으세요.</div>
+        <div class="toolbar">
+            <span id="todoTypes" class="inline small"></span>
+            <input class="w-lg ico-search" id="todoQ" placeholder="검색: 테이블·파일·내용" autocomplete="off">
+        </div>
+        <div class="mb-6 small muted" id="todoSummary"></div>
+        <div id="todoList"><div class="empty small">목록 위 <b>미완 위치 모아 보기</b> 를 누르면 지금 보이는 테이블의 미완 위치를 여기에 모읍니다.</div></div>
+    </aside>
+</main>
+<script th:inline="javascript">
+(function () {
+  const { get, esc, num, fmtDate, fmtMs, statusBadge, toast, $ } = UI;
+  const CATALOG = /*[[${catalog}]]*/ {};
+  const TYPE_LABEL = { SOURCE_UNDEFINED: '원천 미지정(실행 차단)', COLUMN_TODO: '컬럼 매핑 TODO', PK_TODO: 'PK TODO', SORT_KEY_TODO: '정렬키 TODO', TODO: '기타 TODO', MISSING_NOT_NULL_COLUMN: 'INSERT 에 빠진 NOT NULL 컬럼' };
+  const JOB_LIMIT = 2000;   // 플러그인당 최근 실행 조회 건수 (서버 상한 5000)
+  let rows = [], jobsByPlugin = {}, truncated = [], sortKey = 'plugin', sortAsc = true;
+
+  /** 동시 n 개까지만 부른다 (플러그인 수십 개를 한꺼번에 부르지 않도록) */
+  async function limited(items, n, fn) {
+    const out = new Array(items.length); let i = 0;
+    await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); } }));
+    return out;
+  }
+
+  async function load() {
+    const plugins = Object.keys(CATALOG);
+    if (!plugins.length) { $('#list').innerHTML = '<div class="empty">등록된 플러그인이 없습니다.</div>'; return; }
+    let done = 0;
+    $('#list').innerHTML = `<div class="empty loading"><span>불러오는 중… 플러그인 <span id="loadN">0/${plugins.length}</span></span></div>`;
+    const tick = () => { const n = $('#loadN'); if (n) n.textContent = `${done}/${plugins.length}`; };   // 숫자만 바꿔 스피너가 다시 시작되지 않게
+    tick();
+    const next = [], nextJobs = {}, nextTrunc = []; let scanAt = null, failed = [];
+    await limited(plugins, 4, async (p) => {
+      try {
+        const [m, jobs] = await Promise.all([
+          get('/api/ui/mapping-status?pluginName=' + encodeURIComponent(p)),
+          get(`/api/report/jobs?pluginName=${encodeURIComponent(p)}&limit=${JOB_LIMIT}`)]);
+        scanAt = scanAt || m.generatedAt;
+        const byTable = new Map((m.tables || []).map(t => [t.tableName, t]));
+        (CATALOG[p] || []).forEach(t => next.push({ plugin: p, table: t, map: byTable.get(t) || null, scanned: m.available !== false }));
+        nextJobs[p] = jobs || [];
+        if ((jobs || []).length >= JOB_LIMIT) nextTrunc.push(p);
+      } catch (e) { failed.push(p + ': ' + e.message); (CATALOG[p] || []).forEach(t => next.push({ plugin: p, table: t, map: null, scanned: false })); }
+      done++; tick();
+    });
+    rows = next; jobsByPlugin = nextJobs; truncated = nextTrunc;
+    fillTenants();
+    $('#scanAt').textContent = scanAt ? '(' + fmtDate(scanAt) + ')' : '(스캔 결과 없음 - 빌드 후 확인)';
+    if (failed.length) toast('일부 플러그인을 불러오지 못했습니다: ' + failed.join(' / '), 'err');
+    applyMode(); render();
+  }
+
+  const tenantOf = (j) => j.tenantId || j.fullTenantId || '';
+  /** 고른 테넌트와 같거나 그 아래 계층인지 ("GRP.C01" 은 "GRP.C01.BIZ.D01.T1" 을 포함) */
+  const inTenant = (j, sel) => !sel || tenantOf(j) === sel || tenantOf(j).startsWith(sel + '.');
+  /** 선택한 모드·테넌트 기준으로 테이블마다 마지막 실행을 고른다 (서버 응답은 최신순). 테넌트 수도 센다 */
+  function applyMode() {
+    const mode = $('#fMode').value, sel = $('#fTenant').value;
+    const latest = {}, tenants = {};
+    Object.entries(jobsByPlugin).forEach(([p, list]) => list.forEach(j => {
+      if (mode && (j.tags || 'NORMAL') !== mode) return;
+      if (!inTenant(j, sel)) return;
+      const k = p + '|' + j.tableName; if (!latest[k]) latest[k] = j;
+      (tenants[k] = tenants[k] || new Set()).add(tenantOf(j));
+    }));
+    rows.forEach(r => { const k = r.plugin + '|' + r.table; r.job = latest[k] || null; r.tenantCount = tenants[k] ? tenants[k].size : 0; });
+  }
+  /** 테넌트 선택 목록: 실행 이력에 나온 테넌트와 그 상위 계층 */
+  function fillTenants() {
+    const seen = new Set();
+    Object.values(jobsByPlugin).forEach(list => list.forEach(j => { const parts = tenantOf(j).split('.').filter(Boolean); for (let i = 1; i <= parts.length; i++) seen.add(parts.slice(0, i).join('.')); }));
+    const cur = $('#fTenant').value;
+    $('#fTenant').innerHTML = '<option value="">전체 테넌트</option>' + [...seen].sort().map(t => `<option value="${esc(t)}">${esc(t)}</option>`).join('')
+      + (cur && !seen.has(cur) ? `<option value="${esc(cur)}">${esc(cur)} (이력 없음)</option>` : '');
+    $('#fTenant').value = cur;
+  }
+  function tenantCell(r) {
+    if (!r.job) return '-';
+    const many = !$('#fTenant').value && r.tenantCount > 1 ? ` <span class="badge WARN" title="이 테이블은 테넌트 ${r.tenantCount}곳에서 실행됨. 보이는 결과는 그중 가장 최근 실행입니다. 테넌트를 골라 보세요">외 ${r.tenantCount - 1}</span>` : '';
+    return `<span class="small mono">${esc(tenantOf(r.job))}</span>${many}`;
+  }
+
+  const STATE_LABEL = { ACTIVE: '수행', HOLD: '대기', EXCLUDED: '이관 제외' };
+  /** 이관 상태 (플러그인 코드의 TableOptions.state). 매핑 요약이 없으면 수행으로 본다 */
+  const stateOf = (r) => (r.map && r.map.state) || 'ACTIVE';
+  const isActive = (r) => stateOf(r) === 'ACTIVE';
+  const statesOn = () => [...document.querySelectorAll('[data-state]')].filter(c => c.checked).map(c => c.dataset.state);
+  const mapState = (r) => stateOf(r) === 'EXCLUDED' ? 'excluded' : !r.map ? 'unknown' : r.map.blocked ? 'blocked' : r.map.incompleteCount > 0 ? 'todo' : 'clean';
+  function runState(j) {
+    if (!j) return 'none';
+    const s = String(j.status || '').toUpperCase();
+    if (s === 'COMPLETED' || s === 'SUCCESS') return j.warning ? 'warn' : 'ok';
+    if (s === 'FAILED' || s === 'ERROR' || s === 'BLOCKED') return 'ng';
+    if (['RUNNING', 'STARTED', 'STARTING', 'PROCESSING', 'RETRY'].includes(s)) return 'running';
+    return 'other';
+  }
+  const diffOf = (j) => j && j.verdictDiff != null ? Number(j.verdictDiff) : null;
+
+  function filtered() {
+    const p = $('#fPlugin').value, m = $('#fMap').value, rs = $('#fRun').value, q = $('#fQ').value.trim().toLowerCase(), st = statesOn();
+    return rows.filter(r => st.includes(stateOf(r)) && (!p || r.plugin === p) && (!m || mapState(r) === m) && (!rs || runState(r.job) === rs || (rs === 'ok' && runState(r.job) === 'warn'))
+      && (!q || r.table.toLowerCase().includes(q)));
+  }
+  const SORT = {
+    plugin: (r) => r.plugin + '|' + r.table, table: (r) => r.table, state: (r) => ({ ACTIVE: 0, HOLD: 1, EXCLUDED: 2 }[stateOf(r)]) + '|' + r.plugin + '|' + r.table,
+    map: (r) => ({ blocked: 0, todo: 1, unknown: 2, clean: 3, excluded: 4 }[mapState(r)] * 1e7 - (r.map ? r.map.incompleteCount : 0)),
+    run: (r) => ({ ng: 0, running: 1, warn: 2, other: 3, none: 4, ok: 5 }[runState(r.job)]),
+    diff: (r) => -Math.abs(diffOf(r.job) ?? 0), time: (r) => -(r.job && r.job.executionTimeMs || 0),
+    end: (r) => r.job ? String(r.job.endTime || r.job.startTime || r.job.createdAt || '') : '',
+    tenant: (r) => r.job ? tenantOf(r.job) : '~'
+  };
+  function sorted(list) {
+    const f = SORT[sortKey] || SORT.plugin;
+    return list.slice().sort((a, b) => { const x = f(a), y = f(b); const c = x < y ? -1 : x > y ? 1 : 0; return sortAsc ? c : -c; });
+  }
+
+  function stateCell(r) {
+    const st = stateOf(r);
+    if (st === 'ACTIVE') return '<span class="small muted">수행</span>';
+    const why = r.map && r.map.stateReason ? r.map.stateReason : '';
+    return `<span class="badge ${st}" title="${esc(STATE_LABEL[st] + (why ? ': ' + why : '') + '\n상태는 플러그인 코드의 TableOptions.state 로 바꿉니다')}">${esc(STATE_LABEL[st])}</span>${why ? `<div class="small muted" style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(why)}">${esc(why)}</div>` : ''}`;
+  }
+  function mapCell(r) {
+    if (mapState(r) === 'excluded') return '<span class="small muted" title="이관 제외 테이블은 매핑 대상이 아니라 미완 코드를 세지 않습니다">매핑 대상 아님</span>';
+    if (!r.map) return `<span class="badge NOT_RUN" title="${r.scanned ? '스캔 결과에 이 테이블이 없음' : '스캔 결과 없음 (빌드 후 확인)'}">알 수 없음</span>`;
+    const c = r.map.counts || {}, tip = Object.entries(c).map(([k, n]) => (TYPE_LABEL[k] || k) + ' ' + n).join('\n');
+    const label = r.map.blocked ? '실행 차단' : r.map.incompleteCount ? `미완 ${num(r.map.incompleteCount)}` : '미완 없음';
+    const cls = r.map.blocked ? 'BLOCKED' : r.map.incompleteCount ? 'WARNING' : 'COMPLETED';
+    return `<a href="#" data-map="${esc(r.plugin)}|${esc(r.table)}" title="${esc(tip || '미완 없음')}\n(누르면 위치 보기)"><span class="badge ${cls}">${esc(label)}</span></a>`;
+  }
+  function runCell(j) {
+    if (!j) return '<span class="badge NOT_RUN">미실행</span>';
+    const mode = (j.tags || 'NORMAL') !== 'NORMAL' ? ` <span class="badge ${esc(j.tags)}">${esc(j.tags)}</span>` : '';
+    const why = j.blockedReason || j.errorMessage || j.message || '';
+    return `${statusBadge(j.status, j.warning)}${mode}${why && runState(j) !== 'ok' ? `<div class="small muted" style="max-width:280px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(why)}">${esc(why)}</div>` : ''}`;
+  }
+  function countCell(j) {
+    if (!j) return '-';
+    const d = diffOf(j);
+    return `${num(j.verdictSource ?? j.sourceRecordCount)} → ${num(j.targetRecordCount)}${d ? ` <span class="t-danger small" title="판정 차이 (원천 - 적재)">차이 ${num(d)}</span>` : ''}${j.countCheck === 'SKIP' ? ' <span class="small muted" title="1:N 등으로 건수 비교 제외">비교 제외</span>' : ''}`;
+  }
+  function actions(r) {
+    const p = encodeURIComponent(r.plugin), t = encodeURIComponent(r.table);
+    const tn = r.job ? tenantOf(r.job) : $('#fTenant').value, tq = tn ? '&tenant=' + encodeURIComponent(tn) : '';   // 실행·점검 화면의 테넌트 칸을 채움
+    const st = stateOf(r), off = (label, why) => `<span class="small muted" title="${esc(why)}" style="cursor:not-allowed">${label}</span>`;
+    const run = st === 'ACTIVE' ? `<a class="small" href="/ui/execute?pluginName=${p}&tableName=${t}${tq}">실행</a>` : off('실행', STATE_LABEL[st] + ' 테이블은 실행할 수 없습니다 (모든 모드)');
+    const check = st !== 'EXCLUDED' ? `<a class="small" href="/ui/precheck?pluginName=${p}&tables=${t}${tq}">점검</a>` : off('점검', '이관 제외 테이블은 점검하지 않습니다');
+    return `${run} · ${check}`
+      + (r.job ? ` · <a class="small" href="/ui/history?migrationId=${encodeURIComponent(r.job.migrationId)}">이력</a>` : '');
+  }
+
+  function render() {
+    const list = sorted(filtered());
+    const all = rows.length, cnt = (fn) => rows.filter(fn).length;
+    $('#cAll').textContent = num(all);
+    $('#cBlocked').textContent = num(cnt(r => isActive(r) && mapState(r) === 'blocked'));   // 대기 · 제외는 위 건수에서 뺀다
+    $('#cTodo').textContent = num(cnt(r => isActive(r) && mapState(r) === 'todo'));
+    ['ACTIVE', 'HOLD', 'EXCLUDED'].forEach(k => $('#s' + k).textContent = num(cnt(r => stateOf(r) === k)));
+    const nOk = cnt(r => ['ok', 'warn'].includes(runState(r.job))), nNg = cnt(r => runState(r.job) === 'ng'), nNone = cnt(r => !r.job);
+    $('#cOk').textContent = num(nOk);
+    $('#cNg').textContent = num(nNg);
+    $('#cNone').textContent = num(nNone);
+    // 첫 칸 비율 막대: 마지막 실행 결과 (완료 · 실패·차단 · 미실행 · 그 밖)
+    const parts = [ ['ok', nOk, '완료'], ['ng', nNg, '실패·차단'], ['none', nNone, '미실행'], ['etc', all - nOk - nNg - nNone, '그 밖'] ];
+    $('#cBar').innerHTML = all ? parts.filter(p => p[1] > 0).map(([k, n, label]) => `<i class="${k}" style="width:${(n * 100 / all).toFixed(1)}%" title="${label} ${num(n)}"></i>`).join('') : '';
+    const mode = $('#fMode').value, sel = $('#fTenant').value;
+    $('#summary').textContent = `${num(list.length)} / ${num(all)}개 테이블 · 마지막 실행은 ${mode ? mode + ' 실행' : '모든 모드'} · ${sel ? '테넌트 ' + sel : '전체 테넌트'} 기준`
+      + (truncated.length ? ` · 실행 이력이 많아 플러그인별 최근 ${num(JOB_LIMIT)}건만 봄: ${truncated.join(', ')}` : '');
+    const th = (k, label, tip, cls) => `<th data-sort="${k}" class="${cls || ''}" style="cursor:pointer" title="${tip || '누르면 정렬'}">${label}${sortKey === k ? (sortAsc ? ' ▲' : ' ▼') : ''}</th>`;
+    $('#list').innerHTML = list.length ? `<table class="list"><tr>${th('plugin', '플러그인')}${th('table', '테이블')}${th('state', '상태', '수행 → 대기 → 이관 제외')}${th('map', '매핑', '차단 → 미완 많은 순')}${th('tenant', '테넌트')}${th('run', '마지막 결과', '실패·차단 먼저')}${th('diff', '원천 → 적재', '차이 큰 순')}${th('time', '소요', '오래 걸린 순', 'num')}${th('end', '종료')}<th>동작</th></tr>`
+      + list.map(r => `<tr class="state-${stateOf(r)}"><td class="small">${esc(r.plugin)}</td><td class="mono">${esc(r.table)}</td><td class="nowrap">${stateCell(r)}</td><td>${mapCell(r)}</td><td class="nowrap">${tenantCell(r)}</td><td>${runCell(r.job)}</td><td class="nowrap small">${countCell(r.job)}</td><td class="small num">${r.job ? fmtMs(r.job.executionTimeMs) : '-'}</td><td class="small">${r.job ? UI.fmtShort(r.job.endTime || r.job.startTime) : '-'}</td><td class="nowrap">${actions(r)}</td></tr>`).join('') + '</table>'
+      : '<div class="empty">조건에 맞는 테이블이 없습니다. <button class="btn sm" type="button" id="emptyReset">조건 지우기</button></div>';
+    document.querySelectorAll('th[data-sort]').forEach(h => h.onclick = () => { const k = h.dataset.sort; if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = true; } render(); });
+    document.querySelectorAll('a[data-map]').forEach(a => a.onclick = (e) => { e.preventDefault(); const [p, t] = a.dataset.map.split('|'); showMapStatus(p, t); });
+    const er = $('#emptyReset'); if (er) er.onclick = reset;
+    saveQuery();
+  }
+
+  /** 미완 위치 (실행 화면과 같은 표시) */
+  async function showMapStatus(plugin, table) {
+    let s;
+    try { s = await get(`/api/ui/mapping-status?pluginName=${encodeURIComponent(plugin)}&tableName=${encodeURIComponent(table)}`); }
+    catch (e) { toast(e.message, 'err'); return; }
+    const counts = Object.entries(s.counts || {}).map(([k, n]) => `<li>${esc(TYPE_LABEL[k] || k)} <b>${num(n)}</b>건</li>`).join('') || '<li>없음</li>';
+    const issues = (s.issues || []).slice(0, 80).map(i => `<tr><td>${esc(TYPE_LABEL[i.type] || i.type)}</td><td class="small mono">${esc(i.file)}${i.line ? ':' + i.line : ''}</td><td class="small mono" style="white-space:pre-wrap">${esc(i.text)}</td></tr>`).join('');
+    UI.confirmModal(`미완 코드 · ${s.tableName}`, `<ul class="small">${counts}</ul>
+      <div class="small muted">위치는 유형별 최대 20개만 표시합니다. 그대로 두기로 한 줄에는 주석 <code>@mig-ok: 사유</code> 를 적으면 미완 집계에서 빠집니다 (다시 빌드 필요).</div>
+      ${issues ? `<div style="max-height:320px;overflow:auto;margin-top:8px"><table><tr><th>유형</th><th>위치</th><th>내용</th></tr>${issues}</table></div>` : ''}`, '닫기');
+  }
+
+  function copyList() {
+    const list = sorted(filtered());
+    const lines = [['플러그인', '테이블', '상태', '상태 사유', '매핑', '미완', '테넌트', '마지막 결과', '모드', '원천', '적재', '차이', '소요(ms)', '종료'].join('\t')].concat(list.map(r => {
+      const j = r.job;
+      return [r.plugin, r.table, STATE_LABEL[stateOf(r)], (r.map && r.map.stateReason) || '', { blocked: '실행 차단', todo: '미완 남음', clean: '미완 없음', unknown: '알 수 없음', excluded: '매핑 대상 아님' }[mapState(r)], r.map && mapState(r) !== 'excluded' ? r.map.incompleteCount : '',
+        j ? tenantOf(j) : '', j ? j.status + (j.warning ? '(경고)' : '') : '미실행', j ? (j.tags || 'NORMAL') : '', j ? (j.verdictSource ?? j.sourceRecordCount ?? '') : '', j ? (j.targetRecordCount ?? '') : '',
+        diffOf(j) ?? '', j ? (j.executionTimeMs ?? '') : '', j ? fmtDate(j.endTime || j.startTime) : ''].join('\t');
+    }));
+    navigator.clipboard.writeText(lines.join('\n')).then(() => toast(`${list.length}개 테이블을 복사했습니다`, 'ok'), (e) => toast('복사하지 못했습니다: ' + e.message, 'err'));
+  }
+
+  // ---------- 미완 위치 모아 보기 (테이블별 위치 API 를 차례로 불러 한 목록으로) ----------
+  const TODO_RENDER_MAX = 2000;   // 화면에 그리는 줄 수 상한 (복사는 걸러진 전체)
+  let todo = { rows: [], counts: {}, tables: 0, failed: [] }, todoTypesOff = new Set();
+  async function openTodo() {
+    const targets = sorted(filtered()).filter(r => isActive(r) && r.map && r.map.incompleteCount > 0);   // 대기 · 제외 테이블은 모으지 않는다
+    if (!targets.length) { toast('지금 보이는 수행 테이블 중 미완이 남은 테이블이 없습니다', 'ok'); return; }
+    if (targets.length > 150 && !await UI.confirmModal('미완 위치 모아 보기', `테이블 ${num(targets.length)}개의 위치를 불러옵니다. 시간이 걸릴 수 있습니다.<br>조건을 좁히면 더 빠릅니다. 계속할까요?`, '불러오기')) return;
+    UI.panel.open('todo');
+    let done = 0;
+    $('#todoList').innerHTML = `<div class="empty loading"><span>불러오는 중… 테이블 <span id="todoN">0/${targets.length}</span></span></div>`;
+    const tick = () => { const n = $('#todoN'); if (n) n.textContent = `${done}/${targets.length}`; };
+    tick(); $('#todoSummary').textContent = ''; $('#todoMeta').textContent = '';
+    const rowsOut = [], counts = {}, failed = [];
+    await limited(targets, 4, async (r) => {
+      try {
+        const s = await get(`/api/ui/mapping-status?pluginName=${encodeURIComponent(r.plugin)}&tableName=${encodeURIComponent(r.table)}`);
+        Object.entries(s.counts || {}).forEach(([k, n]) => counts[k] = (counts[k] || 0) + n);
+        (s.issues || []).forEach(i => rowsOut.push({ plugin: r.plugin, table: r.table, type: i.type, file: i.file || '', line: i.line || null, text: i.text || '' }));
+      } catch (e) { failed.push(r.table); }
+      done++; tick();
+    });
+    const order = Object.keys(TYPE_LABEL);
+    rowsOut.sort((a, b) => a.plugin.localeCompare(b.plugin) || a.table.localeCompare(b.table) || (order.indexOf(a.type) - order.indexOf(b.type)) || a.file.localeCompare(b.file) || ((a.line || 0) - (b.line || 0)));
+    todo = { rows: rowsOut, counts, tables: targets.length, failed };
+    $('#todoMeta').textContent = `테이블 ${num(targets.length)}개 · 지금 보이는 목록의 수행 테이블 기준`;
+    if (failed.length) toast(`위치를 불러오지 못한 테이블 ${failed.length}개: ${failed.slice(0, 5).join(', ')}${failed.length > 5 ? ' …' : ''}`, 'err');
+    renderTodoTypes(); renderTodo();
+  }
+  function renderTodoTypes() {
+    const shown = {}; todo.rows.forEach(r => shown[r.type] = (shown[r.type] || 0) + 1);
+    const types = Object.keys(TYPE_LABEL).filter(k => todo.counts[k] || shown[k]).concat(Object.keys(todo.counts).filter(k => !TYPE_LABEL[k]));
+    $('#todoTypes').innerHTML = types.map(k => `<label class="check" title="전체 ${num(todo.counts[k] || 0)}건 중 위치 ${num(shown[k] || 0)}건"><input type="checkbox" data-todo-type="${esc(k)}"${todoTypesOff.has(k) ? '' : ' checked'}> ${esc(TYPE_LABEL[k] || k)} <b>${num(todo.counts[k] || 0)}</b></label>`).join(' ');
+    document.querySelectorAll('[data-todo-type]').forEach(c => c.onchange = () => { if (c.checked) todoTypesOff.delete(c.dataset.todoType); else todoTypesOff.add(c.dataset.todoType); renderTodo(); });
+  }
+  function todoFiltered() {
+    const q = $('#todoQ').value.trim().toLowerCase();
+    return todo.rows.filter(r => !todoTypesOff.has(r.type) && (!q || (r.table + ' ' + r.file + ' ' + r.text).toLowerCase().includes(q)));
+  }
+  function renderTodo() {
+    const list = todoFiltered();
+    const total = Object.values(todo.counts).reduce((a, b) => a + b, 0);
+    $('#todoSummary').textContent = `위치 ${num(list.length)}건 표시 (전체 미완 ${num(total)}건) · 스캔은 테이블마다 유형별 최대 20개 위치만 기록하므로 전체 건수보다 적을 수 있습니다`
+      + (list.length > TODO_RENDER_MAX ? ` · 화면에는 앞의 ${num(TODO_RENDER_MAX)}건만 그립니다 (복사는 전체)` : '');
+    let prev = '';
+    $('#todoList').innerHTML = list.length ? '<table class="small list"><tr><th>테이블</th><th>유형</th><th>위치</th><th>내용</th></tr>' + list.slice(0, TODO_RENDER_MAX).map(r => {
+      const head = r.plugin + '|' + r.table, first = head !== prev; prev = head;
+      return `<tr${first ? ' style="border-top:2px solid var(--line-strong)"' : ''}><td class="nowrap mono">${first ? `<a href="#" data-todo-map="${esc(head)}" title="${esc(r.plugin)} · 누르면 이 테이블의 미완 코드 보기">${esc(r.table)}</a>` : ''}</td><td class="nowrap">${esc(TYPE_LABEL[r.type] || r.type)}</td><td class="nowrap mono">${esc(r.file)}${r.line ? ':' + r.line : ''}</td><td class="mono" style="white-space:pre-wrap">${esc(r.text)}</td></tr>`;
+    }).join('') + '</table>' : '<div class="empty">조건에 맞는 위치가 없습니다.</div>';
+    document.querySelectorAll('a[data-todo-map]').forEach(a => a.onclick = (e) => { e.preventDefault(); const [p, t] = a.dataset.todoMap.split('|'); showMapStatus(p, t); });
+  }
+  function copyTodo() {
+    const list = todoFiltered();
+    if (!list.length) { toast('복사할 위치가 없습니다', 'err'); return; }
+    const lines = [['플러그인', '테이블', '유형', '파일', '줄', '내용'].join('\t')].concat(list.map(r => [r.plugin, r.table, TYPE_LABEL[r.type] || r.type, r.file, r.line ?? '', r.text.replace(/\s+/g, ' ').trim()].join('\t')));
+    navigator.clipboard.writeText(lines.join('\n')).then(() => toast(`위치 ${num(list.length)}건을 복사했습니다`, 'ok'), (e) => toast('복사하지 못했습니다: ' + e.message, 'err'));
+  }
+
+  // 조건을 주소에 남겨 다시 열거나 공유할 때 그대로 보이게
+  const FILTERS = { fPlugin: 'plugin', fMap: 'map', fRun: 'run', fMode: 'mode', fTenant: 'tenant', fQ: 'q' };
+  function saveQuery() {
+    const q = new URLSearchParams();
+    Object.entries(FILTERS).forEach(([id, k]) => { const v = $('#' + id).value; if (k === 'mode' ? v !== 'NORMAL' : v) q.set(k, v); });
+    const st = statesOn(); if (st.length !== 3) q.set('state', st.join(',') || 'none');
+    if (sortKey !== 'plugin' || !sortAsc) q.set('sort', sortKey + (sortAsc ? '' : '-'));
+    history.replaceState(null, '', location.pathname + (q.toString() ? '?' + q : ''));
+  }
+  function reset() { $('#fPlugin').value = $('#fMap').value = $('#fRun').value = $('#fQ').value = $('#fTenant').value = ''; $('#fMode').value = 'NORMAL'; setStates(['ACTIVE', 'HOLD', 'EXCLUDED']); sortKey = 'plugin'; sortAsc = true; applyMode(); render(); }
+  function setStates(list) { document.querySelectorAll('[data-state]').forEach(c => c.checked = list.includes(c.dataset.state)); }
+
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('tenant')) $('#fTenant').insertAdjacentHTML('beforeend', `<option value="${esc(qp.get('tenant'))}">${esc(qp.get('tenant'))}</option>`);   // 목록은 이력을 불러온 뒤 채운다
+  Object.entries(FILTERS).forEach(([id, k]) => { if (qp.has(k)) $('#' + id).value = qp.get(k); });
+  if (qp.has('state')) setStates(qp.get('state').split(','));
+  if (qp.get('sort')) { const s = qp.get('sort'); sortAsc = !s.endsWith('-'); sortKey = s.replace(/-$/, ''); }
+  ['fPlugin', 'fMap', 'fRun'].forEach(id => $('#' + id).onchange = render);
+  document.querySelectorAll('[data-state]').forEach(c => c.onchange = render);
+  $('#fMode').onchange = () => { applyMode(); render(); };
+  $('#fTenant').onchange = () => { applyMode(); render(); };
+  $('#fQ').addEventListener('input', render);
+  $('#reset').onclick = reset;
+  $('#reload').onclick = load;
+  $('#copy').onclick = copyList;
+  $('#todoOpen').onclick = openTodo;
+  $('#todoCopy').onclick = copyTodo;
+  $('#todoQ').addEventListener('input', renderTodo);
+  const CARD = { blocked: { fMap: 'blocked' }, todo: { fMap: 'todo' }, ok: { fRun: 'ok' }, ng: { fRun: 'ng' }, none: { fRun: 'none' } };
+  document.querySelectorAll('[data-card]').forEach(c => c.onclick = () => {
+    if (c.dataset.card === 'all') { reset(); return; }
+    $('#fMap').value = $('#fRun').value = $('#fQ').value = '';
+    Object.entries(CARD[c.dataset.card]).forEach(([id, v]) => $('#' + id).value = v);
+    setStates(CARD[c.dataset.card].fMap ? ['ACTIVE'] : ['ACTIVE', 'HOLD', 'EXCLUDED']);   // 차단 · 미완 건수는 수행 테이블만 센 값
+    render();
+  });
+  load();
+})();
+</script>
+</body>
+</html>

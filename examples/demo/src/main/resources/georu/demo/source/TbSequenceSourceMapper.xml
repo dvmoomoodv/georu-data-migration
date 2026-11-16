@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_sequence : 공통시퀀스관리 ← ASIS(Oracle) SEQ_MASTER : 시퀀스 현재값 (매핑 추정, 미확정)
+     자동 매핑 0 / 수기 매핑 3 (TOBE 컬럼 3, apply_demo_mapping.py 적용)
+     자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.sequence.TbSequenceSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."SEQ_MASTER" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbSequenceSourceDto">
+        SELECT
+              A."TARGET_TABLE" AS "TABLES"    <!-- 테이블명 VARCHAR(50) ← TARGET_TABLE (수기) -->
+            , A."TARGET_COLUMN" AS "COL"    <!-- 시퀀스컬럼 VARCHAR(50) ← TARGET_COLUMN (수기) -->
+            , A."CURRENT_VAL" AS "SEQ"    <!-- 시퀀스번호 DECIMAL(18,0) ← CURRENT_VAL (수기) -->
+          FROM "DEMO"."SEQ_MASTER" A
+        <include refid="where"/>
+         ORDER BY A."SEQ_NM"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

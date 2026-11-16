@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('이관 진행')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>이관 진행</h1><p class="page-desc">투입부터 종료까지 단계 · 할 일 · 체크리스트</p></div>
+    <style>
+        .phase-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:14px}
+        .phase-strip button{all:unset;cursor:pointer;display:grid;gap:4px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card, #fff)}
+        .phase-strip button:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+        .phase-strip button.current{border-color:var(--primary);box-shadow:inset 0 0 0 1px var(--primary)}
+        .phase-strip .nm{font-weight:600;font-size:13.5px}
+        .phase-strip .ct{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+        .ck-list{list-style:none;margin:0;padding:0;display:grid}
+        .ck-item{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:4px 10px;align-items:start;padding:9px 0;border-top:1px solid var(--line)}
+        .ck-item:first-child{border-top:0}
+        .ck-item input[type=checkbox]{width:16px;height:16px;margin-top:3px;cursor:pointer}
+        .ck-item .ttl{font-weight:500}
+        .ck-item.done .ttl{color:var(--muted);text-decoration:line-through;text-decoration-color:var(--c-94a3b8, #94a3b8)}
+        .ck-item .meta{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px}
+        .ck-item .side{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+        .ck-item details{grid-column:2/4;font-size:13px}
+        .ck-item details summary{cursor:pointer;color:var(--muted);font-size:12px}
+        .ck-item .memo{grid-column:2/4;display:flex;gap:6px}
+        .ck-item [hidden],#allHist[hidden],#seedNote[hidden]{display:none}   /* .memo · .alert 의 display 가 hidden 속성을 덮지 않게 */
+        .ck-item .memo input{flex:1;min-width:0}
+        .ck-hist{grid-column:2/4;font-size:12px;color:var(--muted);margin:4px 0 0;padding-left:16px}
+        .opt{font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:3px;padding:0 4px}
+        @media (max-width:640px){.ck-item{grid-template-columns:22px minmax(0,1fr)}.ck-item .side{grid-column:2;justify-content:flex-start}}
+    </style>
+
+    <div class="alert warn small" id="seedNote" hidden>권장 단계는 <b>임시 초안</b>입니다. 팀의 표준 단계가 있으면 아래 <b>엑셀 내려받기</b> → 고쳐서 → <b>엑셀 올리기</b> 로 바꿉니다.</div>
+
+    <div class="card">
+        <div class="card-head">
+            <h2>진행 요약 <span class="small muted" id="sumText"></span></h2>
+            <div class="inline">
+                <a class="btn sm" href="/api/project/checklist/download">엑셀 내려받기</a>
+                <label class="btn sm" for="upFile" style="cursor:pointer" data-write>엑셀 올리기</label>
+                <input type="file" id="upFile" accept=".xlsx,.xls" hidden>
+                <button class="btn sm" id="btnReset" type="button" data-write>권장 단계로 되돌리기</button>
+                <button class="btn sm" id="btnHist" type="button">전체 기록</button>
+            </div>
+        </div>
+        <div class="phase-strip" id="strip"></div>
+        <div class="progress" aria-hidden="true"><i id="bar" style="width:0"></i></div>
+    </div>
+
+    <div id="phases" class="stack"></div>
+
+    <aside class="sp" data-panel="hist" data-title="전체 기록" data-width="560" data-dock-label="전체 기록" data-dock-icon="clock">
+        <div class="small muted">체크 · 해제 · 메모 · 엑셀 적용 기록 (최신 순)</div>
+        <ul class="ck-hist" id="allHist"><li class="muted loading">불러오는 중…</li></ul>
+    </aside>
+</main>
+<script>
+(function () {
+  const { $, toast, get, esc } = UI;
+  const STATUS = { WAIT: ['대기', 'RAW'], IN_PROGRESS: ['진행 중', 'STARTED'], DONE: ['완료', 'DONE'] };
+  let view = null;
+
+  /** 서버 시각 → 'yyyy-MM-dd HH:mm' (UI.fmtDate 는 문자열 · 배열을 모두 받는다) */
+  function when(v) { return v ? UI.fmtDate(v).slice(0, 16) : ''; }
+  function day(v) { return when(v).slice(5, 10); }
+  function link(l) {
+    if (!l) return '';
+    const href = l.startsWith('guide:') ? '/ui/guide?name=' + encodeURIComponent(l.slice(6)) : l.startsWith('/ui/') ? l : null;
+    if (!href) return '';
+    const label = l.startsWith('guide:') ? '안내서 ↗' : '화면 ↗';
+    return `<a class="btn sm" href="${esc(href)}">${label}</a>`;
+  }
+
+  function render() {
+    const v = view;
+    // 다시 그리기 전에: 열어 둔 메모(쓰던 글) · 펼친 설명을 기억해 두었다가 살린다
+    const keep = {};
+    document.querySelectorAll('.ck-item').forEach(li => {
+      const m = li.querySelector('.memo'), d = li.querySelector('details');
+      keep[li.dataset.id] = { memo: m && !m.hidden ? m.querySelector('input').value : null, open: !!(d && d.open) };
+    });
+    $('#sumText').textContent = `필수 ${v.requiredChecked}/${v.required} · 전체 ${v.checked}/${v.total}`;
+    $('#bar').style.width = (v.required ? Math.round(v.requiredChecked * 100 / v.required) : 0) + '%';
+    $('#strip').innerHTML = v.phases.map(p => {
+      const [label, cls] = STATUS[p.status];
+      const dates = p.completedAt ? `${day(p.startedAt)} ~ ${day(p.completedAt)}` : p.startedAt ? `${day(p.startedAt)} 시작` : '';
+      return `<button type="button" data-go="${p.no}" class="${p.no === v.currentPhase ? 'current' : ''}">
+        <span class="nm">${p.no}. ${esc(p.name)}</span>
+        <span><span class="badge ${cls}">${label}</span> <span class="ct">${p.requiredChecked}/${p.required}</span></span>
+        <span class="ct">${esc(dates)}</span></button>`;
+    }).join('');
+    $('#phases').innerHTML = v.phases.map(p => {
+      const [label, cls] = STATUS[p.status];
+      return `<div class="card" id="phase-${p.no}">
+        <div class="card-head"><h2>${p.no}. ${esc(p.name)} <span class="badge ${cls}">${label}</span></h2>
+          <span class="small muted">필수 ${p.requiredChecked}/${p.required} · 전체 ${p.checked}/${p.total}${p.startedAt ? ' · 시작 ' + esc(when(p.startedAt)) : ''}${p.completedAt ? ' · 완료 ' + esc(when(p.completedAt)) : ''}</span></div>
+        <ul class="ck-list">${p.items.map(item).join('')}</ul></div>`;
+    }).join('');
+    document.querySelectorAll('.ck-item').forEach(li => {
+      const k = keep[li.dataset.id]; if (!k) return;
+      if (k.memo != null) { const m = li.querySelector('.memo'); m.hidden = false; m.querySelector('input').value = k.memo; }
+      if (k.open) { const d = li.querySelector('details'); if (d) d.open = true; }
+    });
+  }
+
+  function item(i) {
+    const id = 'ck' + i.id;
+    return `<li class="ck-item ${i.checked ? 'done' : ''}" data-id="${i.id}">
+      <input type="checkbox" id="${id}" ${i.checked ? 'checked' : ''} ${UI.can('project', 'W') ? '' : 'disabled title="조회 권한 - 체크하려면 실행 권한이 필요합니다"'} aria-describedby="${id}m">
+      <div><label class="ttl" for="${id}">${esc(i.title)}</label> ${i.required ? '' : '<span class="opt">선택</span>'}
+        <div class="meta" id="${id}m">${i.owner ? '<span>담당 ' + esc(i.owner) + '</span>' : ''}${i.checked ? '<span>✓ ' + esc(i.checkedBy || '') + ' · ' + esc(when(i.checkedAt)) + '</span>' : ''}${i.memo ? '<span>메모: ' + esc(i.memo) + '</span>' : ''}</div></div>
+      <div class="side">${link(i.link)}<button class="btn sm" type="button" data-write data-memo>메모</button><button class="btn sm" type="button" data-hist>기록</button></div>
+      ${i.info ? `<details><summary>알아야 할 것</summary><div style="padding:4px 0 0">${esc(i.info)}</div></details>` : ''}
+      <div class="memo" hidden><input type="text" maxlength="2000" value="${esc(i.memo || '')}" aria-label="메모"><button class="btn sm primary" type="button" data-save>저장</button></div>
+      <ul class="ck-hist" hidden></ul>
+    </li>`;
+  }
+
+  async function load() {
+    try { view = await get('/api/project/checklist'); render(); }
+    catch (e) { toast(e.message, 'err'); }
+  }
+
+  async function change(id, body) {
+    try { view = await UI.api('PUT', '/api/project/checklist/items/' + id, body); render(); }
+    catch (e) { toast(e.plainMessage || e.message, 'err'); await load(); }
+  }
+
+  function histHtml(rows) {
+    const NAMES = { CHECK: '체크', UNCHECK: '해제', MEMO: '메모', IMPORT: '엑셀 적용', RESET: '권장 단계로', SEED: '처음 채움' };
+    return rows.length ? rows.map(r => `<li>${esc(when(r.createdAt))} · ${esc(r.actor || '-')} · ${esc(NAMES[r.action] || r.action)}${r.detail && r.action !== 'CHECK' && r.action !== 'UNCHECK' ? ' · ' + esc(r.detail) : ''}</li>`).join('') : '<li>기록 없음</li>';
+  }
+
+  $('#phases').addEventListener('change', e => {
+    if (e.target.type !== 'checkbox') return;
+    const li = e.target.closest('.ck-item');
+    change(li.dataset.id, { checked: e.target.checked });
+  });
+  $('#phases').addEventListener('click', async e => {
+    const li = e.target.closest('.ck-item'); if (!li) return;
+    if (e.target.matches('[data-memo]')) { const m = li.querySelector('.memo'); m.hidden = !m.hidden; if (!m.hidden) m.querySelector('input').focus(); }
+    if (e.target.matches('[data-save]')) change(li.dataset.id, { memo: li.querySelector('.memo input').value });
+    if (e.target.matches('[data-hist]')) {
+      const h = li.querySelector('.ck-hist');
+      if (!h.hidden) { h.hidden = true; return; }
+      try { h.innerHTML = histHtml(await get('/api/project/checklist/events?itemId=' + li.dataset.id)); h.hidden = false; } catch (err) { toast(err.message, 'err'); }
+    }
+  });
+  $('#phases').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && e.target.closest('.memo')) { e.preventDefault(); e.target.closest('.memo').querySelector('[data-save]').click(); }
+  });
+  $('#strip').addEventListener('click', e => {
+    const b = e.target.closest('[data-go]'); if (!b) return;
+    document.getElementById('phase-' + b.dataset.go)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  // 전체 기록: 패널을 열 때마다 새로
+  $('#btnHist').setAttribute('data-panel-open', 'hist');
+  UI.panel.on('hist', async () => {
+    try { $('#allHist').innerHTML = histHtml(await get('/api/project/checklist/events')); } catch (e) { $('#allHist').innerHTML = `<li class="t-danger">${esc(e.message)}</li>`; }
+  });
+
+  async function upload(file, apply) {
+    const fd = new FormData(); fd.append('file', file);
+    const res = await fetch('/api/project/checklist/upload?apply=' + apply, { method: 'POST', body: fd, headers: UI_DEFAULT_HEADERS() });
+    if (res.status === 401 && window.GEORU_SECURITY) { location.href = '/login?reason=expired'; throw new Error('로그인이 필요합니다'); }
+    const json = await res.json().catch(() => ({ success: false, message: 'HTTP ' + res.status }));
+    if (!json.success) throw new Error(json.message);
+    return json.data;
+  }
+  $('#upFile').addEventListener('change', async e => {
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    try {
+      const p = await upload(f, false);
+      const lost = p.removedChecked.length ? `<p class="t-danger small">체크된 채 지워지는 항목 ${p.removedChecked.length}개: ${p.removedChecked.map(esc).join(', ')}<br>필요하면 먼저 엑셀로 내려받아 보관하세요.</p>` : '';
+      const warn = p.warnings.length ? `<p class="small muted">${p.warnings.slice(0, 5).map(esc).join('<br>')}</p>` : '';
+      const ok = await UI.confirmModal('엑셀로 체크리스트 바꾸기', `<p>${esc(f.name)}</p>
+        <table class="small"><tr><td>추가</td><td><b>${p.added}</b></td></tr><tr><td>삭제</td><td><b>${p.removed}</b></td></tr>
+        <tr><td>바뀜 (설명 · 순서 등)</td><td><b>${p.changed}</b></td></tr><tr><td>그대로</td><td>${p.unchanged}</td></tr></table>
+        <p class="small muted">단계 이름과 항목이 같은 행은 체크 · 메모가 그대로 이어집니다.</p>${lost}${warn}`, '적용');
+      if (!ok) return;
+      await upload(f, true);
+      toast('엑셀 기준으로 바꿨습니다', 'ok'); await load();
+    } catch (err) { toast(err.message, 'err'); }
+  });
+  $('#btnReset').onclick = async () => {
+    const ok = await UI.confirmModal('권장 단계로 되돌리기', '<p>권장 단계에 없는 항목은 지워지고, 같은 항목의 체크 · 메모는 이어집니다. 필요하면 먼저 엑셀로 내려받아 보관하세요.</p>', '되돌리기');
+    if (!ok) return;
+    try { await UI.post('/api/project/checklist/reset'); toast('권장 단계로 되돌렸습니다', 'ok'); await load(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+
+  load().then(() => { $('#seedNote').hidden = !(view && view.checked === 0); });
+})();
+</script>
+</body>
+</html>

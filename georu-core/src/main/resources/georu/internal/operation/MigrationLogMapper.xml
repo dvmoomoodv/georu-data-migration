@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.georu.core.internal.operation.mapper.MigrationLogMapper">
+
+    <!-- 
+        MigrationLogMapper XML 파일
+        - MyBatis가 @Mapper 어노테이션을 인식하도록 하는 최소한의 XML 파일
+        - 실제 쿼리는 어노테이션에 정의되어 있음
+        - 이 파일은 Bean 등록을 위한 용도
+    -->
+
+    <!-- ResultMap 정의 -->
+    <resultMap id="migrationLogResultMap" type="com.georu.core.internal.entity.MigrationLog">
+        <id property="id" column="id"/>
+        <result property="migrationJobId" column="migration_job_id"/>
+        <result property="migrationId" column="migration_id"/>
+        <result property="logLevel" column="log_level"/>
+        <result property="category" column="category"/>
+        <result property="step" column="step"/>
+        <result property="subStep" column="sub_step"/>
+        <result property="operationType" column="operation_type"/>
+        <result property="message" column="message"/>
+        <result property="details" column="details"/>
+        <result property="tableName" column="table_name"/>
+        <result property="recordId" column="record_id"/>
+        <result property="recordCount" column="record_count"/>
+        <result property="batchNumber" column="batch_number"/>
+        <result property="executionTimeMs" column="execution_time_ms"/>
+        <result property="memoryUsageMb" column="memory_usage_mb"/>
+        <result property="cpuUsagePercent" column="cpu_usage_percent"/>
+        <result property="threadName" column="thread_name"/>
+        <result property="className" column="class_name"/>
+        <result property="methodName" column="method_name"/>
+        <result property="lineNumber" column="line_number"/>
+        <result property="exceptionClass" column="exception_class"/>
+        <result property="exceptionMessage" column="exception_message"/>
+        <result property="stackTrace" column="stack_trace"/>
+        <result property="tenantId" column="tenant_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="sessionId" column="session_id"/>
+        <result property="requestId" column="request_id"/>
+        <result property="clientIp" column="client_ip"/>
+        <result property="serverIp" column="server_ip"/>
+        <result property="logTime" column="log_time"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <!-- LogLevelStats ResultMap -->
+    <resultMap id="logLevelStatsResultMap" type="com.georu.core.internal.operation.mapper.MigrationLogMapper$LogLevelStats">
+        <result property="logLevel" column="log_level"/>
+        <result property="count" column="count"/>
+        <result property="firstLog" column="first_log"/>
+        <result property="lastLog" column="last_log"/>
+    </resultMap>
+
+    <!-- ErrorStats ResultMap -->
+    <resultMap id="errorStatsResultMap" type="com.georu.core.internal.operation.mapper.MigrationLogMapper$ErrorStats">
+        <result property="exceptionClass" column="exception_class"/>
+        <result property="errorCount" column="error_count"/>
+        <result property="lastOccurrence" column="last_occurrence"/>
+    </resultMap>
+
+    <!-- 
+        실제 쿼리들은 @Select, @Insert, @Update, @Delete 어노테이션에 정의되어 있습니다.
+        이 XML 파일은 MyBatis가 Mapper 인터페이스를 Bean으로 등록하기 위한 최소한의 설정입니다.
+        
+        어노테이션 기반 쿼리들:
+        - insertLog: 단일 로그 삽입
+        - insertLogBatch: 배치 로그 삽입
+        - selectByMigrationId: 마이그레이션 ID로 조회
+        - selectByMigrationIdAndLevel: 로그 레벨별 조회
+        - selectErrorLogs: 에러 로그 조회
+        - selectByStep: 단계별 조회
+        - selectPerformanceLogs: 성능 로그 조회
+        - getLogLevelStatistics: 로그 레벨별 통계
+        - getErrorStatistics: 에러 통계
+        - countByMigrationId: 로그 개수 조회
+        - deleteOldLogs: 오래된 로그 삭제
+    -->
+
+</mapper>

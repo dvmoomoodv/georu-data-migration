@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('DDL → Processor')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>DDL → Processor</h1><p class="page-desc">ASIS·TOBE DDL 로 컬럼 매핑을 추정하고 transformItem 코드와 Source SELECT 초안을 만듭니다 · 브라우저에서만 처리</p></div>
+    <div th:replace="~{ui/layout :: ddlTabs}"></div>
+    <div class="split r11">
+        <div class="card">
+            <div class="card-head"><h2>① TOBE DDL (타겟, 필수)</h2><label class="small">DBMS <select id="tDialect"><option value="auto">자동</option><option>MySQL</option><option>Oracle</option><option>MSSQL</option><option>PostgreSQL</option></select></label></div>
+            <textarea id="tobeDdl" class="mono" style="width:100%;height:22vh;margin-top:8px;font-size:12px" placeholder="타겟(TOBE) CREATE TABLE ... 여러 개 가능. 이것만 넣으면 같은 이름으로 복사하는 Processor 를 만듭니다."></textarea>
+        </div>
+        <div class="card">
+            <details id="asisBox"><summary><b>② ASIS DDL (소스, 선택)</b> <span class="small muted">· 넣으면 컬럼 이름이 다른 것까지 추정합니다. 없으면 TOBE 컬럼명 그대로 복사</span></summary>
+                <div class="inline" style="justify-content:flex-end;margin-top:6px"><label class="small">DBMS <select id="sDialect"><option value="auto">자동</option><option>Oracle</option><option>MySQL</option><option>MSSQL</option><option>PostgreSQL</option></select></label></div>
+                <textarea id="asisDdl" class="mono" style="width:100%;height:17vh;margin-top:6px;font-size:12px" placeholder="소스(ASIS) CREATE TABLE ... (선택)"></textarea>
+            </details>
+        </div>
+    </div>
+    <div class="card">
+        <div class="inline" style="justify-content:space-between;flex-wrap:wrap">
+            <div class="inline">
+                <button class="btn primary" id="parse" type="button">읽기</button>
+                <label class="small">TOBE 테이블 <select id="tobeSel"><option value="">-</option></select></label>
+                <label class="small">ASIS 테이블 <select id="asisSel"><option value="">(없음 · TOBE 이름으로 복사)</option></select></label>
+                <label class="small">업체 접두어 <input class="w-xs" id="company" value="Sample" title="SampleCodeRules / SampleConvertUtils / SamplePathRules 처럼 쓰입니다"></label>
+                <label class="small">도메인 <input class="w-xs" id="domain" value="board" title="패키지 plugins.<업체>.<도메인>.processor"></label>
+                <label class="small" title="프레임워크 규칙: Source 매퍼가 TOBE 컬럼명으로 별칭을 주므로 SourceDto getter 도 TOBE 이름. ASIS 이름 그대로 쓰는 경우만 바꿉니다">getter 기준 <select id="getterFrom"><option value="tobe">TOBE 컬럼명 (기본)</option><option value="asis">ASIS 컬럼명</option></select></label>
+            </div>
+            <div class="inline small"><button class="btn sm" id="sample" type="button" title="예제 ASIS · TOBE DDL 을 넣고 바로 생성">예제 ▾</button><button class="btn sm" id="clear" type="button">지우기</button><span class="muted">프레임워크 규칙은 <a href="#" data-panel-open="help">? 도움말</a></span></div>
+        </div>
+        <div id="warn"></div>
+    </div>
+    <div class="split r11">
+        <div class="card">
+            <h2>③ 컬럼 매핑 <span class="small muted" id="mapMeta"></span> <span class="small muted">· 원천·규칙을 바꾸면 코드가 바로 다시 생성됩니다</span></h2>
+            <div id="map" style="max-height:62vh;overflow:auto"><div class="empty">DDL 을 읽으면 TOBE 컬럼마다 ASIS 컬럼과 변환 규칙을 추정해 보여 줍니다.</div></div>
+            <div class="mt-6 small muted" id="unused"></div>
+        </div>
+        <div class="card">
+            <div class="card-head">
+                <h2>④ 생성 코드</h2>
+                <div class="inline">
+                    <select id="view"><option value="full">Processor 전체</option><option value="transform">transformItem 만</option><option value="select">Source SELECT 초안</option><option value="strategy">Strategy 옵션</option></select>
+                    <button class="btn primary sm" id="copy" type="button">복사</button><button class="btn sm" id="download" type="button">다운로드</button>
+                </div>
+            </div>
+            <div id="summary" class="mt-6 small"></div>
+            <pre id="out" class="mono codebox" style="max-height:60vh">DDL 을 읽으면 여기에 코드가 나옵니다.</pre>
+        </div>
+    </div>
+</main>
+<script th:src="@{/ui-assets/ddl-parser.js}"></script>
+<script th:src="@{/ui-assets/ddl-codegen.js}"></script>
+<script th:src="@{/ui-assets/ddl-samples.js}"></script>
+<script>
+(function () {
+  const { esc, toast, $ } = UI; const P = window.DdlParser, G = window.DdlCodegen;
+  const SHARE_KEY = 'ui.ddl.input', SHARE_ASIS = 'ui.ddl.input.asis';
+  try { const sv = localStorage.getItem(SHARE_KEY); if (sv && !$('#tobeDdl').value) $('#tobeDdl').value = sv; const sa = localStorage.getItem(SHARE_ASIS); if (sa && !$('#asisDdl').value) { $('#asisDdl').value = sa; $('#asisBox').open = true; } } catch (e) { /* ignore */ }
+  $('#tobeDdl').addEventListener('change', () => { try { localStorage.setItem(SHARE_KEY, $('#tobeDdl').value); } catch (e) { /* ignore */ } });
+  $('#asisDdl').addEventListener('change', () => { try { localStorage.setItem(SHARE_ASIS, $('#asisDdl').value); } catch (e) { /* ignore */ } });
+  let asisRes = null, tobeRes = null, map = null, gen = null;
+  const opt = (v, label, sel) => `<option value="${esc(v)}" ${sel ? 'selected' : ''}>${esc(label)}</option>`;
+
+  function parseBoth() {
+    const t = $('#tobeDdl').value; if (!t.trim()) { toast('TOBE DDL 을 넣어 주세요', 'err'); return; }
+    try { localStorage.setItem(SHARE_KEY, t); localStorage.setItem(SHARE_ASIS, $('#asisDdl').value); } catch (e) { /* ignore */ }
+    const warns = [];
+    try { tobeRes = P.parse(t, { dialect: $('#tDialect').value }); warns.push(...tobeRes.warnings.map(w => '[TOBE] ' + w)); } catch (e) { toast('TOBE 읽기 실패: ' + e.message, 'err'); return; }
+    asisRes = null; if ($('#asisDdl').value.trim()) { try { asisRes = P.parse($('#asisDdl').value, { dialect: $('#sDialect').value }); warns.push(...asisRes.warnings.map(w => '[ASIS] ' + w)); } catch (e) { toast('ASIS 읽기 실패: ' + e.message, 'err'); } }
+    $('#warn').innerHTML = warns.length ? `<details class="mt-8 alert warn"><summary>읽지 못한 부분 ${warns.length}건</summary><ul class="small">${warns.slice(0, 30).map(w => `<li>${esc(w)}</li>`).join('')}</ul></details>` : '';
+    $('#tobeSel').innerHTML = tobeRes.tables.map((x, i) => opt(i, x.name + (x.comment ? ' · ' + x.comment : ''), i === 0)).join('');
+    const asisTables = asisRes ? asisRes.tables : [];
+    $('#asisSel').innerHTML = '<option value="">(없음 · TOBE 이름으로 복사)</option>' + asisTables.map((x, i) => opt(i, x.name + (x.comment ? ' · ' + x.comment : ''))).join('');
+    pickAsisFor($('#tobeSel').value); suggest();
+    toast(`TOBE ${tobeRes.tables.length}개` + (asisTables.length ? `, ASIS ${asisTables.length}개 테이블` : ' (ASIS 없음 → 같은 이름으로 복사)'), 'ok');
+  }
+  // TOBE 테이블 이름과 가장 비슷한 ASIS 테이블을 고른다 (접두어 tb_/fb_ 제거, 낱말 겹침)
+  function pickAsisFor(ti) {
+    if (!asisRes || !asisRes.tables.length) return;
+    const t = tobeRes.tables[Number(ti)]; if (!t) return;
+    const words = (n) => n.toUpperCase().replace(/^(TB|FB|TBL|T)_/, '').split(/[^A-Z0-9]+/).filter(w => w.length >= 2);
+    const tw = words(t.name); let best = -1, score = 0;
+    asisRes.tables.forEach((a, i) => { const aw = words(a.name); let s = tw.filter(w => aw.some(x => x === w || x.startsWith(w) || w.startsWith(x))).length; if (a.name.toUpperCase() === t.name.toUpperCase()) s += 10; if (s > score) { score = s; best = i; } });
+    $('#asisSel').value = best >= 0 && score > 0 ? String(best) : (asisRes.tables.length === 1 ? '0' : '');
+  }
+  function suggest() {
+    const t = tobeRes && tobeRes.tables[Number($('#tobeSel').value)]; if (!t) return;
+    const a = asisRes && $('#asisSel').value !== '' ? asisRes.tables[Number($('#asisSel').value)] : null;
+    map = G.suggestMapping(t, a, { company: $('#company').value.trim() || 'Sample' });
+    renderMap(); regen();
+  }
+  function renderMap() {
+    const asisCols = map.asis ? map.asis.columns : [];
+    $('#mapMeta').textContent = `${map.tobe.name} ← ${map.asis ? map.asis.name : '(ASIS 없음)'} · ${map.rows.length} 컬럼`;
+    const hasAsis = !!map.asis;
+    let html = '<table><tr><th>#</th><th>TOBE 컬럼</th><th>타입</th>' + (hasAsis ? '<th>ASIS 컬럼</th>' : '') + '<th>변환 규칙</th><th>비고</th></tr>';
+    map.rows.forEach((r, i) => {
+      const nn = r.target.notNull === 'Y'; const pk = r.target.pk;
+      html += `<tr><td class="mono">${r.target.no}</td><td><b class="mono">${esc(r.target.name)}</b>${pk ? ' <span class="badge COMPLETED">PK</span>' : ''}${nn ? ' <span class="badge WARNING" title="NOT NULL">NN</span>' : ''}<div class="small muted">${esc(r.target.comment || '')}</div></td>
+        <td class="small mono">${esc(r.target.typeRaw)}<br><span class="muted">${esc(r.targetType)}</span></td>
+        ${hasAsis ? `<td><select data-i="${i}" data-k="source" style="max-width:170px"><option value="">(없음)</option>${asisCols.map(c => opt(c.name, c.name + ' ' + c.typeRaw, r.source && r.source.name === c.name)).join('')}</select></td>` : ''}
+        <td><select data-i="${i}" data-k="rule" style="max-width:220px">${G.RULES.map(x => opt(x.id, x.label, x.id === r.rule)).join('')}</select>
+          ${r.rule === 'const' ? `<input data-i="${i}" data-k="constant" value="${esc(r.constant || '')}" placeholder='Java 리터럴 예: "A"' style="width:120px;margin-top:4px">` : ''}
+          ${r.rule === 'code' ? `<input data-i="${i}" data-k="codeFn" value="${esc(r.codeFn || '')}" placeholder="CodeRules 메서드명 (비우면 컬럼명)" style="width:170px;margin-top:4px">` : ''}</td>
+        <td class="small ${/TODO|꼭|확인/.test(r.note) ? '' : 'muted'}">${esc(r.note || '')}</td></tr>`;
+    });
+    $('#map').innerHTML = html + '</table>';
+    $('#unused').innerHTML = map.unusedAsis.length ? `TOBE 에 안 쓰인 ASIS 컬럼 ${map.unusedAsis.length}개: <span class="mono">${map.unusedAsis.map(c => esc(c.name)).join(', ')}</span> · 인벤토리에 "미사용" 으로 기록하세요` : (map.asis ? 'ASIS 컬럼을 모두 썼습니다.' : '');
+    $('#map').querySelectorAll('select,input').forEach(el => el.addEventListener('change', onEdit));
+  }
+  function onEdit(e) {
+    const el = e.target, r = map.rows[Number(el.dataset.i)], k = el.dataset.k;
+    if (k === 'source') { r.source = map.asis ? map.asis.columns.find(c => c.name === el.value) || null : null; r.sourceType = r.source ? G.javaType(r.source, map.asis.dialect, {}) : null; if (r.source && (r.rule === 'todo' || r.rule === 'seq')) r.rule = 'copy'; if (!r.source && r.rule === 'copy') r.rule = 'todo'; r.note = '수정'; }
+    else if (k === 'rule') { r.rule = el.value; r.note = '수정'; }
+    else r[k] = el.value;
+    map.unusedAsis = map.asis ? map.asis.columns.filter(c => !map.rows.some(x => x.source && x.source.name === c.name)) : [];
+    renderMap(); regen();
+  }
+  function regen() {
+    if (!map) return;
+    const company = $('#company').value.trim() || 'Sample';
+    gen = G.generateProcessor(map, { company, domain: $('#domain').value.trim() || 'domain', getterFrom: $('#getterFrom').value });
+    gen.select = G.generateSourceSelect(map, {});
+    $('#summary').innerHTML = `<span class="badge ${gen.todo.length ? 'WARNING' : 'COMPLETED'}">TODO ${gen.todo.length}</span> ${gen.todo.length ? '<span class="mono">' + gen.todo.map(esc).join(', ') + '</span>' : ''} ${gen.seqCols.length ? ' · 채번 <span class="mono">' + gen.seqCols.join(', ') + '</span>' : ''}${gen.syncCols.length ? ' · 동기화 <span class="mono">' + gen.syncCols.join(', ') + '</span>' : ''}`;
+    show();
+  }
+  function show() { if (!gen) return; const v = $('#view').value; $('#out').textContent = v === 'full' ? gen.code : v === 'transform' ? gen.transformOnly : v === 'select' ? gen.select : (gen.strategy || '// 채번·동기화 컬럼 없음 - TableOptions.DEFAULT'); }
+  async function copyText(t) { try { await navigator.clipboard.writeText(t); toast('복사됨', 'ok'); } catch (e) { toast('클립보드 복사 실패 - 결과 영역에서 직접 복사하세요', 'err'); } }
+  function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+  $('#parse').onclick = parseBoth; $('#tobeSel').onchange = () => { pickAsisFor($('#tobeSel').value); suggest(); }; $('#asisSel').onchange = suggest;
+  ['company', 'domain', 'getterFrom'].forEach(id => $('#' + id).addEventListener('change', () => { if (map) { map.company = $('#company').value.trim() || 'Sample'; regen(); } }));
+  $('#view').onchange = show;
+  $('#copy').onclick = () => { if (gen) copyText($('#out').textContent); };
+  $('#download').onclick = () => { if (!gen) return; const v = $('#view').value; download(v === 'select' ? G.pascal(map.tobe.name) + 'SourceMapper-select.sql' : v === 'strategy' ? 'TableOptions-' + map.tobe.name + '.java.txt' : gen.fileName, $('#out').textContent); };
+  $('#clear').onclick = () => { $('#asisDdl').value = ''; $('#tobeDdl').value = ''; asisRes = tobeRes = map = gen = null; $('#map').innerHTML = '<div class="empty">DDL 을 읽으면 TOBE 컬럼마다 ASIS 컬럼과 변환 규칙을 추정해 보여 줍니다.</div>'; $('#out').textContent = ''; $('#summary').innerHTML = ''; $('#unused').innerHTML = ''; $('#warn').innerHTML = ''; $('#tobeSel').innerHTML = ''; $('#asisSel').innerHTML = '<option value="">(없음 · TOBE 이름으로 복사)</option>'; };
+  [$('#asisDdl'), $('#tobeDdl')].forEach(el => el.addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); parseBoth(); } }));
+  window.DdlSamples.pop($('#sample'), window.DdlSamples.samples.processor, (smp) => {
+    $('#tobeDdl').value = smp.tobe; $('#asisDdl').value = smp.asis || ''; $('#asisBox').open = !!smp.asis;
+    $('#company').value = smp.company || 'Sample'; $('#domain').value = smp.domain || 'domain'; $('#sDialect').value = 'auto'; $('#tDialect').value = 'auto';
+    parseBoth();
+    if (smp.table && tobeRes) { const i = tobeRes.tables.findIndex(t => t.name === smp.table); if (i >= 0) { $('#tobeSel').value = String(i); pickAsisFor(String(i)); suggest(); } }
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+# 0.x 동안 옛 설정 키(app.* · migration.* · notification.*)를 georu.* 로 읽는다
+org.springframework.boot.env.EnvironmentPostProcessor=com.georu.core.internal.common.config.LegacyPropertyKeysPostProcessor

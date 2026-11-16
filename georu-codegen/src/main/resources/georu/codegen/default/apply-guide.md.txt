@@ -1,0 +1,158 @@
+# 기본 소스 적용 안내
+
+생성 [(${gen.generatedAt})] · georu [(${gen.version})] · 올린 파일 [(${gen.fileName})]
+기본 패키지 `[(${s.basePackage})]` · 소스 `[(${s.sourceDataSource})]` ([(${s.sourceDialect})]) · 타겟 `[(${s.targetDataSource})]` ([(${s.targetDialect})])
+
+## 1. 이 묶음에 든 것
+
+| 구분 | 개수 |
+|------|------|
+| 업무 | [(${sum.works})] ([(${sum.workKeys})]) |
+| 테이블 | [(${sum.tables})] 중 이관대상 [(${sum.migrate})] (원천 지정 [(${sum.mapped})] · 골격 [(${sum.skeleton})]), 제외 [(${sum.excluded})] |
+| 파일 | Java [(${sum.javaFiles})] · XML [(${sum.xmlFiles})] · 설정 [(${sum.configFiles})] |
+| Writer | BATCH [(${sum.batch})] · REUSE [(${sum.reuse})] → 6절 |
+| Reader · Writer 파일 | [(${sum.readerWriter} == 'FILES' ? '테이블마다 만듦 (FILES)' : '엔진 공용, 파일 없음 (ENGINE). REUSE 테이블만 Writer 파일')] → 6절 |
+| 할 일 (TODO) | [(${sum.todo})] (골격 테이블 [(${sum.skeleton})] 포함) → 7절 |
+
+업체 기본 셋트(`[(${s.pascal})]Application` · `application.yml` · `application-dev.yml` · `common/[(${s.pascal})]ConvertUtils` · `common/[(${s.pascal})]AuditRules` · `[(${s.pascal})]ArchTest` · `gradle/georu-mapping-status.gradle`)는 처음 한 번만 필요하다.
+이미 있는 프로젝트라면 3절 방법으로 풀 때 자동으로 건너뛴다.
+
+## 2. 넣기 전 확인
+
+- [ ] `build.gradle` 에 georu 의존성과 lombok 이 있다 (아래)
+- [ ] 소스 · 타겟 DB 의 JDBC 드라이버를 `build.gradle` 에 더했다 (starter 에는 H2 만 있다. 안내서 "DB 접속 · JDBC 드라이버")
+- [ ] 이 묶음이 쓰는 DataSource 이름: 소스 `[(${s.sourceDataSource})]`, 타겟 `[(${s.targetDataSource})]`
+- [ ] 앱 시작 클래스가 `[(${s.basePackage})]` 또는 그 위 패키지에 있다 (없으면 이 묶음의 `[(${s.pascal})]Application` 을 쓴다)
+
+```groovy
+implementation 'com.georu:georu-spring-boot-starter:[(${gen.version})]'
+testImplementation 'com.georu:georu-test:[(${gen.version})]'
+compileOnly 'org.projectlombok:lombok'
+annotationProcessor 'org.projectlombok:lombok'
+// JDBC 드라이버 (예: 소스 Oracle · 타겟 MySQL. 다른 DB 는 안내서 jdbc-driver)
+runtimeOnly 'com.oracle.database.jdbc:ojdbc11'
+runtimeOnly 'com.oracle.database.nls:orai18n'
+runtimeOnly 'com.mysql:mysql-connector-j'
+```
+
+## 3. 넣기
+
+저장소 루트에서, 이미 있는 파일은 덮어쓰지 않게 푼다.
+
+```
+unzip -n [(${zipName})] -d .
+```
+
+Windows 탐색기라면 "파일 건너뛰기"를 고른다. 그다음 `build.gradle` 에 한 줄을 더한다 (처음 한 번).
+
+```groovy
+apply from: 'gradle/georu-mapping-status.gradle'
+```
+
+업무 Strategy 는 `@GeoruPlugin` 이라 따로 등록하지 않는다.
+업무 하나를 끄려면 `application.yml` 에 `georu.plugins.[(${s.company})].<업무>.enabled: false`.
+
+공통 컬럼 규칙: 감사 컬럼 `REG_DATE` · `REG_ID` · `UPT_DATE` · `UPT_ID`, 일반 컬럼 `USE_YN` · `DEL_YN` 은 원천의 흔한 이름(예: `REG_DT` · `CREATED_AT` · `MOD_ID` · `USE_AT` · `DEL_FLAG`)으로 채우고,
+Processor 에서 비면 기본값(지금 · 이관 등록자 · `Y` · `N`)을 넣는다. WRITER_TEST 등록자 표기는 `common/[(${s.pascal})]AuditRules` 의 컬럼(`REG_ID` · `UPT_ID`)을 쓴다.
+
+## 4. 설정
+
+`application-dev.yml` 의 접속 정보 자리를 채운다 (운영은 환경 변수로).
+
+```
+georu.datasource.operation              운영 저장소 (기본: 내장 H2 파일, application.yml)
+georu.datasource.[(${s.sourceDataSource})]               소스 DB 접속 정보 (SOURCE_DB_URL · SOURCE_DB_USERNAME · SOURCE_DB_PASSWORD)
+georu.datasource.[(${s.targetDataSource})]               타겟 DB 접속 정보 (TARGET_DB_URL · TARGET_DB_USERNAME · TARGET_DB_PASSWORD)
+```
+
+기동 로그에서 **활성 프로파일**(`The following 1 profile is active: "dev"`)과 DataSource 접속 로그를 확인한다. 다른 프로파일(예: 환경 변수 `SPRING_PROFILES_ACTIVE` 가 다른 값)로 뜨면 그 프로파일 yml 이 없어 접속 정보가 비고, 기동은 되지만 첫 실행에서 `jdbcUrl is required` 로 실패한다.
+
+채번(`TableOptions.sequenceColumns`)을 쓰는 테이블이 있으면 `application.yml` 의 `georu.sequence.table` 등을 TOBE 앱의 채번 관리 테이블에 맞춘다 (기본 `mig_sequence`). 타겟 DB 가 여럿이고 관리 테이블이 DB 마다 다르면 `georu.datasource.<DB>.sequence.*`, 한 DB 의 관리 테이블을 같이 쓰면 `sequence.datasource` + `key-prefix`. 예제 앱 `examples/demo` 의 `application.yml` 과 플러그인(`demo.member` · `demo.multi`)이 그대로 예이고, 안내서 "시퀀스(채번) 사용법" 의 "채번 위치" 절에 경우별 설정이 있다. 테이블이 없으면 첫 채번에서 `시퀀스 관리행이 없습니다: <테이블> <키>` 로 실패한다.
+
+## 5. 확인 순서
+
+1. `./gradlew build` — 컴파일 · 의존 경계 테스트
+2. `./gradlew scanMappingStatus` — TODO [(${sum.todo})] · 원천 미지정 [(${sum.sourceUndefined})] 이면 정상
+3. 앱 실행 → 운영 UI "테이블 이관 실행" → 플러그인 `[(${s.company})].<업무>` · 테이블 선택 → READER_TEST 로 몇 건이 읽히는지
+4. PROCESSOR_TEST → WRITER_TEST 순서로. **WRITER_TEST 는 타겟에 실제로 쓴다** (`testMaxItems` 건). 끝나면 타겟 테이블과 채번 관리행을 비우고 **앱을 다시 띄운다** (채번 선점 상태가 메모리에 있다). 비우지 않으면 NORMAL 이 "기존 데이터" 로 차단된다 (`ignoreExistingData` 는 그 위에 더 쓰겠다는 뜻)
+5. NORMAL 로 전량. 부모 테이블이 자식보다 먼저. 소스 건수와 적재 건수를 비교한다 (이관 조건을 넣었으면 그만큼 적다)
+
+## 6. Writer 고르기
+
+테이블마다 Writer 기반 클래스가 둘 중 하나다. **기본은 BATCH** 이고 대부분 그대로 둔다.
+
+| | BATCH (기본) | REUSE |
+|---|---|---|
+| 기반 클래스 | `AbstractBatchMigrationWriter` | `AbstractMigrationWriter` + `writeToDatabase(items)` |
+| 보내는 방식 · 속도 | 모아서 한 번에. 빠르다 | 행마다 바로. 느리다 |
+| 실패했을 때 | 묶음 전체 실패, 로그는 묶음 단위 | 실패한 행에서 멈추고 로그에 그 행 ID |
+| 어울리는 건수 · 데이터 | 수만 건 이상, 형식이 고르고 행 오류가 드문 데이터 | 수만 건 이하, 키 · 필수값 위반이 있을 수 있는 데이터 |
+| 큰 행 (BLOB · 긴 본문) | 묶음이 커져 메모리 · 패킷 한도에 걸릴 수 있다 | 행마다 보내 한도 걱정이 적다 |
+
+업무 성격별 권장 (처음 정할 때 기준, 테스트 모드 결과를 보고 바꾼다):
+
+| 업무 성격 | 예 | 권장 |
+|---|---|---|
+| 이력 · 로그 | 접속 로그, 변경 이력, 발송 이력 | BATCH (대량, 단순 INSERT) |
+| 거래 · 실적 | 주문, 결제, 수강 신청, 포인트 | BATCH (첫 적재 실패 때만 잠시 REUSE) |
+| 회원 · 고객 마스터 | 회원, 고객, 거래처 | 첫 적재 REUSE → 안정되면 BATCH (중복 키 · 필수값 위반이 잦고 자식이 참조) |
+| 조직 · 계층 | 회사, 부서, 사용자, 메뉴 | REUSE (작고, 상위 누락 같은 행 오류를 바로 본다) |
+| 공통코드 · 설정 | 코드 그룹, 코드 | REUSE (속도 차이 없음) |
+| 첨부 · 본문 | 첨부파일, 게시글 본문 | REUSE (건수가 많으면 BATCH + 청크 줄이기) |
+
+그 밖에 REUSE 를 고르는 경우:
+
+- 어느 행이 문제인지 찾아야 할 때 (처음 적재하는 테이블, 원천 품질을 모르는 테이블, WRITER_TEST 에서 BATCH 가 실패했는데 원인 행을 모를 때)
+- INSERT 뒤 키를 돌려받는 SQL(`selectKey` · `useGeneratedKeys`)처럼 행마다 결과가 필요할 때
+- BATCH 에서만 드라이버 오류가 날 때 (묶음 실행 설정과 SQL 이 맞지 않는 경우)
+- 수백 건 이하의 작은 테이블 (속도 차이가 거의 없다)
+
+권장 순서: BATCH 로 테스트 모드를 돌리고, WRITER_TEST 가 실패해 원인 행을 못 찾으면 그 테이블만 REUSE 로 바꿔 다시 돌린다. 고친 뒤 BATCH 로 되돌려도 된다.
+
+바꾸는 법: 아직 넣지 않은 테이블은 정의 파일의 `Writer` 열에 `REUSE` 를 적고 생성한다. 이미 넣은 Writer 는 `unzip -n` 이 덮지 않으므로
+직접 고친다 (`extends AbstractMigrationWriter` 로 바꾸고 `writeItems` 에서 `writeToDatabase(items)` 를 부른다).
+Writer 파일이 없는 테이블(ENGINE)을 REUSE 로 바꾸려면 `Writer` 열을 `REUSE` 로 바꿔 다시 생성해 Writer 파일을 받거나 위처럼 직접 만들고, 어느 쪽이든 **업무 클래스 선언에 `.writer(…Writer.class)` 를 직접 더한다** (`unzip -n` 은 이미 있는 업무 클래스를 덮지 않으므로 연결 줄은 자동으로 들어가지 않는다).
+
+**Reader · Writer 파일 (ENGINE · FILES).** ENGINE(기본)은 Reader · Writer 파일을 만들지 않는다. 엔진 공용 Reader · Writer 가 SourceMapper · TargetMapper 를
+이름 규칙(`georu.<업체>.<업무>.<테이블>SourceMapper`)으로 불러 같은 일을 하고, 테스트 모드 세 가지도 같은 기반 클래스가 처리해 결과가 같다.
+FILES 는 테이블마다 파일을 만들어 업무 클래스에 연결한다. FILES 로 받은 뒤 지우려면 파일과 업무 클래스의 `.reader(…)` · `.writer(…)` 줄을 함께 지운다.
+자세한 기준은 운영 UI 안내서 "Writer 고르기"(`/ui/guide?name=writer-choice`).
+
+## 7. 해야 할 일
+[# th:if="${sum.skeleton > 0}"]
+### 골격 테이블 (원천 미지정 · 실행 전 확인에서 막힘)
+
+| 업무 | 테이블 | 파일 | 할 일 |
+|------|--------|------|-------|
+[# th:each="d : ${sum.skeletonTables}"]| [(${d.work})] | [(${d.table})] | `[(${d.file})]:[(${d.line})]` | FROM · SELECT 작성 후 `WHERE 1 = 0` 을 `WHERE 1 = 1` 로 |
+[/][/][# th:if="${!sum.todoTop.isEmpty()}"]
+### 그 밖의 TODO
+
+| 업무 | 테이블 | 종류 | 위치 |
+|------|--------|------|------|
+[# th:each="d : ${sum.todoTop}"]| [(${d.work})] | [(${d.table})] | [(${d.type})] | `[(${d.file})]:[(${d.line})]` |
+[/][# th:if="${sum.todoMore > 0}"]
+(상위 20행만. 나머지 [(${sum.todoMore})]행은 generation-report.csv)
+[/][/][# th:if="${sum.todo == 0}"]
+없음.
+[/][# th:if="${!sum.warnings.isEmpty()}"]
+### 읽을 때 경고
+
+[# th:each="m : ${sum.warnings}"]- [(${m})]
+[/][/]
+## 8. 막히면
+
+| 증상 | 원인 · 해결 |
+|------|-------------|
+| 실행 전 확인 "미완 코드"로 막힘 | 7절 골격 테이블. 원천을 채우면 풀린다 |
+| 기동 실패 "DataSource ... 가 없거나 꺼져 있습니다" | 4절 설정 확인 |
+| 기동 실패 Bean 이름 중복 | 같은 테이블이 두 업무 Strategy 에 있다. 한쪽에서 뺀다 |
+| READER_TEST 0건 | Source SQL 의 FROM · WHERE 조건 확인 |
+| 매핑 현황 화면이 비어 있음 | 3절의 `apply from` 줄이 빠졌다 |
+| WRITER_TEST 가 `Batch insert failed` 로 실패, 원인 행을 모름 | 6절. 그 테이블만 REUSE 로 바꿔 다시 돌리면 로그에 실패 행 ID 가 남는다 |
+
+## 9. 다시 생성할 때
+
+새 테이블이나 새 업무가 생기면 파일을 고쳐 다시 올리고 같은 방법(`unzip -n`)으로 푼다.
+새 파일만 들어가고 손댄 파일은 그대로다.
+이미 있는 업무 Strategy 는 건너뛰므로, 새 테이블의 `TableDef` 줄은 이 묶음의 `<업무>/<업무>Strategy.java` 에서 복사해 붙인다.

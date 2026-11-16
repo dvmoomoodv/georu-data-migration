@@ -1,0 +1,13 @@
+plugins {
+    id 'georu.java-library'
+}
+
+description = 'georu 자동 설정: 엔진·API·UI Bean 등록, 플러그인 토글'
+
+dependencies {
+    api project(':georu-core')
+    implementation libs.spring.boot.autoconfigure
+
+    // api·ui 는 클래스패스에 있을 때만 스캔된다 (패키지 이름으로만 참조). 컴파일 의존 없음
+    annotationProcessor libs.spring.boot.configuration.processor
+}

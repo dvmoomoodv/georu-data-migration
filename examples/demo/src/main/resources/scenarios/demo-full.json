@@ -1,0 +1,25 @@
+{
+  "id": "demo-full",
+  "name": "데모 전체 이관",
+  "description": "데모 11 테이블을 부모 → 자식 순서로 이관. 시퀀스는 선적재하지 않고 테이블 Job 마다 선점·MAX 동기화. 로그인 로그는 월별 분할",
+  "onUnitFailure": "STOP",
+  "onStepStop": "STOP_ALL",
+  "common": {
+    "tenantLevel1": "DEMO", "tenantLevel2": "DEMO", "tenantLevel3": "DEMO", "tenantLevel4": "DEMO", "tenantLevel5": "DEMO",
+    "chunkSize": 500
+  },
+  "steps": [
+    { "plugin": "demo.code",   "table": "tb_code_group",       "label": "코드 그룹" },
+    { "plugin": "demo.code",   "table": "tb_code",             "label": "코드" },
+    { "plugin": "demo.member", "table": "tb_member_grade",     "label": "회원 등급" },
+    { "plugin": "demo.member", "table": "tb_member",           "label": "회원 (탈퇴 제외)" },
+    { "plugin": "demo.member", "table": "tb_member_login_log", "label": "로그인 로그 (월별)",
+      "divide": { "unit": "1m", "startDate": "20251001", "endDate": "20261031" } },
+    { "plugin": "demo.board",  "table": "tb_board",            "label": "게시판" },
+    { "plugin": "demo.board",  "table": "tb_post",             "label": "게시글 (삭제 제외)" },
+    { "plugin": "demo.board",  "table": "tb_post_file",        "label": "첨부 파일" },
+    { "plugin": "demo.board",  "table": "tb_post_comment",     "label": "댓글 (삭제 제외)" },
+    { "plugin": "demo.stats",  "table": "tb_stat_daily",       "label": "일별 통계" },
+    { "plugin": "demo.stats",  "table": "tb_stat_menu",        "label": "메뉴 통계" }
+  ]
+}

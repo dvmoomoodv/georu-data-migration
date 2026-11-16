@@ -1,0 +1,45 @@
+package [(${w.pkg})].writer;
+
+import [(${w.pkg})].dto.[(${t.pascal})]TargetDto;
+import com.georu.core.plugin.GeoruDataSources;
+import com.georu.core.writer.AbstractMigrationWriter;
+import org.apache.ibatis.session.SqlSession;
+
+import java.util.List;
+
+/**
+ * [Writer] [(${t.physical})][(${t.javaComment})] ([(${s.targetDataSource})])
+ * SQL 은 georu/[(${s.company})]/[(${w.key})]/[(${t.pascal})]TargetMapper.xml 의 insertData.
+ * REUSE 모드: 행마다 바로 실행해 실패한 행을 정확히 알 수 있다. 테스트 모드 · Queue 적재는 기반 클래스가 처리한다.
+ * 자동 생성: georu 코드 생성기 [(${gen.version})]
+ */
+public class [(${t.pascal})]Writer extends AbstractMigrationWriter<[(${t.pascal})]TargetDto> {
+
+    private static final String NS = "georu.[(${w.plugin})].[(${t.pascal})]TargetMapper";
+
+    public [(${t.pascal})]Writer(GeoruDataSources dataSources) {
+        super("MIGRATION", "TARGET");
+        this.sqlSessionFactory = dataSources.sqlSessionFactory("[(${s.targetDataSource})]");
+    }
+
+    @Override
+    protected void writeItems(List<? extends [(${t.pascal})]TargetDto> items) throws Exception {
+        writeToDatabase(items);
+    }
+
+    @Override
+    protected void insertItem(SqlSession session, [(${t.pascal})]TargetDto item) throws Exception {
+        session.insert(NS + ".insertData", item);
+    }
+
+    @Override
+    protected Object getItemId([(${t.pascal})]TargetDto item) {
+[# th:if="${t.idExpr != null}"]        return item != null ? [(${t.idExpr})] : null;
+[/][# th:unless="${t.idExpr != null}"]        return null;    // PK 없음 (Processor 의 getItemId 참고)
+[/]    }
+
+    @Override
+    protected String getEntityName() {
+        return "[(${t.pascal})]Writer";
+    }
+}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Target] target-1 demo_dw.tb_post_notice -->
+<mapper namespace="georu.demo.multi.TbPostNoticeTargetMapper">
+    <insert id="insertData" parameterType="com.georu.examples.demo.multi.dto.TbPostNoticeDto">
+        INSERT INTO tb_post_notice (POST_ID, BOARD_ID, TITLE, WRITER_ID, VIEW_CNT, INDATE)
+        VALUES (#{postId}, #{boardId}, #{title}, #{writerId}, #{viewCnt}, #{indate})
+    </insert>
+</mapper>

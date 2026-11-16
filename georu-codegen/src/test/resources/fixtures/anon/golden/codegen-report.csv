@@ -1,0 +1,50 @@
+업무구분,패키지,테이블,설명,이관대상,원천 테이블,매핑,Writer,상태,TODO,파일,비고
+코드,code,tb_code_group,코드그룹,Y,CD_GROUP,이름 일치 4 · 공통 컬럼 0 · 감사 컬럼 4 · 미매핑 0 (TOBE 컬럼 8),REUSE,생성,0,6,
+코드,code,tb_code,코드,Y,CD_CODE,이름 일치 6 · 공통 컬럼 0 · 감사 컬럼 4 · 미매핑 0 (TOBE 컬럼 10),REUSE,생성,0,6,
+02 회원관리,member,tb_member_grade,회원등급,Y,MEM_GRADE,이름 일치 5 · 공통 컬럼 0 · 감사 컬럼 4 · 미매핑 0 (TOBE 컬럼 9),BATCH,생성,0,5,
+02 회원관리,member,tb_member,회원,Y,MEM_MEMBER,이름 일치 10 · 공통 컬럼 0 · 감사 컬럼 4 · 미매핑 3 (TOBE 컬럼 17),BATCH,생성,3,5,
+02 회원관리,member,tb_member_login_log,로그인이력,Y,MEM_LOGIN_HIS,이름 일치 5 · 공통 컬럼 0 · 감사 컬럼 1 · 미매핑 3 (TOBE 컬럼 9),BATCH,생성,4,5,
+게시판,board,tb_board,게시판,Y,BRD_BOARD,이름 일치 7 · 공통 컬럼 0 · 감사 컬럼 4 · 미매핑 0 (TOBE 컬럼 11),BATCH,생성,0,5,
+게시판,board,tb_post,게시글,Y,BRD_POST,이름 일치 9 · 공통 컬럼 0 · 감사 컬럼 4 · 미매핑 0 (TOBE 컬럼 13),BATCH,생성,0,5,
+게시판,board,tb_post_file,게시글첨부,Y,BRD_POST_FILE,이름 일치 6 · 공통 컬럼 0 · 감사 컬럼 4 · 미매핑 2 (TOBE 컬럼 12),BATCH,생성,2,5,PK 번호 유지 (설명에 채번): FILE_ID — 새 번호를 받으려면 SELECT 를 NULL 로 바꾸고 Strategy 에 sequenceColumns
+게시판,board,tb_post_comment,게시글댓글,Y,BRD_COMMENT,이름 일치 7 · 공통 컬럼 0 · 감사 컬럼 4 · 미매핑 0 (TOBE 컬럼 11),BATCH,생성,0,5,
+Stats,stats,tb_stat_daily,일별통계,Y,STAT_DAILY_VISIT,이름 일치 6 · 공통 컬럼 0 · 감사 컬럼 1 · 미매핑 2 (TOBE 컬럼 9),BATCH,생성,3,5,
+Stats,stats,tb_stat_menu,메뉴통계,Y,STAT_MENU_HIT,이름 일치 6 · 공통 컬럼 0 · 감사 컬럼 1 · 미매핑 1 (TOBE 컬럼 8),BATCH,생성,2,5,
+기타,,tb_sequence,공통시퀀스관리,N,,,,제외,0,0,이관대상 아님
+지점,branch,tb_branch,지점 (2:1 테이블별 소스: source-1 BR_BRANCH),Y,,원천 미지정,BATCH,생성 (골격),8,5,원천 테이블이 없어 SELECT 골격만 (WHERE 1 = 0)
+포인트,point,tb_member_point,회원 포인트 (2:1 결합: SourceLookup),Y,,원천 미지정,REUSE,생성 (골격),9,6,원천 테이블이 없어 SELECT 골격만 (WHERE 1 = 0)
+Stats,,tb_stat_daily_hist,"일별통계 이력 (1:2 한 번 읽어 두 곳에 쓰기, 자연키 upsert)",N,,,,제외,0,0,이관대상 아님
+강좌,subj,tb_subj_course,가상 tb_subj_course,Y,SUBJ_COURSE,이름 일치 6 · 공통 컬럼 0 · 감사 컬럼 2 · 미매핑 0 (TOBE 컬럼 8),BATCH,생성,0,5,PK 번호 유지 (설명에 채번): COURSE_ID — 새 번호를 받으려면 SELECT 를 NULL 로 바꾸고 Strategy 에 sequenceColumns
+
+업무,테이블,종류,파일,줄,내용
+member,tb_member,COLUMN_TODO,src/main/resources/georu/acme/member/TbMemberSourceMapper.xml,29,", NULL AS ""BIRTH_YMD""    <!-- 생년월일 VARCHAR(8) TODO ← ASIS ? -->"
+member,tb_member,COLUMN_TODO,src/main/resources/georu/acme/member/TbMemberSourceMapper.xml,34,", NULL AS ""JOIN_DATE""    <!-- 가입일시 VARCHAR(14) TODO ← ASIS ? -->"
+member,tb_member,COLUMN_TODO,src/main/resources/georu/acme/member/TbMemberSourceMapper.xml,35,", NULL AS ""LAST_LOGIN_DATE""    <!-- 최근로그인 VARCHAR(14) TODO ← ASIS ? -->"
+member,tb_member_login_log,PK_TODO,src/main/java/com/georu/acme/member/processor/TbMemberLoginLogProcessor.java,25,"// TODO PK: LOGIN_LOG_ID 원천 없음 - 채번이면 Strategy 에 .options(TableOptions.builder().sequenceColumns(List.of(""LOGIN_LOG_ID"")).build()), 아니면 SELECT 를 채운 뒤 비었는지 검증을 더한다"
+member,tb_member_login_log,COLUMN_TODO,src/main/resources/georu/acme/member/TbMemberLoginLogSourceMapper.xml,24,"NULL AS ""LOGIN_LOG_ID""    <!-- 이력ID (TOBE 시퀀스 채번) BIGINT TODO ← ASIS ? -->"
+member,tb_member_login_log,COLUMN_TODO,src/main/resources/georu/acme/member/TbMemberLoginLogSourceMapper.xml,25,", NULL AS ""ASIS_ID""    <!-- ASIS LOGIN_HIS_ID (역추적) BIGINT TODO ← ASIS ? -->"
+member,tb_member_login_log,COLUMN_TODO,src/main/resources/georu/acme/member/TbMemberLoginLogSourceMapper.xml,27,", NULL AS ""LOGIN_DATE""    <!-- 로그인일시 VARCHAR(14) TODO ← ASIS ? -->"
+board,tb_post_file,COLUMN_TODO,src/main/resources/georu/acme/board/TbPostFileSourceMapper.xml,25,", NULL AS ""ASIS_ID""    <!-- ASIS FILE_ID (역추적) BIGINT TODO ← ASIS ? -->"
+board,tb_post_file,COLUMN_TODO,src/main/resources/georu/acme/board/TbPostFileSourceMapper.xml,28,", NULL AS ""FILE_PATH""    <!-- 저장경로 file/board/... VARCHAR(500) TODO ← ASIS ? -->"
+stats,tb_stat_daily,PK_TODO,src/main/java/com/georu/acme/stats/processor/TbStatDailyProcessor.java,25,"// TODO PK: STAT_ID 원천 없음 - 채번이면 Strategy 에 .options(TableOptions.builder().sequenceColumns(List.of(""STAT_ID"")).build()), 아니면 SELECT 를 채운 뒤 비었는지 검증을 더한다"
+stats,tb_stat_daily,COLUMN_TODO,src/main/resources/georu/acme/stats/TbStatDailySourceMapper.xml,24,"NULL AS ""STAT_ID""    <!-- 통계ID (TOBE 대리키, 시퀀스 채번) BIGINT TODO ← ASIS ? -->"
+stats,tb_stat_daily,COLUMN_TODO,src/main/resources/georu/acme/stats/TbStatDailySourceMapper.xml,25,", NULL AS ""STAT_YMD""    <!-- 통계일 VARCHAR(8) TODO ← ASIS ? -->"
+stats,tb_stat_menu,PK_TODO,src/main/java/com/georu/acme/stats/processor/TbStatMenuProcessor.java,25,"// TODO PK: STAT_MENU_ID 원천 없음 - 채번이면 Strategy 에 .options(TableOptions.builder().sequenceColumns(List.of(""STAT_MENU_ID"")).build()), 아니면 SELECT 를 채운 뒤 비었는지 검증을 더한다"
+stats,tb_stat_menu,COLUMN_TODO,src/main/resources/georu/acme/stats/TbStatMenuSourceMapper.xml,24,"NULL AS ""STAT_MENU_ID""    <!-- 메뉴통계ID (TOBE 대리키, 시퀀스 채번) BIGINT TODO ← ASIS ? -->"
+branch,tb_branch,PK_TODO,src/main/java/com/georu/acme/branch/processor/TbBranchProcessor.java,25,"// TODO PK: BRANCH_CD 원천 없음 - 채번이면 Strategy 에 .options(TableOptions.builder().sequenceColumns(List.of(""BRANCH_CD"")).build()), 아니면 SELECT 를 채운 뒤 비었는지 검증을 더한다"
+branch,tb_branch,SOURCE_UNDEFINED,src/main/resources/georu/acme/branch/TbBranchSourceMapper.xml,10,WHERE 1 = 0    <!-- TODO 원천 미지정: FROM · SELECT 를 채운 뒤 이 줄을 WHERE 1 = 1 로 바꾼다 -->
+branch,tb_branch,TODO,src/main/resources/georu/acme/branch/TbBranchSourceMapper.xml,15,FROM TODO_SOURCE_TABLE A
+branch,tb_branch,COLUMN_TODO,src/main/resources/georu/acme/branch/TbBranchSourceMapper.xml,23,"NULL AS ""BRANCH_CD""    <!-- 지점코드 VARCHAR(10) TODO ← ASIS ? -->"
+branch,tb_branch,COLUMN_TODO,src/main/resources/georu/acme/branch/TbBranchSourceMapper.xml,24,", NULL AS ""BRANCH_NM""    <!-- 지점명 VARCHAR(50) TODO ← ASIS ? -->"
+branch,tb_branch,COLUMN_TODO,src/main/resources/georu/acme/branch/TbBranchSourceMapper.xml,25,", NULL AS ""REGION""    <!-- 지역 VARCHAR(20) TODO ← ASIS ? -->"
+branch,tb_branch,COLUMN_TODO,src/main/resources/georu/acme/branch/TbBranchSourceMapper.xml,26,", NULL AS ""USE_YN""    <!-- 사용여부 CHAR(1) TODO ← ASIS ? -->"
+branch,tb_branch,TODO,src/main/resources/georu/acme/branch/TbBranchSourceMapper.xml,27,FROM TODO_SOURCE_TABLE A
+point,tb_member_point,PK_TODO,src/main/java/com/georu/acme/point/processor/TbMemberPointProcessor.java,25,"// TODO PK: MEMBER_ID 원천 없음 - 채번이면 Strategy 에 .options(TableOptions.builder().sequenceColumns(List.of(""MEMBER_ID"")).build()), 아니면 SELECT 를 채운 뒤 비었는지 검증을 더한다"
+point,tb_member_point,SOURCE_UNDEFINED,src/main/resources/georu/acme/point/TbMemberPointSourceMapper.xml,10,WHERE 1 = 0    <!-- TODO 원천 미지정: FROM · SELECT 를 채운 뒤 이 줄을 WHERE 1 = 1 로 바꾼다 -->
+point,tb_member_point,TODO,src/main/resources/georu/acme/point/TbMemberPointSourceMapper.xml,15,FROM TODO_SOURCE_TABLE A
+point,tb_member_point,COLUMN_TODO,src/main/resources/georu/acme/point/TbMemberPointSourceMapper.xml,23,"NULL AS ""MEMBER_ID""    <!-- 회원ID (본사) INT TODO ← ASIS ? -->"
+point,tb_member_point,COLUMN_TODO,src/main/resources/georu/acme/point/TbMemberPointSourceMapper.xml,24,", NULL AS ""MEMBER_NM""    <!-- 회원명 VARCHAR(50) TODO ← ASIS ? -->"
+point,tb_member_point,COLUMN_TODO,src/main/resources/georu/acme/point/TbMemberPointSourceMapper.xml,25,", NULL AS ""BRANCH_CD""    <!-- 포인트 지점 (source-1 BR_MEMBER_POINT) VARCHAR(10) TODO ← ASIS ? -->"
+point,tb_member_point,COLUMN_TODO,src/main/resources/georu/acme/point/TbMemberPointSourceMapper.xml,26,", NULL AS ""BRANCH_NM""    <!-- 지점명 (source-1 BR_BRANCH) VARCHAR(50) TODO ← ASIS ? -->"
+point,tb_member_point,COLUMN_TODO,src/main/resources/georu/acme/point/TbMemberPointSourceMapper.xml,27,", NULL AS ""POINT_BAL""    <!-- 포인트 잔액 (없으면 0) BIGINT TODO ← ASIS ? -->"
+point,tb_member_point,TODO,src/main/resources/georu/acme/point/TbMemberPointSourceMapper.xml,28,FROM TODO_SOURCE_TABLE A

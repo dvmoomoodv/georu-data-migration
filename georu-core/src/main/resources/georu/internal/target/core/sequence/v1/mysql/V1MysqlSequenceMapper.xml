@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  [core] 시퀀스 채번 v1 / MySQL 방언
+  - 관리 테이블명·컬럼명은 yml(georu.sequence.*) → SequenceTableSpec(cfg) 로만 받는다 (${cfg.*}). 테이블명을 여기 적지 않는다.
+  - 키 값·숫자는 #{} 바인딩.
+  - 업체 CommonSequnceMapper(nextval/manyseq/currval) 참고. 갱신값 회수는 LAST_INSERT_ID 로 원자화.
+  - 전제: 관리 테이블에 (테이블명, 컬럼명) PK/UNIQUE.
+  - 값 열이 NULL 인 관리행은 initial 로 본다 (COALESCE). 없으면 NULL + N 이 NULL 로 남고 LAST_INSERT_ID 가 0 을 돌려줘
+    [-N+1, 0] 구간을 블록마다 다시 나눠 준다 (MySQL 8.0.46 확인).
+  참조: src/main/java/com/georu/core/sequence/README.md
+-->
+<mapper namespace="com.georu.core.internal.sequence.v1.mysql.mapper.V1MysqlSequenceMapper">
+
+    <!-- 관리행 생성 + N 선점을 한 문장으로. result = 갱신 후 현재값(선점 구간의 끝). 업체 manyseq 와 같은 의미 -->
+    <insert id="upsertAdd" parameterType="com.georu.core.internal.sequence.v1.mysql.V1MysqlReserveParam">
+        /* seq v1/mysql upsertAdd */
+        INSERT INTO ${cfg.table} (${cfg.tableNameColumn}, ${cfg.columnNameColumn}, ${cfg.valueColumn})
+        VALUES (#{key.table}, #{key.column}, LAST_INSERT_ID(#{initial} + #{count}))
+        ON DUPLICATE KEY UPDATE ${cfg.valueColumn} = LAST_INSERT_ID(COALESCE(${cfg.valueColumn}, #{initial}) + #{count})
+        <selectKey keyProperty="result" resultType="long" order="AFTER">
+            SELECT LAST_INSERT_ID()
+        </selectKey>
+    </insert>
+
+    <!-- 현재값(마지막 사용값). 업체 currval -->
+    <select id="selectCurrent" resultType="java.lang.Long">
+        /* seq v1/mysql selectCurrent */
+        SELECT ${cfg.valueColumn}
+          FROM ${cfg.table}
+         WHERE ${cfg.tableNameColumn}  = #{key.table}
+           AND ${cfg.columnNameColumn} = #{key.column}
+    </select>
+
+    <insert id="insertRow">
+        /* seq v1/mysql insertRow */
+        INSERT INTO ${cfg.table} (${cfg.tableNameColumn}, ${cfg.columnNameColumn}, ${cfg.valueColumn})
+        VALUES (#{key.table}, #{key.column}, #{value})
+    </insert>
+
+    <update id="setValue">
+        /* seq v1/mysql setValue */
+        UPDATE ${cfg.table}
+           SET ${cfg.valueColumn} = #{value}
+         WHERE ${cfg.tableNameColumn}  = #{key.table}
+           AND ${cfg.columnNameColumn} = #{key.column}
+    </update>
+
+    <select id="selectMaxOfTarget" resultType="java.lang.Long">
+        /* seq v1/mysql selectMaxOfTarget */
+        SELECT MAX(${column}) FROM ${targetTable}
+    </select>
+
+    <select id="selectAll" resultType="map">
+        /* seq v1/mysql selectAll */
+        SELECT ${cfg.tableNameColumn}  AS SEQ_TBL
+             , ${cfg.columnNameColumn} AS SEQ_COL
+             , ${cfg.valueColumn}      AS SEQ_VAL
+          FROM ${cfg.table}
+         ORDER BY 1, 2
+    </select>
+
+</mapper>

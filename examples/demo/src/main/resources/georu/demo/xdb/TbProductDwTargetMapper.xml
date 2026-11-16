@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Target] target-1 MySQL demo_dw.tb_product -->
+<mapper namespace="georu.demo.xdb.TbProductDwTargetMapper">
+    <insert id="insertData" parameterType="com.georu.examples.demo.xdb.dto.TbProductDto">
+        INSERT INTO `tb_product` (`PRODUCT_CD`, `PRODUCT_NM`, `PRICE`, `REG_DATE`)
+        VALUES (#{productCd}, #{productNm}, #{price}, #{regDate})
+    </insert>
+</mapper>

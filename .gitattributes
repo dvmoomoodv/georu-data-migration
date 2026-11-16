@@ -1,0 +1,273 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+# Explicitly declare text files you want to always be normalized and converted
+# to native line endings on checkout.
+*.java text
+*.xml text
+*.properties text
+*.yml text
+*.yaml text
+*.json text
+*.md text
+*.txt text
+*.sql text
+*.gradle text
+*.groovy text
+*.sh text eol=lf
+*.bat text eol=crlf
+# Declare files that will always have CRLF line endings on checkout.
+*.sln text eol=crlf
+*.vcxproj text eol=crlf
+# Declare files that will always have LF line endings on checkout.
+*.gitattributes text eol=lf
+*.gitignore text eol=lf
+Dockerfile text eol=lf
+Makefile text eol=lf
+# Denote all files that are truly binary and should not be modified.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mov binary
+*.mp4 binary
+*.mp3 binary
+*.flv binary
+*.fla binary
+*.swf binary
+*.gz binary
+*.zip binary
+*.7z binary
+*.ttf binary
+*.eot binary
+*.woff binary
+*.woff2 binary
+*.pyc binary
+*.pdf binary
+*.ez binary
+*.bz2 binary
+*.swp binary
+*.jar binary
+*.war binary
+*.ear binary
+*.class binary
+# Java specific
+*.jar binary
+*.war binary
+*.ear binary
+*.class binary
+# Gradle wrapper
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+# IDE files
+*.iml text
+*.ipr text
+*.iws text
+.idea/ text
+# Spring Boot
+application*.properties text
+application*.yml text
+application*.yaml text
+bootstrap*.properties text
+bootstrap*.yml text
+bootstrap*.yaml text
+# Database
+*.sql text
+*.ddl text
+*.dml text
+# Documentation
+*.md text
+*.adoc text
+*.txt text
+README* text
+CHANGELOG* text
+LICENSE* text
+NOTICE* text
+# Configuration files
+*.conf text
+*.config text
+*.ini text
+*.toml text
+# Web files
+*.html text
+*.css text
+*.js text
+*.jsx text
+*.ts text
+*.tsx text
+*.vue text
+*.scss text
+*.sass text
+*.less text
+# Docker
+Dockerfile* text eol=lf
+*.dockerfile text eol=lf
+docker-compose*.yml text eol=lf
+docker-compose*.yaml text eol=lf
+# CI/CD
+.github/ text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+Jenkinsfile text eol=lf
+# Logs
+*.log text
+# Temporary files
+*.tmp binary
+*.temp binary
+*.cache binary
+# OS generated files
+.DS_Store binary
+Thumbs.db binary
+ehthumbs.db binary
+Desktop.ini binary
+# JetBrains IDE
+*.iml text
+.idea/ text eol=lf
+# Eclipse IDE
+.project text
+.classpath text
+.settings/ text
+# VS Code
+.vscode/ text eol=lf
+# Maven
+pom.xml text
+*.pom text
+# Gradle
+build.gradle text
+settings.gradle text
+gradle.properties text
+*.gradle text
+# Spring Boot specific
+*.factories text
+META-INF/ text
+# Test files
+*Test.java text
+*Tests.java text
+*Spec.java text
+test/ text
+tests/ text
+# Resources
+src/main/resources/ text
+src/test/resources/ text
+# Certificates and keys (should be binary for security)
+*.pem binary
+*.key binary
+*.crt binary
+*.cer binary
+*.p12 binary
+*.pfx binary
+*.jks binary
+*.keystore binary
+*.truststore binary
+# Archives
+*.tar binary
+*.tgz binary
+*.tar.gz binary
+*.tar.bz2 binary
+*.tar.xz binary
+*.rar binary
+# Fonts
+*.otf binary
+*.ttc binary
+# Images
+*.svg text
+*.webp binary
+*.bmp binary
+*.tiff binary
+*.tif binary
+# Audio/Video
+*.wav binary
+*.avi binary
+*.mkv binary
+*.webm binary
+*.ogg binary
+*.m4a binary
+*.aac binary
+# Office documents
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+*.odt binary
+*.ods binary
+*.odp binary
+# Backup files
+*.bak binary
+*.backup binary
+*.old binary
+# Lock files
+package-lock.json text eol=lf
+yarn.lock text eol=lf
+Gemfile.lock text eol=lf
+Pipfile.lock text eol=lf
+# Environment files
+.env text
+.env.* text
+# Batch/Shell scripts
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+# Python
+*.py text
+*.pyw text
+*.pyx text
+*.pyz text
+*.pyi text
+# Ruby
+*.rb text
+*.rake text
+Gemfile text
+Rakefile text
+# Node.js
+package.json text
+package-lock.json text eol=lf
+*.js text
+*.ts text
+*.json text
+# Go
+*.go text
+# Rust
+*.rs text
+Cargo.toml text
+Cargo.lock text
+# C/C++
+*.c text
+*.cpp text
+*.cxx text
+*.cc text
+*.h text
+*.hpp text
+*.hxx text
+# C#
+*.cs text
+*.csproj text
+*.sln text eol=crlf
+*.vb text
+*.vbproj text
+# PHP
+*.php text
+# Perl
+*.pl text
+*.pm text
+# Lua
+*.lua text
+# R
+*.r text
+*.R text
+# Scala
+*.scala text
+*.sc text
+# Kotlin
+*.kt text
+*.kts text
+# Swift
+*.swift text
+# Objective-C
+*.m text
+*.mm text
+# Assembly
+*.asm text
+*.s text
+*.S text
+

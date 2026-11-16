@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Source] source-2 PostgreSQL demo_pg.shop_customer → tb_customer. 탈퇴(use_yn N) 제외, 등급 GOLD/SILVER/BRONZE → G/S/B, 날짜 → 문자 14
+     PostgreSQL: 따옴표 없는 이름은 소문자로 접힌다 (테이블 · 컬럼을 소문자로 만들었으므로 따옴표 없이 쓴다). 페이징 LIMIT / OFFSET -->
+<mapper namespace="georu.demo.xdb.TbCustomerSourceMapper">
+    <sql id="where">
+        WHERE a.use_yn = 'Y'
+    </sql>
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*) FROM shop_customer a <include refid="where"/>
+    </select>
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto" resultType="com.georu.examples.demo.xdb.dto.ShopCustomerSourceDto">
+        SELECT a.customer_id AS asis_id
+             , a.login_id
+             , a.customer_nm
+             , CASE a.grade WHEN 'GOLD' THEN 'G' WHEN 'SILVER' THEN 'S' WHEN 'BRONZE' THEN 'B' END AS grade_cd
+             , to_char(a.joined_at, 'YYYYMMDDHH24MISS') AS join_date
+          FROM shop_customer a
+        <include refid="where"/>
+         ORDER BY a.customer_id
+         LIMIT #{_pagesize} OFFSET #{_skiprows}
+    </select>
+</mapper>

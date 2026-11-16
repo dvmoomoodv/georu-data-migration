@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="georu.t6h.StgMemberBrSourceMapper">
+  <select id="selectTotalCount" resultType="int">SELECT COUNT(*) FROM BR_MEMBER WHERE STATUS &lt;&gt; 'D'</select>
+  <select id="selectPageData" resultType="map">SELECT ID, NM, EMAIL FROM BR_MEMBER WHERE STATUS &lt;&gt; 'D' ORDER BY ID LIMIT #{_pagesize} OFFSET #{_skiprows}</select>
+</mapper>

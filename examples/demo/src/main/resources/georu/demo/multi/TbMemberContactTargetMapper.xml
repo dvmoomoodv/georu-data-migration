@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Target] target-1 demo_dw.tb_member_contact (1:2 나누기) -->
+<mapper namespace="georu.demo.multi.TbMemberContactTargetMapper">
+    <insert id="insertData" parameterType="com.georu.examples.demo.multi.dto.TbMemberContactDto">
+        INSERT INTO tb_member_contact (MEMBER_ID, EMAIL, PHONE) VALUES (#{memberId}, #{email}, #{phone})
+    </insert>
+</mapper>

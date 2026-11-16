@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('관계 분석')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>관계 분석</h1><p class="page-desc">FK 가 걸려 있지 않은 테이블 구조 정의를 올리면 컬럼 이름으로 FK 관계를 추정해 분석용 xlsx(관계 목록 · 테이블 요약 · 적재 순서 · 원본 정의)를 만든다 · ASIS · TOBE 어느 쪽이든 · 올린 파일은 저장하지 않는다</p></div>
+    <div class="stack focus-col">
+            <div class="card" data-collapse="files" data-collapse-sum="#fileName,#rulesName">
+                <h2>1. 파일 올리기</h2>
+                <div class="inline small"><span class="muted">FK 없는 테이블 구조 정의서(ASIS · TOBE, 한 행에 컬럼 하나)를 올린다 · 열 · 결과 읽는 법은 <a href="#" data-panel-open="help">? 도움말</a></span>
+                    <button class="btn sm" id="btnTemplate" type="button">예제 양식 내려받기 (xlsx)</button></div>
+                <div id="drop" class="mt-10 gen-drop dropzone" tabindex="0">
+                    <b>테이블 구조 정의</b> 를 끌어다 놓거나 클릭 (CSV · xlsx · xls 첫 시트)
+                    <div id="fileName" class="small mono"></div>
+                </div>
+                <input type="file" id="file" accept=".csv,.xlsx,.xls" style="display:none">
+                <div class="mt-10">
+                    <div id="dropRules" class="gen-drop dropzone" tabindex="0">
+                        <b>업체 규칙 파일</b> <span class="muted">선택 · xlsx (명명 규칙 · 감사 컬럼)</span>
+                        <div id="rulesName" class="small mono"></div>
+                    </div>
+                    <input type="file" id="fileRules" accept=".xlsx,.xls" style="display:none">
+                    <div class="mt-6 inline small">
+                        <button class="btn sm" id="btnRulesTemplate" type="button">규칙 양식 내려받기</button>
+                        <button class="btn sm" id="btnRulesExport" type="button">현재 규칙 내려받기</button>
+                        <span class="muted">올리면 2. 설정의 명명 규칙 · 감사 컬럼이 채워진다 · 서버에 남지 않는다</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" data-collapse="settings" data-collapse-sum="#audit">
+                <div class="card-head"><h2>2. 설정</h2><button class="btn sm" id="btnRecent" type="button" title="최근 분석 기록의 설정으로 폼 다시 채우기">최근 ▾</button></div>
+                <form class="f" onsubmit="return false">
+                    <div class="field full"><label class="small"><input type="checkbox" id="declaredPk" checked> 정의서의 PK 열을 쓴다 <span class="muted">(끄면 첫 컬럼 · 앞쪽 NOT NULL 키형 컬럼으로 추정)</span></label></div>
+                    <div class="field full"><label>업체 명명 규칙 <span class="muted">(컬럼 접미어 → 부모 테이블 · 키. 예: *_MEMBER(숫자) → MEMBER.MEMBER_SEQ)</span></label>
+                        <table class="small" id="rules"><tr><th>컬럼 접미어</th><th>부모 테이블</th><th>부모 키</th><th>숫자형만</th><th></th></tr></table>
+                        <div><button class="btn sm" id="btnAddRule" type="button">규칙 추가</button></div></div>
+                    <div class="field full"><label>감사 컬럼 더하기 <span class="muted">(쉼표 · 줄바꿈 구분. 이 컬럼의 관계는 LOW · 물리 FK 비권장. 기본: REG_ID · UPT_ID · MOD_ID · CREATED_BY · INUSERID 등)</span></label>
+                        <textarea id="audit" rows="2" placeholder="예: REG_MEMBER, MOD_MEMBER" spellcheck="false"></textarea></div>
+                    <div class="full inline">
+                        <button class="btn" id="btnCheck" type="button" disabled>분석</button>
+                        <button class="btn primary" id="btnXlsx" type="button" disabled>xlsx 내려받기</button>
+                        <span class="small muted" id="status"></span>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card" id="resultCard" style="display:none">
+                <div class="card-head"><h2>3. 분석 결과</h2><span id="resultBadge"></span></div>
+                <div class="grid c6 kpi" id="stats"></div>
+                <div id="msgs" class="mt-10"></div>
+                <div id="orderBox" class="mt-10"></div>
+                <div class="mt-10">
+                    <div class="inline"><b>관계</b>
+                        <select id="fStatus"><option value="">상태 전체</option><option>FK추정</option><option>검토필요</option></select>
+                        <select id="fConf"><option value="">신뢰도 전체</option><option>HIGH</option><option>MEDIUM</option><option>LOW</option></select>
+                        <input class="w-sm ico-search" id="fTable" placeholder="테이블"><span class="small muted" id="sampleNote"></span></div>
+                    <div class="scroll-y" style="max-height:460px;margin-top:6px" id="relBox"></div>
+                </div>
+            </div>
+        </div>
+
+</main>
+<style>/* Hallmark · checked: 2026-10-29 · genre: modern-minimal (inferred) · built: the project · redesign: polish · v2.0.0 */
+    .gen-drop{border:2px dashed var(--line);border-radius:6px;padding:16px;text-align:center;color:var(--muted);cursor:pointer}
+    .gen-drop.over{border-color:var(--primary)}
+    .gen-drop.has{border-style:solid;color:inherit}
+    #rules input{width:100%}
+    #relBox td.rel{max-width:260px}
+    #relBox td.why{overflow-wrap:anywhere;min-width:180px}
+    #relBox td.rel div+div{color:var(--muted)}
+</style>
+<script>
+(function () {
+  const { $, esc, num, toast, get } = UI;
+  const KEY = 'ui.gen.relations';
+  const S = { file: null, last: null, maxBytes: 20 * 1024 * 1024 };
+
+  function rulesOf() {
+    return [...document.querySelectorAll('#rules tr[data-rule]')].map(tr => {
+      const [suffix, parentTable, parentKey] = [...tr.querySelectorAll('input[type=text]')].map(i => i.value.trim());
+      return { suffix, parentTable, parentKey, numericOnly: tr.querySelector('input[type=checkbox]').checked };
+    }).filter(r => r.suffix && r.parentTable && r.parentKey);
+  }
+  function addRule(r) {
+    r = r || { suffix: '', parentTable: '', parentKey: '', numericOnly: true };
+    const tr = document.createElement('tr'); tr.dataset.rule = '1';
+    tr.innerHTML = `<td><input type="text" placeholder="_MEMBER" value="${esc(r.suffix)}"></td><td><input type="text" placeholder="MEMBER" value="${esc(r.parentTable)}"></td>
+      <td><input type="text" placeholder="MEMBER_SEQ" value="${esc(r.parentKey)}"></td><td><input type="checkbox" ${r.numericOnly ? 'checked' : ''}></td><td><button class="btn sm" type="button">삭제</button></td>`;
+    tr.querySelector('button').onclick = () => { tr.remove(); changed(); };
+    tr.querySelectorAll('input').forEach(i => i.addEventListener('change', changed));
+    $('#rules').appendChild(tr);
+  }
+  function settings() {
+    return { declaredPk: $('#declaredPk').checked, suffixRules: rulesOf(),
+      auditColumns: $('#audit').value.split(/[,\n]/).map(s => s.trim()).filter(Boolean) };
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(settings())); } catch (e) { /* ignore */ } }
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } }
+  function changed() { save(); if (S.file) check(); }
+
+  // ---------- 파일
+  const drop = $('#drop'), input = $('#file');
+  drop.onclick = () => input.click();
+  drop.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } };
+  input.onchange = () => setFile(input.files[0]);
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => { if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
+  function setFile(f) {
+    if (!f) return;
+    if (!/\.(csv|xlsx|xls)$/i.test(f.name)) { toast('CSV · xlsx · xls 파일만 올릴 수 있습니다', 'err'); return; }
+    if (f.size > S.maxBytes) { toast(f.name + ' 가 크기 상한(' + Math.round(S.maxBytes / 1048576) + 'MB)을 넘습니다', 'err'); return; }
+    S.file = f; drop.classList.add('has'); $('#fileName').textContent = f.name + ' (' + num(Math.round(f.size / 1024)) + ' KB)';
+    $('#btnCheck').disabled = false; check();
+  }
+  function form() { const fd = new FormData(); fd.append('file', S.file); if (S.rules) fd.append('rulesFile', S.rules); fd.append('settings', JSON.stringify(settings())); return fd; }
+
+  // ---------- 업체 규칙 파일: 올리면 명명 규칙 · 감사 컬럼 칸을 채우고(화면 값이 우선), 요청마다 함께 보낸다. 서버에 남지 않는다
+  const dropRules = $('#dropRules'), inputRules = $('#fileRules');
+  dropRules.onclick = () => inputRules.click();
+  dropRules.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRules.click(); } };
+  inputRules.onchange = () => setRules(inputRules.files[0]);
+  ['dragenter', 'dragover'].forEach(ev => dropRules.addEventListener(ev, e => { e.preventDefault(); dropRules.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => dropRules.addEventListener(ev, e => { e.preventDefault(); dropRules.classList.remove('over'); }));
+  dropRules.addEventListener('drop', e => { if (e.dataTransfer.files.length) setRules(e.dataTransfer.files[0]); });
+  async function setRules(f) {
+    if (!f) return;
+    if (!/\.(xlsx|xls)$/i.test(f.name)) { toast('규칙 파일은 xlsx 만 올릴 수 있습니다', 'err'); return; }
+    const fd = new FormData(); fd.append('rulesFile', f);
+    try {
+      const res = await fetch('/api/generator/rules/read', { method: 'POST', body: fd, headers: UI_DEFAULT_HEADERS() });
+      const json = await res.json().catch(() => ({ success: false, message: 'HTTP ' + res.status }));
+      if (!json.success) throw new Error(json.message);
+      S.rules = f; S.rulesData = json.data; dropRules.classList.add('has'); $('#rulesName').textContent = f.name + ' (' + num(Math.round(f.size / 1024)) + ' KB)';
+      document.querySelectorAll('#rules tr[data-rule]').forEach(tr => tr.remove());
+      (json.data.suffixRules || []).forEach(addRule);
+      if ((json.data.auditColumns || []).length) $('#audit').value = json.data.auditColumns.join(', ');
+      save();
+      toast('규칙 파일을 읽었습니다 (' + (json.data.summary || '') + ')', 'ok');
+      (json.data.warnings || []).slice(0, 3).forEach(w => toast('규칙 파일: ' + w, 'warn'));
+      if (S.file) check();
+    } catch (e) { toast(e.message, 'err'); S.rules = null; S.rulesData = null; dropRules.classList.remove('has'); $('#rulesName').textContent = ''; }
+  }
+  async function exportRules() {
+    const s = settings(), base = S.rulesData || {};
+    const dto = { defaults: base.defaults || {}, workNames: base.workNames || {}, audit: base.audit || {}, suffixRules: s.suffixRules, auditColumns: s.auditColumns };
+    try {
+      const res = await fetch('/api/generator/rules/export', { method: 'POST', body: JSON.stringify(dto), headers: Object.assign({ 'Content-Type': 'application/json' }, UI_DEFAULT_HEADERS()) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const blob = await res.blob();
+      const name = ((base.defaults || {}).company || 'georu') + '-rules.xlsx';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      toast(name + ' 를 내려받았습니다', 'ok');
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  // ---------- 분석
+  let seq = 0;
+  async function check() {
+    if (!S.file) return;
+    const my = ++seq;
+    $('#btnCheck').disabled = true; $('#btnXlsx').disabled = true; $('#status').textContent = '분석 중…';
+    try {
+      const res = await fetch('/api/generator/relations/check', { method: 'POST', body: form(), headers: UI_DEFAULT_HEADERS() });
+      const json = await res.json().catch(() => ({ success: false, message: 'HTTP ' + res.status }));
+      if (my !== seq) return;
+      if (!json.success) throw new Error(json.message);
+      S.last = json.data; render(json.data);
+      $('#btnXlsx').disabled = !json.data.ok;
+      $('#status').textContent = json.data.ok ? '분석했습니다' : '읽지 못했습니다';
+    } catch (e) { if (my === seq) { toast(e.message, 'err'); $('#status').textContent = ''; } }
+    finally { if (my === seq) $('#btnCheck').disabled = !S.file; }
+  }
+  function stat(k, v, sub) { return `<div class="card stat"><span class="k">${esc(k)}</span><span class="v">${v}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`; }
+  function render(d) {
+    $('#resultCard').style.display = '';
+    $('#resultBadge').innerHTML = d.ok ? '<span class="badge ok">분석 완료</span>' : '<span class="badge err">읽기 오류</span>';
+    $('#msgs').innerHTML = (d.errors || []).map(e => `<div class="alert err small">${esc(e)}</div>`).join('')
+      + ((d.warnings || []).length ? `<details><summary class="small">경고 ${num(d.warnings.length)}</summary>${d.warnings.slice(0, 100).map(w => `<div class="alert warn small">${esc(w)}</div>`).join('')}</details>` : '');
+    if (!d.ok) { $('#stats').innerHTML = ''; $('#orderBox').innerHTML = ''; $('#relBox').innerHTML = ''; return; }
+    $('#stats').innerHTML = stat('테이블', num(d.tables), '백업 · 임시 ' + num(d.variants))
+      + stat('PK', num(d.pkDeclared + d.pkEstimated), '정의서 ' + num(d.pkDeclared) + ' · 추정 ' + num(d.pkEstimated) + ' · 없음 ' + num(d.pkNone))
+      + stat('관계', num(d.relations), 'FK추정 ' + num(d.estimated) + ' · 검토필요 ' + num(d.review))
+      + stat('HIGH', num(d.high), 'MEDIUM ' + num(d.medium) + ' · LOW ' + num(d.low))
+      + stat('중복경로', num(d.duplicated)) + stat('적재 단계', num(d.levels.length), '순환 ' + num(d.cycles.length));
+    $('#orderBox').innerHTML = `<div class="small"><b>적재 순서</b> ${d.levels.map((n, i) => `단계 ${i} <span class="mono">${num(n)}</span>`).join(' → ')}
+      ${d.cycles.length ? `<div class="mt-6 alert warn small">순환 ${num(d.cycles.length)}: ${d.cycles.map(c => esc(c.join(' ↔ '))).join(' / ')}</div>` : ''}</div>`;
+    renderRel();
+  }
+  function renderRel() {
+    const d = S.last; if (!d || !d.ok) return;
+    const st = $('#fStatus').value, cf = $('#fConf').value, tb = $('#fTable').value.trim().toUpperCase();
+    const rows = d.sample.filter(x => (!st || x.status === st) && (!cf || x.conf === cf) && (!tb || x.child.toUpperCase().includes(tb) || x.parent.toUpperCase().includes(tb)));
+    $('#sampleNote').textContent = d.relations > d.sample.length ? `앞 ${num(d.sample.length)}건 · 전체는 xlsx` : '';
+    const wb = (t) => esc(t).replace(/([.+])/g, '$1<wbr>');   // 복합키(A+B+C)가 길면 . · + 뒤에서 줄바꿈
+    const badge = (c) => c === 'HIGH' ? 'ok' : c === 'MEDIUM' ? 'warn' : 'err';
+    $('#relBox').innerHTML = rows.length ? `<table class="small"><tr><th>ID</th><th>자식 → 부모</th><th>관계</th><th>신뢰도</th><th>근거 · 검토</th></tr>${rows.map(x => `<tr>
+      <td class="mono">${esc(x.id)}</td><td class="mono rel"><div>${wb(x.child + '.' + x.childCols)}</div><div>→ ${wb(x.parent + '.' + x.parentCols)}</div></td>
+      <td>${esc(x.card)}${x.dup ? '<br><span class="badge RAW">중복경로</span>' : ''}</td><td><span class="badge ${badge(x.conf)}">${esc(x.conf)}</span><div class="small muted">${esc(x.status)}</div></td>
+      <td class="small why">${esc(x.basis)}${x.notes ? '<div class="muted">' + esc(x.notes) + '</div>' : ''}</td></tr>`).join('')}</table>` : '<div class="empty">맞는 관계가 없습니다</div>';
+  }
+
+  // ---------- 내려받기 · 기록
+  async function download() {
+    $('#btnXlsx').disabled = true; $('#status').textContent = '만드는 중…';
+    try {
+      const res = await fetch('/api/generator/relations/analyze', { method: 'POST', body: form(), headers: UI_DEFAULT_HEADERS() });
+      const type = res.headers.get('Content-Type') || '';
+      if (!res.ok || type.includes('json')) { const json = await res.json().catch(() => ({ message: 'HTTP ' + res.status })); throw new Error(json.message); }
+      const blob = await res.blob();
+      const cd = res.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/) || cd.match(/filename="?([^";]+)"?/);
+      const name = m ? decodeURIComponent(m[1]) : 'relations.xlsx';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      toast(name + ' 를 내려받았습니다', 'ok'); $('#status').textContent = name;
+    } catch (e) { toast(e.message, 'err'); $('#status').textContent = ''; }
+    finally { $('#btnXlsx').disabled = !(S.last && S.last.ok); }
+  }
+  // 기록 행을 누르면 그때의 설정으로 폼을 다시 채운다 (파일은 다시 올린다). 브라우저 저장값은 바꾸지 않는다 — 바꾸고 검사하면 그때 저장된다
+  function applySettings(s) {
+    if (!s || typeof s !== 'object') return;
+    Object.keys(s).filter(k => !['declaredPk', 'suffixRules', 'auditColumns'].includes(k)).forEach(k => console.debug('[gen-relations] 기록 설정의 모르는 키 무시:', k));
+    if (typeof s.declaredPk === 'boolean') $('#declaredPk').checked = s.declaredPk;
+    if (Array.isArray(s.suffixRules)) { document.querySelectorAll('#rules tr[data-rule]').forEach(tr => tr.remove()); s.suffixRules.forEach(addRule); }
+    if (Array.isArray(s.auditColumns)) $('#audit').value = s.auditColumns.join(', ');
+    if (S.file) check();
+  }
+
+
+  // ---------- 시작
+  (async function init() {
+    try { const o = await get('/api/generator/options'); S.maxBytes = o.maxFileBytes || S.maxBytes; } catch (e) { /* 기본값 */ }
+    const saved = load();
+    if (saved.declaredPk === false) $('#declaredPk').checked = false;
+    (saved.suffixRules || []).forEach(addRule);
+    if (saved.auditColumns) $('#audit').value = saved.auditColumns.join(', ');
+    $('#btnAddRule').onclick = () => addRule();
+    $('#btnTemplate').onclick = () => { location.href = '/api/generator/relations/template'; };
+    $('#btnRulesTemplate').onclick = () => { location.href = '/api/generator/rules/template'; };
+    $('#btnRulesExport').onclick = exportRules;
+    $('#declaredPk').onchange = changed; $('#audit').onchange = changed;
+    $('#btnCheck').onclick = check; $('#btnXlsx').onclick = download;
+    ['fStatus', 'fConf'].forEach(id => $('#' + id).onchange = renderRel); $('#fTable').oninput = renderRel;
+    UI.genRecent($('#btnRecent'), 'RELATIONS', '최근 분석', applySettings);
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "id": "demo-notice",
+  "name": "데모 공지",
+  "description": "공지 → FAQ. 수행 테이블만 넣는다 (팝업 · 배너는 대기, 읽음 이력 · 템플릿은 이관 제외라 시나리오에 넣으면 정의 오류)",
+  "onUnitFailure": "STOP",
+  "onStepStop": "STOP_ALL",
+  "common": {
+    "tenantLevel1": "DEMO", "tenantLevel2": "DEMO", "tenantLevel3": "DEMO", "tenantLevel4": "DEMO", "tenantLevel5": "DEMO",
+    "chunkSize": 500
+  },
+  "steps": [
+    { "plugin": "demo.notice", "table": "tb_notice", "label": "공지사항" },
+    { "plugin": "demo.notice", "table": "tb_faq",    "label": "자주 묻는 질문" }
+  ]
+}

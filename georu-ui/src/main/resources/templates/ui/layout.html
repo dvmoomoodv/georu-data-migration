@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${title} + ' - ' + ${brand ?: 'Georu'}">Georu</title>
+    <meta name="georu-brand" th:content="${brand ?: 'Georu'}">
+    <!-- 메뉴 접힘 상태를 그리기 전에 적용 (깜빡임 방지) -->
+    <script>try { if (localStorage.getItem('ui.sidebar.collapsed') === '1') document.documentElement.classList.add('sb-collapsed'); } catch (e) { /* ignore */ }</script>
+    <link rel="icon" type="image/svg+xml" th:href="@{/ui-assets/georu-mark.svg}">
+    <link rel="stylesheet" th:href="@{/ui-assets/ui.css}">
+    <!-- Georu 테마 v0.1 (todo-task 33): ui.css 뒤에 색 · 크기 토큰, 그 뒤 컴포넌트 -->
+    <link rel="stylesheet" th:href="@{/ui-assets/theme-georu.css}">
+    <link rel="stylesheet" th:href="@{/ui-assets/components.css}">
+    <script th:src="@{/ui-assets/ui.js}"></script>
+    <script th:src="@{/ui-assets/ui-panel.js}"></script>
+</head>
+<body>
+<div th:fragment="nav" style="display:contents">
+    <aside class="sidebar">
+        <div class="sb-head"><img class="sb-mark" th:src="@{/ui-assets/georu-mark.svg}" alt="" width="24" height="24"><span class="sb-brand" th:with="b=${brand ?: 'Georu'}, two=${#strings.contains(brand ?: 'Georu', ' for ')}" th:title="${b}"><!-- "Georu for 업체" 는 두 줄로 (메뉴 폭에서 잘리지 않게) --><b th:text="${two} ? ${#strings.substringBefore(b, ' for ')} : ${b}">Georu</b><small th:if="${two}" th:text="'for ' + ${#strings.substringAfter(b, ' for ')}"></small></span><button class="sb-toggle" type="button" id="sbToggle" title="메뉴 접기/펴기" aria-label="메뉴 접기/펴기">
+            <svg aria-hidden="true" focusable="false" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg></button></div>
+        <nav id="sbNav">
+            <!-- 메뉴 기준 (2026-10-23): 사용자 작업 순서 - (이관 설계) → 실행 → 현황·결과 → 점검·관리, 그리고 개발 도구·도움말. 이관 설계 외에는 운영(prd)에서도 모두 보인다 -->
+            <!-- 이관 설계: 업체 적용 전 · 매핑 작업 때 쓰는 도구. 운영(prd)과 georu.codegen.enabled=false 에서는 숨긴다 -->
+            <a th:if="${perm.canView('project')}" th:href="@{/ui/project}" th:classappend="${page=='project'}?'active'" title="이관 진행 - 투입부터 종료까지 단계 · 할 일 · 체크리스트" data-alias="project 진행 단계 체크리스트 checklist 할일 todo 투입 킥오프 종료 일정 관리 엑셀"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><polyline points="4 7 6 9 10 5"/><line x1="13" y1="7" x2="20" y2="7"/><polyline points="4 14 6 16 10 12"/><line x1="13" y1="14" x2="20" y2="14"/><line x1="13" y1="20" x2="20" y2="20"/><circle cx="7" cy="20" r="1.5"/></svg><span class="sb-label">이관 진행</span></a>
+            <div th:if="${codegenEnabled and perm.admin}" class="sb-group" data-group="design">이관 설계</div>
+            <a th:if="${codegenEnabled and perm.admin}" th:href="@{/ui/gen-code}" data-alias="generator 생성기 코드 code zip apply 기본 소스 strategy reader writer processor dto 업체 패키지 tobe 정의" th:classappend="${page=='gen-code'}?'active'" title="코드 생성 - TOBE 컬럼 정의로 업체 기본 셋트 · 업무 Strategy · 테이블별 코드 zip"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/><line x1="14" y1="4" x2="10" y2="20"/></svg><span class="sb-label">코드 생성</span></a>
+            <a th:if="${codegenEnabled and perm.admin}" th:href="@{/ui/gen-relations}" data-alias="relation 관계 fk 외래키 foreign key 추정 분석 적재 순서 부모 자식 erd 순환 xlsx" th:classappend="${page=='gen-relations'}?'active'" title="관계 분석 - FK 없는 테이블 구조 정의에서 이름으로 관계를 추정해 분석용 xlsx"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="6"/><rect x="14" y="15" width="7" height="6"/><path d="M6.5 9v4h11v2"/></svg><span class="sb-label">관계 분석</span></a>
+            <a th:if="${codegenEnabled and perm.admin}" th:href="@{/ui/gen-mapping}" data-alias="mapping 매핑 정의서 초안 asis tobe 대응 컬럼 매칭 전환 기준 공통코드 code xlsx" th:classappend="${page=='gen-mapping'}?'active'" title="매핑 정의서 초안 - ASIS · TOBE 정의로 테이블 대응 · 컬럼 매칭 · 전환기준을 제안한 xlsx"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="16" rx="1"/><rect x="14" y="4" width="7" height="16" rx="1"/><path d="M10 9h4M10 15h4"/></svg><span class="sb-label">매핑 정의서 초안</span></a>
+            <div th:if="${perm.canViewAny('execute', 'scenario', 'excel')}" class="sb-group" data-group="run">실행</div>
+            <a th:if="${perm.canView('execute')}" th:href="@{/ui/execute}" data-alias="execute run 실행 이관 잡 job 테이블 테이블이관 실행목록 json 날짜분할" th:classappend="${page=='execute'}?'active'" title="테이블 이관 실행"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><polygon points="7 4 20 12 7 20 7 4"/></svg><span class="sb-label">테이블 이관 실행</span></a>
+            <a th:if="${perm.canView('scenario')}" th:href="@{/ui/scenario}" data-alias="scenario 시나리오 설계 design 순서 단계 묶음 그룹 group 분할 flow" th:classappend="${page=='scenario' or page=='scenario-design'}?'active'" title="시나리오 이관 실행 - 정의된 순서로 여러 테이블을 단계·날짜 구간으로 나눠 실행"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><line x1="7" y1="12" x2="10" y2="12"/><line x1="14" y1="12" x2="17" y2="12"/></svg><span class="sb-label">시나리오 이관 실행</span></a>
+            <a th:if="${perm.canView('excel')}" th:href="@{/ui/excel}" data-alias="excel 엑셀 업로드 upload xlsx csv 템플릿 template 파일 적재 수작업" th:classappend="${page=='excel'}?'active'" title="엑셀 이관 - 업로드한 엑셀(TOBE 컬럼 헤더)을 테이블 이관 파이프라인으로 적재"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg><span class="sb-label">엑셀 이관</span></a>
+            <div th:if="${perm.canViewAny('dashboard', 'tables', 'running', 'history', 'notifications')}" class="sb-group" data-group="result">현황·결과</div>
+            <a th:if="${perm.canView('dashboard')}" th:href="@{/ui/dashboard}" data-alias="dashboard home 홈 요약 현황 부하" th:classappend="${page=='dashboard'}?'active'" title="대시보드"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg><span class="sb-label">대시보드</span></a>
+            <a th:if="${perm.canView('tables')}" th:href="@{/ui/tables}" data-alias="tables 테이블 현황 매핑 미완 todo 차단 원천 미지정 최근 결과 전체 진척" th:classappend="${page=='tables'}?'active'" title="테이블 현황 - 테이블별 매핑 상태와 마지막 실행 결과"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="4" x2="9" y2="20"/></svg><span class="sb-label">테이블 현황</span></a>
+            <a th:if="${perm.canView('running')}" th:href="@{/ui/running}" data-alias="running 실행중 게이트 gate 스케줄 cron 중지 stop" th:classappend="${page=='running'}?'active'" title="실행 현황"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg><span class="sb-label">실행 현황</span></a>
+            <a th:if="${perm.canView('history')}" th:href="@{/ui/history}" data-alias="history 이력 결과 보고서 report 빠진 행 채우기 fill 재시도 csv xlsx pdf" th:classappend="${page=='history'}?'active'" title="이력"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg><span class="sb-label">이력</span></a>
+            <a th:if="${perm.canView('notifications')}" th:href="@{/ui/notifications}" data-alias="notifications 알림 텔레그램 경고 차단" th:classappend="${page=='notifications'}?'active'" title="알림"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="sb-label">알림</span><span id="notiCount" class="noti-count empty"></span></a>
+            <div th:if="${perm.canViewAny('precheck', 'system', 'logs') or perm.manageUsers}" class="sb-group" data-group="manage">점검·관리</div>
+            <a th:if="${perm.canView('precheck')}" th:href="@{/ui/precheck}" th:classappend="${page=='precheck'}?'active'" title="실행 전 점검 - 소스 샘플을 변환해 타겟 컬럼 정의와 대조" data-alias="precheck check 점검 검증 길이 not null 샘플"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span class="sb-label">실행 전 점검</span></a>
+            <a th:if="${perm.canView('system')}" th:href="@{/ui/system}" data-alias="system 시스템 운영기록정리 정리 cleanup 삭제 보관 헬스 health db 커넥션 플러그인 지표 cpu" th:classappend="${page=='system'}?'active'" title="시스템 - 헬스·DB·플러그인·지표, 운영 기록 정리"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="1"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M19 9h3M19 15h3M2 9h3M2 15h3"/></svg><span class="sb-label">시스템</span></a>
+            <a th:if="${perm.canView('logs')}" th:href="@{/ui/logs}" data-alias="logs 로그 파일 오류 error" th:classappend="${page=='logs'}?'active'" title="로그"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg><span class="sb-label">로그</span></a>
+            <!-- 사용자 · 권한 관리: 총관리자만 (로그인이 켜져 있을 때) -->
+            <a th:if="${perm.manageUsers}" th:href="@{/ui/users}" data-alias="users 사용자 계정 추가 비밀번호 초기화 잠금 풀기 사용 중지 권한 role" th:classappend="${page=='users' or page=='roles'}?'active'" title="사용자 · 권한 관리 - 사용자 계정과 권한(메뉴별 조회 · 실행, 유휴 잠금)"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.7.8 2.7 2.5 3 5.2"/></svg><span class="sb-label">사용자 · 권한</span></a>
+            <div th:if="${perm.canView('ddl') or perm.admin}" class="sb-group" data-group="tools">개발 도구</div>
+            <a th:if="${perm.canView('ddl')}" th:href="@{/ui/ddl}" data-alias="ddl table 테이블 컬럼 엑셀 excel create table 정의 model dto 자바 java processor 변환 매핑 writer insert upsert 매퍼 mapper" th:classappend="${page.startsWith('ddl')}?'active'" title="DDL 도구 - CREATE TABLE 문으로 컬럼 표 · 자바 모델 · Processor · Writer 초안 (탭)"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="1"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="4" x2="9" y2="20"/></svg><span class="sb-label">DDL 도구</span></a>
+            <a th:if="${!isProduction and perm.admin}" th:href="@{/swagger-ui/index.html}" data-alias="swagger api openapi 문서 rest" target="_blank" title="Swagger (API 문서)"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span class="sb-label">Swagger <span class="muted small">↗</span></span></a>
+            <a th:if="${isProduction and perm.admin}" class="disabled" aria-disabled="true" data-alias="swagger api openapi 문서 rest" title="Swagger - 운영(prd) 프로파일은 API 문서(springdoc)를 꺼 두어 열 수 없습니다 (application-prd.yml springdoc.*.enabled=false)"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg><span class="sb-label">Swagger <span class="muted small">(운영 꺼짐)</span></span></a>
+            <!-- 서버 진단 (Spring Boot Admin). georu.admin-console.enabled 를 따른다 (꺼져 있으면 서버에 화면이 없음) -->
+            <a th:if="${adminConsoleEnabled and perm.admin}" th:href="@{/admin}" data-alias="admin spring boot admin sba 서버 진단 jvm 스레드 thread dump 덤프 메모리 gc 로그레벨 loggers env 설정값" target="_blank" title="서버 진단 (Spring Boot Admin) - JVM 메모리·스레드 덤프·지표·설정값. 새 탭"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><polyline points="6 13 9 13 11 9 13 16 15 12 18 12"/></svg><span class="sb-label">서버 진단 <span class="muted small">↗</span></span></a>
+            <div class="sb-group" data-group="help">도움말</div>
+            <a th:href="@{/ui/start}" th:classappend="${page=='start'}?'active'" title="시작하기 - 이 프로그램이 무엇인지, 처음 10분, 화면 투어" data-alias="start 시작 처음 소개 온보딩 튜토리얼 10분"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polygon points="10 8 16 12 10 16 10 8"/></svg><span class="sb-label">시작하기</span></a>
+            <a th:href="@{/ui/guide(name='screens')}" data-alias="guide 안내서 화면 정리 cleanup 확인 매핑 규칙 용어 faq 도움" th:classappend="${page=='guide'}?'active'" title="안내서 (화면 설명 · 수작업 정리 · 수작업 확인 · 앱 안내서)"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span class="sb-label">안내서</span></a>
+            <a th:href="@{/ui/architecture}" data-alias="architecture 구조 reader processor writer strategy plugin 클래스 설계" th:classappend="${page=='architecture'}?'active'" title="구조 설명 (Reader · Processor · Writer · Strategy 등 핵심 클래스와 구조도)"><svg aria-hidden="true" focusable="false" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="5"/><rect x="14" y="3" width="7" height="5"/><rect x="8.5" y="16" width="7" height="5"/><path d="M6.5 8v4h11V8"/><path d="M12 12v4"/></svg><span class="sb-label">구조 설명</span></a>
+            <div class="sb-empty" id="sbEmpty" style="display:none">맞는 메뉴 없음<br><a id="sbEmptyGuide" href="/ui/guide">안내서에서 찾기</a></div>
+        </nav>
+        <div class="sb-clock" id="sbClock" title="현재 시간 (이 PC 기준)"><span class="t" id="sbClockTime">--:--:--</span><span class="d" id="sbClockDate"></span><span class="v" th:if="${georuVersion}" th:text="'Georu ' + ${georuVersion}" th:title="'Georu 라이브러리 버전 ' + ${georuVersion}">Georu</span></div>
+    </aside>
+    <!-- 상단 바 (todo-task 33 T1): 메뉴 검색 · 시스템 요약 · 게이트 칩 · 아이콘 버튼 · 알림 종 · 사용자 메뉴.
+         id(sbSearch · sysbar · gateDot · helpLink · executedBy)는 ui.js · ui-panel.js 가 찾으므로 바꾸지 않는다 -->
+    <header class="topbar">
+        <span class="page-name" th:text="${pageTitle}" hidden>화면</span>   <!-- 도움말 서랍 제목에 쓴다 (화면에는 경로 · 제목으로 보임) -->
+        <div class="tb-search"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><input id="sbSearch" type="search" placeholder="메뉴 검색  ( / )" autocomplete="off" aria-label="메뉴 검색" data-refresh-ignore></div>
+        <div th:if="${perm.canViewAny('dashboard', 'system')}" class="sysbar" id="sysbar" title="시스템 화면에서 추이를 볼 수 있습니다"><span class="it"><span class="k">시스템 지표 조회 중…</span></span></div>
+        <span th:if="${perm.canViewAny('execute', 'scenario', 'excel', 'running', 'history')}" class="tb-chip" id="gateChip" title="단일 실행 게이트: 확인 중"><span class="gate-dot" id="gateDot"></span><span id="gateChipText">확인 중</span></span>
+        <button class="tb-ico tb-refresh" type="button" onclick="UI.refreshPage()" title="화면 새로고침 (작성 중인 값이 있으면 먼저 확인)" aria-label="새로고침"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg></button>
+        <a class="tb-ico" id="helpLink" th:href="@{/ui/guide(name='screens')} + '#' + ${page}" title="이 화면 설명 (오른쪽 서랍)" aria-label="도움말" aria-haspopup="dialog"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8 1c0 1.7-2.4 2.2-2.4 3.7"/><path d="M12 17.3v.2"/></svg></a>
+        <a th:if="${perm.canView('notifications')}" class="tb-ico tb-bell" id="tbBell" th:href="@{/ui/notifications}" title="알림" aria-label="알림"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18 9a6 6 0 0 0-12 0c0 6.5-2.5 8-2.5 8h17S18 15.5 18 9"/><path d="M10.3 20.5a2 2 0 0 0 3.4 0"/></svg><span class="dot-count" id="tbBellCount" hidden></span></a>
+        <div class="who">
+            <span class="profile" th:classappend="${isProduction}?'prd'" th:text="${activeProfile}">docker</span>
+            <details th:if="${securityEnabled}" class="dd tb-user">
+                <summary th:title="'로그인: ' + ${loginUsername} + ' · 권한 ' + ${loginRole}"><span class="avatar sm" th:text="${#strings.isEmpty(loginUser)} ? '?' : ${#strings.substring(loginUser, 0, 1)}">?</span><span class="u-name"><span th:text="${loginUser}">사용자</span><small th:text="${loginRole}"></small></span><svg class="ico sm chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 10l5 5 5-5"/></svg></summary>
+                <div class="dd-menu" role="menu">
+                    <div class="dd-head"><b th:text="${loginUser}">사용자</b><span th:text="${loginUsername} + (${#strings.isEmpty(loginRole)} ? '' : ' · ' + ${loginRole})"></span></div>
+                    <a th:href="@{/ui/account}" role="menuitem"><svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c1-3.8 3.8-5.5 7-5.5s6 1.7 7 5.5"/></svg>내 계정 · 비밀번호</a>
+                    <hr>
+                    <button type="button" class="danger" onclick="UI.logout()" role="menuitem"><svg class="ico sm" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 4h4v16h-4"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h10"/></svg>로그아웃</button>
+                </div>
+            </details>
+            <th:block th:unless="${securityEnabled}">
+                <label for="executedBy">실행자</label>
+                <input id="executedBy" placeholder="이름 (기록용)" title="실행 요청에 X-Executed-By 로 전달되어 migration_jobs.executed_by 에 남습니다">
+            </th:block>
+        </div>
+    </header>
+    <script th:inline="javascript">(function () {
+      window.GEORU_SECURITY = /*[[${securityEnabled}]]*/ false;
+      window.GEORU_PERMS = /*[[${perm.codes}]]*/ null;   // 메뉴 키 → R · W. null 이면 모두 (관리자 · 로그인 꺼짐). UI.can() 이 쓴다
+      window.GEORU_PAGE_MENU = /*[[${pageMenu}]]*/ null;   // 이 화면의 메뉴 키 (도움말 · 관리 화면은 null)
+      window.GEORU_PAGE = /*[[${page}]]*/ null;   // 화면 이름 (도움말 서랍의 안내서 절 · 패널 폭 기억 키)
+      UI.readonlyPage();   // 이 화면의 메뉴가 조회만이면 실행 · 변경 버튼(data-write)을 숨긴다
+      var el = document.getElementById('executedBy');
+      if (el) { el.value = UI.executedBy.get(); el.addEventListener('change', function () { UI.executedBy.set(el.value.trim()); }); }
+      if (window.GEORU_SECURITY) UI.idleLock(/*[[${idleLockMinutes}]]*/ 0);   // 유휴 잠금 (DB 값, 이 화면을 열 때 한 번)
+      document.getElementById('sbToggle').onclick = UI.toggleSidebar;
+      UI.menuSearch();   // 메뉴 검색 · 그룹 접기 · 최근 메뉴
+      UI.clock();        // 메뉴 하단 현재 시간
+      // 모든 화면 공통 주기 갱신: 실행 게이트(배너·요약 바) 5초, 알림 수 15초, 시스템 지표 30초
+      document.addEventListener('DOMContentLoaded', function () {
+        UI.crumbs();        // 페이지 머리 경로 (사이드바 지금 메뉴로 만든다, todo-task 33)
+        UI.icons();         // 템플릿의 [data-ico] 아이콘 자리
+        // 권한이 없는 위젯은 부르지 않는다 (todo-task 25)
+        if (UI.canAny(['execute', 'scenario', 'excel', 'running', 'history'])) { UI.gate(); setInterval(UI.gate, 5000); }
+        if (UI.can('notifications')) { UI.refreshNotiBadge(); setInterval(UI.refreshNotiBadge, 15000); }
+        if (UI.canAny(['dashboard', 'system'])) { UI.sysbar(); setInterval(UI.sysbar, 30000); }
+        UI.filterMarks();   // 값이 들어간 필터 칸 표시
+        UI.envLine();       // 실행 화면 상단 이관 환경 한 줄 (#envStrip 이 있는 화면)
+      });
+    })();</script>
+</div>
+<span th:fragment="refresh" class="page-refresh"></span>   <!-- 새로고침은 상단 바 ⟳ 로 통일 (프래그먼트는 호환용으로 비워 둠) -->
+<div id="gateBanner" th:fragment="gate" style="display:none"></div>
+<!-- 사용자 · 권한 관리 탭 (메뉴 "점검·관리 › 사용자 · 권한" 한 항목, 화면 2개) -->
+<div th:fragment="userTabs" class="tabs tab-links">
+    <a th:href="@{/ui/users}" th:classappend="${page=='users'}?'active'">사용자</a>
+    <a th:href="@{/ui/roles}" th:classappend="${page=='roles'}?'active'">권한</a>
+</div>
+<!-- DDL 도구 탭 (메뉴 "개발 도구 › DDL 도구" 한 항목, 화면 4개) -->
+<div th:fragment="ddlTabs" class="tabs tab-links">
+    <a th:href="@{/ui/ddl}" th:classappend="${page=='ddl'}?'active'">DDL → 테이블</a>
+    <a th:href="@{/ui/ddl-model}" th:classappend="${page=='ddl-model'}?'active'">DDL → 자바 모델</a>
+    <a th:href="@{/ui/ddl-processor}" th:classappend="${page=='ddl-processor'}?'active'">DDL → Processor</a>
+    <a th:href="@{/ui/ddl-writer}" th:classappend="${page=='ddl-writer'}?'active'">DDL → Writer</a>
+</div>
+</body>
+</html>

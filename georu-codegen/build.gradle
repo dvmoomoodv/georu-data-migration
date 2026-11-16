@@ -1,0 +1,34 @@
+plugins {
+    id 'georu.java-library'
+}
+
+description = 'georu 코드 생성기: TOBE 컬럼 정의(CSV·xlsx·xls) → 업체 기본 셋트·업무 Strategy·테이블별 Reader/Processor/Writer/DTO/XML zip (Thymeleaf TEXT)'
+
+dependencies {
+    implementation libs.thymeleaf                        // 웹 없이 TEXT 모드만
+    implementation libs.poi                              // xls
+    implementation libs.poi.ooxml                        // xlsx
+
+    // 생성한 코드를 컴파일해 H2 로 끝까지 돌려 본다
+    testImplementation project(':georu-test')
+    testImplementation libs.lombok
+}
+
+tasks.named('processResources') {
+    inputs.property('version', project.version)
+    filesMatching('georu/codegen/codegen.properties') {
+        expand(version: project.version)
+    }
+}
+
+tasks.named('test') {
+    if (project.hasProperty('codegenDump')) {
+        systemProperty 'georu.codegen.dump', project.property('codegenDump')
+        outputs.upToDateWhen { false }
+    }
+    // 요약 골든 갱신: ./gradlew :georu-codegen:test -PupdateGolden (fixtures/anon/golden/*.csv 를 지금 결과로 덮어쓴다)
+    if (project.hasProperty('updateGolden')) {
+        systemProperty 'georu.golden.update', 'true'
+        outputs.upToDateWhen { false }
+    }
+}

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('알림')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>알림</h1><p class="page-desc">텔레그램과 같은 내용 · 텔레그램 전송이 안 되어도 여기에는 남습니다</p></div>
+    <div class="card">
+        <div class="card-head"><h2>알림 목록 <span class="small muted" id="summary"></span></h2>
+            <div class="inline"><label class="check switch"><input type="checkbox" id="auto" data-refresh-ignore checked> 15초 자동 갱신</label> <button class="btn sm" id="markRead">모두 읽음</button> <a class="btn sm" href="/ui/guide?name=telegram" title="알림 메시지 유형 안내서">메시지 유형</a></div></div>
+        <div class="toolbar">
+            <input class="w-lg ico-search" id="fQ" placeholder="검색: 제목·내용·테이블명·migrationId" autocomplete="off">
+            <input class="w-sm" type="date" id="fFrom" title="시작일"> ~ <input class="w-sm" type="date" id="fTo" title="종료일 (그날 포함)">
+            <select id="fLevel"><option value="">전체 레벨</option><option>ERROR</option><option>WARNING</option><option>INFO</option></select>
+            <select id="fCategory"><option value="">전체 종류</option>
+                <option value="TABLE_RESULT">테이블 결과</option><option value="BATCH_SUMMARY">묶음 실행 요약</option>
+                <option value="EXISTING_DATA">기존 데이터</option><option value="PRECHECK_BLOCK">실행 전 점검 차단</option>
+                <option value="INCOMPLETE_CODE">미완 코드 차단</option><option value="SYSTEM">시스템 상태</option><option value="GENERAL">기타 (시작·날짜 분할 등)</option></select>
+            <select id="fLimit"><option>100</option><option>300</option><option>500</option></select>
+            <button class="btn primary" id="search">조회</button>
+            <button class="btn sm" id="reset" type="button">조건 지우기</button>
+        </div>
+        <div id="list" class="scroll-y"><div class="empty loading">불러오는 중…</div></div>
+    </div>
+    <!-- 알림 내용 (todo-task 33 9-1): 목록에는 메시지 한 줄, 누르면 여기에 전체 -->
+    <aside class="sp" data-panel="msg" data-title="알림 내용" data-width="560" data-dock-label="알림 내용" data-dock-icon="bell">
+        <div id="msgBox"><div class="empty small">목록에서 알림을 누르면 여기에 전체 내용이 나옵니다.</div></div>
+    </aside>
+</main>
+<script>
+(function () {
+  const { get, esc, badge, fmtDate, toast, $ } = UI;
+  const CAT = { TABLE_RESULT: '테이블 결과', BATCH_SUMMARY: '묶음 요약', EXISTING_DATA: '기존 데이터', PRECHECK_BLOCK: '점검 차단', INCOMPLETE_CODE: '미완 코드', SYSTEM: '시스템', GENERAL: '기타' };
+  const HELP = { EXISTING_DATA: 'existing-data', PRECHECK_BLOCK: 'precheck', INCOMPLETE_CODE: 'incomplete-code', TABLE_RESULT: 'count-mismatch', BATCH_SUMMARY: 'where-to-look', SYSTEM: 'app-restart' };
+  let rows = [], timer = null, selId = null;   // selId: 알림 내용 패널에 띄운 알림 (자동 갱신 뒤에도 고른 표시 유지)
+  async function load() {
+    const q = new URLSearchParams({ limit: $('#fLimit').value });
+    if ($('#fQ').value.trim()) q.set('q', $('#fQ').value.trim());
+    if ($('#fFrom').value) q.set('from', $('#fFrom').value);
+    if ($('#fTo').value) q.set('to', $('#fTo').value);
+    if ($('#fLevel').value) q.set('level', $('#fLevel').value);
+    if ($('#fCategory').value) q.set('category', $('#fCategory').value);
+    try { rows = await get('/api/ui/notifications?' + q) || []; render(); }
+    catch (e) { $('#list').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  /** 검색어를 노란 표시로 (HTML 이스케이프 후) */
+  function hl(text) {
+    const kw = $('#fQ').value.trim(), t = esc(text ?? '');
+    if (!kw) return t;
+    const k = esc(kw).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return t.replace(new RegExp(k, 'gi'), (m) => `<mark>${m}</mark>`);
+  }
+  function render() {
+    const unread = (n) => UI.notiRead.isUnread(n);
+    const unreadCount = rows.filter(unread).length;
+    const filters = [$('#fQ').value.trim() && `검색어 "${$('#fQ').value.trim()}"`, $('#fFrom').value && $('#fFrom').value + ' 부터', $('#fTo').value && $('#fTo').value + ' 까지'].filter(Boolean);
+    $('#summary').textContent = `${rows.length}건 (읽지 않음 ${unreadCount})${rows.length >= Number($('#fLimit').value) ? ' (최대 건수에 도달, 조건을 좁히세요)' : ''}${filters.length ? ' · ' + filters.join(' · ') : ''}`;
+    // 타임라인 (todo-task 33 T10 · 9-1): 제목 + 레벨 / 종류 · 테이블 / 메시지 한 줄(넘치면 …). 누르면 오른쪽 알림 내용 패널에 전체
+    $('#list').innerHTML = rows.length ? '<ol class="timeline">' + rows.map((n, i) => {
+      const lv = n.level === 'WARNING' ? 'WARN' : n.level;
+      const tone = lv === 'ERROR' ? 'err' : lv === 'WARN' ? 'warn' : /^\s*\[완료\]/.test(n.title || '') ? 'ok' : 'info';
+      const meta = [esc(CAT[n.category] || n.category || ''), hl(n.tableName || '')].filter(Boolean).join(' · ');
+      return `<li class="tl-item lv-${tone}${unread(n) ? ' unread' : ''}${n.id === selId ? ' sel' : ''}" data-i="${i}" data-id="${n.id}" tabindex="0" role="button" aria-label="${esc(n.title || '')} 내용 보기"${unread(n) ? ' title="누르면 내용을 보고 읽음 처리합니다"' : ''}>`
+        + `<time>${fmtDate(n.createdAt)}</time><span class="tl-dot"></span>`
+        + `<div class="tl-body"><div class="tl-title">${hl(n.title)} ${badge(lv)}</div>`
+        + `<div class="tl-meta">${meta}</div>`
+        + `<div class="tl-msg">${hl(preview(n.message))}</div></div></li>`;
+    }).join('') + '</ol>'
+      : '<div class="empty">알림이 없습니다.</div>';
+    document.querySelectorAll('#list .tl-item').forEach(li => {
+      li.onclick = () => select(Number(li.dataset.i));
+      li.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(Number(li.dataset.i)); } };
+    });
+    // 자동 갱신으로 다시 그려도 열린 패널은 그 알림 그대로 (목록에 남아 있으면 내용도 새로)
+    if (selId != null && UI.panel.isOpen('msg')) { const i = rows.findIndex(r => r.id === selId); if (i >= 0) fill(i); }
+    updateSummary();
+  }
+  /** 목록 한 줄 요약: 첫 줄(제목과 같음)은 빼고 다음 줄들을 " · " 로 */
+  function preview(msg) {
+    const lines = String(msg || '').split('\n').map(x => x.trim()).filter(Boolean);
+    return (lines.length > 1 ? lines.slice(1, 5) : lines).join(' · ');
+  }
+  /** i 번째 알림을 패널에 (이전 · 다음 = 목록의 앞뒤 알림) */
+  function fill(i) {
+    const n = rows[i]; if (!n) return;
+    const lv = n.level === 'WARNING' ? 'WARN' : n.level;
+    const help = HELP[n.category] ? `/ui/guide?name=troubleshooting#${HELP[n.category]}` : null;
+    $('#msgBox').innerHTML = `<div class="sp-sum"><div><b>${hl(n.title)}</b></div><div class="inline">${badge(lv)}</div></div>`
+      + '<table class="list"><tbody>'
+      + `<tr><th>시각</th><td>${fmtDate(n.createdAt)}</td></tr>`
+      + `<tr><th>종류</th><td>${esc(CAT[n.category] || n.category || '-')}</td></tr>`
+      + `<tr><th>테이블</th><td>${n.tableName ? hl(n.tableName) : '-'}</td></tr>`
+      + (n.migrationId ? `<tr><th>migrationId</th><td class="mono small">${hl(n.migrationId)}</td></tr>` : '')
+      + '</tbody></table>'
+      + `<h3 class="sp-h">메시지</h3><pre class="msg-pre">${hl(n.message)}</pre>`
+      + '<div class="inline mt-10">'
+      + (n.migrationId ? `<a class="btn sm" href="/ui/history?migrationId=${encodeURIComponent(n.migrationId)}">이력 보기</a>` : '')
+      + (help ? `<a class="btn sm" href="${help}" title="사유별 조치 안내서">조치 안내</a>` : '')
+      + '</div>';
+    UI.panel.nav('msg', i > 0 ? () => select(i - 1) : null, i < rows.length - 1 ? () => select(i + 1) : null);
+  }
+  function select(i) {
+    const n = rows[i]; if (!n) return;
+    selId = n.id;
+    document.querySelectorAll('#list .tl-item').forEach(li => li.classList.toggle('sel', Number(li.dataset.i) === i));
+    if (n.id && !UI.notiRead.has(n.id) && n.id > UI.notiSeen.get()) {   // 하나씩 읽음: 내용을 열면 읽은 것으로
+      UI.notiRead.add(n.id);
+      const li = document.querySelector(`#list .tl-item[data-i="${i}"]`); if (li) { li.classList.remove('unread'); li.removeAttribute('title'); }
+      UI.refreshNotiBadge(); updateSummary();
+    }
+    fill(i);
+    UI.panel.open('msg');
+  }
+  $('#search').onclick = load;
+  $('#fQ').addEventListener('keydown', (e) => { if (e.key === 'Enter') load(); });
+  ['fFrom', 'fTo'].forEach(id => $('#' + id).onchange = load);
+  $('#reset').onclick = () => { ['fQ', 'fFrom', 'fTo', 'fLevel', 'fCategory'].forEach(id => $('#' + id).value = ''); load(); };
+  ['fLevel', 'fCategory', 'fLimit'].forEach(id => $('#' + id).onchange = load);
+  function updateSummary() { const u = rows.filter(n => UI.notiRead.isUnread(n)).length; $('#summary').textContent = $('#summary').textContent.replace(/\(읽지 않음 \d+\)/, `(읽지 않음 ${u})`); }
+  $('#markRead').onclick = () => { if (rows.length) { UI.notiSeen.set(Math.max(...rows.map(r => r.id))); UI.refreshNotiBadge(); render(); toast('읽음 처리했습니다', 'ok'); } };
+  $('#auto').onchange = (e) => { if (e.target.checked) timer = setInterval(load, 15000); else { clearInterval(timer); timer = null; } };
+  load(); timer = setInterval(load, 15000);
+})();
+</script>
+</body>
+</html>

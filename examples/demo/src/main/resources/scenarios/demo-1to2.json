@@ -1,0 +1,55 @@
+{
+  "id": "demo-1to2",
+  "name": "여러 DB 1:2",
+  "description": "본사 1곳 → 운영·분석 DB 2곳: 복제, 나누기, 조건 분기, 한 번 읽어 두 곳에 쓰기 (docker 프로파일, guides/demo.md 의 \"여러 DB\")",
+  "profiles": [
+    "docker"
+  ],
+  "onUnitFailure": "STOP",
+  "onStepStop": "STOP_ALL",
+  "common": {
+    "tenantLevel1": "DEMO",
+    "tenantLevel2": "DEMO",
+    "tenantLevel3": "DEMO",
+    "tenantLevel4": "DEMO",
+    "tenantLevel5": "DEMO",
+    "chunkSize": 500
+  },
+  "steps": [
+    {
+      "plugin": "demo.code",
+      "table": "tb_code",
+      "label": "코드 (→ target-m)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "tb_code_to_dw",
+      "label": "코드 (1:2 복제 → target-1)"
+    },
+    {
+      "plugin": "demo.member",
+      "table": "tb_member",
+      "label": "회원 (→ target-m)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "tb_member_contact",
+      "label": "회원 연락처 (1:2 나누기 → target-1)"
+    },
+    {
+      "plugin": "demo.board",
+      "table": "tb_post",
+      "label": "게시글 (→ target-m)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "tb_post_notice",
+      "label": "공지 게시글 (1:2 조건 분기 → target-1)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "tb_stat_daily_fanout",
+      "label": "일별통계 (1:2 한 번 읽어 두 곳에 쓰기)"
+    }
+  ]
+}

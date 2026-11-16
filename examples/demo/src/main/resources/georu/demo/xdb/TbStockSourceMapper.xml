@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Source] source-3 SQL Server demo_ms.dbo.WMS_STOCK → tb_stock -->
+<mapper namespace="georu.demo.xdb.TbStockSourceMapper">
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*) FROM dbo.WMS_STOCK
+    </select>
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto" resultType="com.georu.examples.demo.xdb.dto.TbStockDto">
+        SELECT A.STOCK_ID
+             , A.PRODUCT_CD
+             , A.WAREHOUSE_CD
+             , A.QTY
+             , REPLACE(REPLACE(REPLACE(CONVERT(varchar(19), A.UPD_DT, 120), '-', ''), ' ', ''), ':', '') AS UPD_DATE
+          FROM dbo.WMS_STOCK A
+         ORDER BY A.STOCK_ID
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+</mapper>

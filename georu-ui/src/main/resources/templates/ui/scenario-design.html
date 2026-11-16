@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('시나리오 설계')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<div th:replace="~{ui/layout :: gate}"></div>
+<main>
+    <div class="page-head">
+        <h1>시나리오 설계 <span class="small muted" id="dsTitle"></span></h1>
+        <div class="page-acts">
+            <button class="btn" id="dsValidate" type="button" title="저장하지 않고 정의를 검사">검증</button>
+            <button class="btn" id="dsCheck" type="button" title="저장하지 않고 단계별 기존 데이터·막는 것을 확인">사전 확인</button>
+            <button class="btn primary" id="dsSave" type="button" data-write>저장</button>
+            <button class="btn" id="dsSaveRun" type="button" data-write title="저장한 뒤 시나리오 이관 실행 화면에서 실행">저장 후 실행</button>
+            <button class="btn" id="dsDownload" type="button">내려받기</button>
+            <a class="btn" th:href="@{/ui/scenario}">닫기</a>
+        </div>
+    </div>
+    <div id="dsBar" class="small" style="margin:8px 0"></div>
+    <!-- 단계 표시 (todo-task 33 T7): 탭과 같은 data-dtab 동작 -->
+    <div class="stepper" role="tablist" aria-label="시나리오 설계 단계"><button type="button" class="step active" data-dtab="t1" role="tab" aria-selected="true"><span class="no">1</span><span><b>기본 정보</b><small>이름 · 공통 요청 값</small></span></button><span class="line"></span><button type="button" class="step" data-dtab="t2" role="tab" aria-selected="false"><span class="no">2</span><span><b>단계 설계 <span class="cnt" id="stepCnt">0</span></b><small>테이블을 단계로 묶기</small></span></button><span class="line"></span><button type="button" class="step" data-dtab="t3" role="tab" aria-selected="false"><span class="no">3</span><span><b>검토 · 저장</b><small>사전 확인 후 저장</small></span></button></div>
+
+    <!-- ① 기본 정보 -->
+    <div id="t1" class="ds-grid2">
+        <div class="card" data-collapse="scn" data-collapse-sum="#fName,#fId">
+            <h2>시나리오</h2>
+            <form class="f compact" onsubmit="return false">
+                <div class="field"><label>id <span class="muted">(자동 채번 · 저장 시 확정)</span></label><input id="fId" maxlength="100" readonly class="mono"></div>
+                <div class="field"><label>이름</label><input id="fName" maxlength="200"></div>
+                <div class="field full"><label>설명</label><input id="fDesc"></div>
+                <div class="field full"><label>실행할 수 있는 프로파일 <span class="muted">(비우면 제한 없음 · 지금 활성 <span id="activeProfiles"></span>)</span></label>
+                    <div class="inline" id="fProfiles"></div></div>
+                <div class="field"><label>구간이 실패하면 (기본)</label><select id="fUnit"><option value="STOP">남은 구간 멈춤 (기본)</option><option value="CONTINUE">남은 구간 계속</option></select></div>
+                <div class="field"><label>단계가 끝까지 성공하지 못하면 (기본)</label><select id="fStep"><option value="STOP_ALL">시나리오 전체 멈춤 (기본)</option><option value="NEXT_STEP">다음 단계 계속</option></select></div>
+            </form>
+        </div>
+        <div class="card" data-collapse="common">
+            <h2>공통 요청 값</h2>
+            <div class="small muted" style="margin-bottom:8px">테이블 이관 요청과 같은 항목. 모든 단계에 적용되고 단계 속성에서 덮어쓸 수 있습니다.</div>
+            <form class="f compact" onsubmit="return false">
+                <div class="field full"><label class="req">테넌트 (tenantLevel1~5)</label>
+                    <div class="tenant5"><input id="cT1" placeholder="그룹" title="tenantLevel1 (그룹)"><input id="cT2" placeholder="계열사" title="tenantLevel2 (계열사)"><input id="cT3" placeholder="사업부" title="tenantLevel3 (사업부)"><input id="cT4" placeholder="부서" title="tenantLevel4 (부서)"><input id="cT5" placeholder="팀" title="tenantLevel5 (팀)"></div><div class="hint">그룹 · 계열사 · 사업부 · 부서 · 팀 - 소스에 단위 컬럼이 없으면 회사명으로 모두 채웁니다</div></div>
+                <div class="field"><label>청크 크기 <span class="muted">(1~10000)</span></label><input class="w-sm" id="cChunk" type="number" min="1" max="10000" value="500"></div>
+                <div class="field"><label>&nbsp;</label><label class="check"><input type="checkbox" id="cTimeWindow"> 시간 윈도우 적용 <span class="muted">(georu.run-window)</span></label></div>
+                <div class="field full"><details id="cAttrDetails"><summary>추가 속성 (attribute1~25) <span class="muted small" id="cAttrFilled"></span></summary>
+                    <div class="mt-4 small muted">테이블별 특화 설정으로 플러그인이 해석합니다. 값이 있는 칸만 정의에 들어갑니다.</div>
+                    <div class="mt-6 f compact" id="cAttrBox"></div>
+                    <div class="mt-6 inline"><button class="btn sm" id="cAttrMore" type="button">+ 속성 추가</button></div></details></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ② 단계 설계 -->
+    <div id="t2" style="display:none">
+        <div class="ds-grid">
+            <div class="card ds-pane">
+                <div class="card-head"><h2>테이블 카탈로그</h2><button class="btn sm" id="catReload" type="button">새로고침</button></div>
+                <input id="catSearch" type="search" placeholder="테이블 검색" style="width:100%;margin:8px 0" data-refresh-ignore>
+                <div class="mb-6 small muted">더블클릭 또는 끌어다 놓기로 단계 추가 · <span class="badge READER_TEST">분할可</span> 기간 조건·날짜 분할 가능 · <span class="badge WARNING">채번</span> 채번 컬럼 · <span class="badge BLOCKED">차단</span> 원천 미지정 · <span class="muted">#n</span> 추천 순서</div>
+                <div id="catalog" class="ds-scroll"><div class="empty small loading">불러오는 중…</div></div>
+            </div>
+            <div class="card ds-pane">
+                <div class="card-head"><h2>단계 흐름 <span class="small muted">위에서 아래로 실행 · 끌어서 순서 변경</span></h2>
+                    <div class="inline"><button class="btn sm" id="sortRecommended" type="button" title="플러그인이 선언한 추천 순서(부모→자식)로 정렬">추천 순서로 정렬</button></div></div>
+                <div class="mt-8 ds-scroll"><div id="canvas" class="ds-canvas"><div class="empty small">카탈로그에서 테이블을 추가하세요</div></div></div>
+            </div>
+            <div class="card ds-pane ds-props" id="propPane">
+                <h2>단계 속성</h2>
+                <div id="props" class="ds-scroll"><div class="empty small">단계를 선택하면 속성이 나옵니다</div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ③ 검토 -->
+    <div id="t3" class="stack" style="display:none">
+        <div class="card">
+            <div class="card-head"><h2>요약</h2><div class="inline"><label class="small">사전 확인 모드</label><select id="rvMode"><option>READER_TEST</option><option>WRITER_TEST</option><option selected>NORMAL</option></select><button class="btn sm" id="rvCheck" type="button">사전 확인</button></div></div>
+            <div id="rvSummary" class="mt-8"></div>
+            <div id="rvCheckBox" class="mt-8"></div>
+        </div>
+    </div>
+    <aside class="sp" data-panel="json" data-title="정의 JSON" data-width="600" data-more-desc="읽기 전용 · 탭의 입력으로 만들어짐 (열 때 새로 그림)" data-dock-label="정의 JSON" data-dock-icon="code">
+        <div class="inline" style="justify-content:space-between"><span class="small muted">읽기 전용 · ① ② 탭의 입력으로 만들어집니다</span><button class="btn sm" id="rvCopy" type="button">복사</button></div>
+        <pre id="rvJson"></pre>
+    </aside>
+    <aside class="sp" data-panel="hist" data-title="변경 이력" data-width="640" data-more-desc="저장한 버전과 그 시점의 JSON (편집 중인 시나리오만)" data-dock-label="변경 이력" data-dock-icon="clock">
+        <div id="hist"><div class="empty small loading">불러오는 중…</div></div>
+    </aside>
+</main>
+<style>/* Hallmark · checked: 2026-10-29 · genre: modern-minimal (inferred) · built: the project · redesign: polish · v2.0.0 */
+.ds-grid{display:grid;grid-template-columns:minmax(260px,300px) minmax(360px,1fr) minmax(340px,400px);gap:12px;align-items:start}
+.ds-grid2{display:grid;grid-template-columns:minmax(320px,1fr) minmax(320px,1fr);gap:12px;align-items:start;max-width:1200px}
+@media (max-width:900px){.ds-grid2{grid-template-columns:1fr}}
+form.f.compact{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 12px}
+form.f.compact input,form.f.compact select{padding:5px 8px}
+@media (max-width:1280px){.ds-grid{grid-template-columns:minmax(240px,280px) 1fr}.ds-grid > .ds-props{grid-column:1/-1;position:static;max-height:none}}
+@media (max-width:860px){.ds-grid{grid-template-columns:1fr}}
+.ds-pane{min-height:320px;overflow:hidden}
+.ds-scroll{max-height:calc(100vh - 290px);min-height:240px;overflow-y:auto;overflow-x:hidden;padding-right:4px}
+.ds-props{position:sticky;top:calc(var(--top-h,56px) + 12px)}
+.ds-props .ds-scroll{max-height:calc(100vh - 220px)}
+.cat-group{font-weight:600;margin:8px 0 2px;cursor:pointer;display:flex;align-items:center;gap:6px;user-select:none}
+.cat-group .arr{display:inline-block;width:12px;color:var(--muted);transition:transform .15s}.cat-group.closed .arr{transform:rotate(-90deg)}
+.cat-row{display:flex;align-items:center;gap:4px;padding:3px 4px;border-radius:4px;cursor:grab;font-size:12px;white-space:nowrap;min-width:0}
+.cat-row:hover{background:var(--hover,var(--c-a-37-99-235-08))}.cat-row.used{opacity:.5}
+.cat-row.off{cursor:not-allowed;color:var(--muted)}.cat-row.off:hover{background:none}
+.cat-row .t{font-family:var(--mono);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.cat-row .badge{white-space:nowrap;flex-shrink:0;padding:0 5px;font-size:10px}
+.cat-row .o{width:22px;flex-shrink:0;color:var(--muted)}
+.ds-canvas{display:flex;flex-direction:column;gap:6px;min-height:200px;padding:4px;border:1px dashed var(--line);border-radius:6px}
+.ds-canvas.over{background:var(--c-a-37-99-235-06)}
+.ds-card{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:6px;padding:6px 8px;background:var(--card);cursor:grab}
+.ds-card.sel{outline:2px solid var(--c-2563eb)}.ds-card.bad{border-color:var(--c-dc2626)}.ds-card.warn{border-color:var(--c-d97706)}.ds-card.dragging{opacity:.4}
+.ds-card .n{width:22px;color:var(--muted);flex-shrink:0}.ds-card .t{font-weight:600;font-family:var(--mono)}.ds-card .p{font-size:11px;color:var(--muted)}.ds-card > div{min-width:0}.ds-card .body{flex:1;min-width:0;overflow:hidden}.ds-card .acts{flex-shrink:0;white-space:nowrap}
+.ds-card .units{display:flex;gap:2px;flex-wrap:wrap;max-width:160px}.ds-card .units i{width:7px;height:7px;background:var(--line);border-radius:2px}
+.prop h3{font-size:12px;margin:10px 0 4px;color:var(--muted)}.prop .inline{flex-wrap:wrap}.prop input,.prop select{max-width:100%}
+.prop .over{font-weight:600}.prop .inh{color:var(--muted)}
+</style>
+<script th:inline="javascript">
+(function () {
+  const ACTIVE_PROFILES = /*[[${activeProfile}]]*/ 'docker';
+  const PRECHECK_AUTO = /*[[${precheckAuto}]]*/ true;
+  const { get, post, esc, badge, confirmModal, toast, num, $ } = UI;
+  const ATTR_MAX = 25, ATTR_MIN = 5;
+  const qp = new URLSearchParams(location.search);
+  let mode = qp.get('mode') || 'new';          // new | edit | copy
+  let editId = null;                            // 수정 중인 사용자 정의 id
+  let catalog = {};                             // plugin → [{table, divisible, sequenceColumns, syncColumns, state, stateReason, incomplete, blocked, order}]
+  const STATE_LABEL = { HOLD: '대기', EXCLUDED: '이관 제외' };
+  /** 대기 · 제외 테이블은 단계로 넣을 수 없다 (서버 시나리오 검증도 정의 오류로 막는다). 넣을 수 있으면 null */
+  const stateBlock = (info) => info.state && info.state !== 'ACTIVE'
+    ? `${STATE_LABEL[info.state] || info.state} 테이블${info.stateReason ? ' (' + info.stateReason + ')' : ''} - 이 테이블을 빼고 시나리오를 다시 만드세요` : null;
+  let def = { id: '', name: '', description: '', profiles: [], onUnitFailure: 'STOP', onStepStop: 'STOP_ALL',
+    common: { tenantLevel1: 'DEFAULT', tenantLevel2: 'DEFAULT', tenantLevel3: 'DEFAULT', tenantLevel4: 'DEFAULT', tenantLevel5: 'DEFAULT', chunkSize: 500 }, steps: [] };
+  let selected = -1;
+  let previewId = null;   // 새 정의의 예상 id (서버 채번, 저장 시 확정)
+  const countCache = {};
+
+  // ---------- 탭
+  document.querySelectorAll('[data-dtab]').forEach(b => b.onclick = () => {
+    syncFromForm();
+    document.querySelectorAll('[data-dtab]').forEach(x => { x.classList.toggle('active', x === b); x.setAttribute('aria-selected', String(x === b)); });
+    ['t1', 't2', 't3'].forEach(t => $('#' + t).style.display = t === b.dataset.dtab ? '' : 'none');
+    if (b.dataset.dtab === 't3') renderReview();
+  });
+
+  // ---------- ① 기본 정보
+  const profilesAll = () => [...new Set(ACTIVE_PROFILES.split(',').map(x => x.trim()).filter(Boolean).concat(def.profiles || []))];
+  function renderProfiles() {
+    $('#activeProfiles').textContent = ACTIVE_PROFILES;
+    $('#fProfiles').innerHTML = profilesAll().map(p => `<label class="check"><input type="checkbox" data-prof="${esc(p)}" ${(def.profiles || []).includes(p) ? 'checked' : ''}> ${esc(p)}</label>`).join('')
+      + `<input class="w-md" id="fProfOther" placeholder="다른 프로파일 추가"><button class="btn sm" id="fProfAdd" type="button">+</button>`;
+    $('#fProfAdd').onclick = () => { const v = $('#fProfOther').value.trim(); if (v) { def.profiles = [...new Set((def.profiles || []).concat([v]))]; renderProfiles(); } };
+  }
+  let cAttrShown = 0;
+  function showCAttrs(n) {
+    n = Math.max(ATTR_MIN, Math.min(ATTR_MAX, n));
+    for (let i = cAttrShown + 1; i <= n; i++) { const d = document.createElement('div'); d.className = 'field'; d.innerHTML = `<label>attribute${i}</label><input id="cAttr${i}" maxlength="500">`; $('#cAttrBox').appendChild(d); }
+    cAttrShown = Math.max(cAttrShown, n); $('#cAttrMore').style.display = cAttrShown >= ATTR_MAX ? 'none' : '';
+  }
+  $('#cAttrMore').onclick = () => showCAttrs(cAttrShown + 5);
+  function fillForm() {
+    $('#fId').value = def.id || '(저장 시 채번)';
+    $('#fName').value = def.name || ''; $('#fDesc').value = def.description || '';
+    $('#fUnit').value = (def.onUnitFailure || 'STOP').toUpperCase(); $('#fStep').value = (def.onStepStop || 'STOP_ALL').toUpperCase();
+    const c = def.common || {};
+    ['1', '2', '3', '4', '5'].forEach(n => $('#cT' + n).value = c['tenantLevel' + n] || '');
+    $('#cChunk').value = c.chunkSize || ''; $('#cTimeWindow').checked = !!c.enableTimeWindow;
+    let last = 0; for (let i = 1; i <= ATTR_MAX; i++) if (c['attribute' + i] != null && c['attribute' + i] !== '') last = i;
+    showCAttrs(last); for (let i = 1; i <= cAttrShown; i++) $('#cAttr' + i).value = c['attribute' + i] ?? '';
+    if (last) $('#cAttrDetails').open = true;
+    renderProfiles();
+    $('#dsTitle').textContent = mode === 'edit' ? '· 수정 ' + def.id : (mode === 'copy' ? '· 복제로 새로 만들기' : '· 새 시나리오');
+  }
+  function syncFromForm() {
+    def.name = $('#fName').value.trim(); def.description = $('#fDesc').value.trim() || undefined;
+    def.profiles = [...document.querySelectorAll('[data-prof]')].filter(x => x.checked).map(x => x.dataset.prof);
+    def.onUnitFailure = $('#fUnit').value; def.onStepStop = $('#fStep').value;
+    const c = def.common || (def.common = {});
+    ['1', '2', '3', '4', '5'].forEach(n => { const v = $('#cT' + n).value.trim(); if (v) c['tenantLevel' + n] = v; else delete c['tenantLevel' + n]; });
+    if ($('#cChunk').value) c.chunkSize = Number($('#cChunk').value); else delete c.chunkSize;
+    if ($('#cTimeWindow').checked) c.enableTimeWindow = true; else delete c.enableTimeWindow;
+    let filled = 0;
+    for (let i = 1; i <= ATTR_MAX; i++) { const el = $('#cAttr' + i); const v = el ? el.value.trim() : ''; if (v) { c['attribute' + i] = v; filled++; } else delete c['attribute' + i]; }
+    $('#cAttrFilled').textContent = filled ? `· ${filled}개` : '';
+    $('#stepCnt').textContent = def.steps.length;
+  }
+
+  // ---------- ② 카탈로그
+  async function loadCatalog() {
+    try { catalog = await get('/api/ui/scenario-catalog') || {}; } catch (e) { $('#catalog').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; return; }
+    renderCatalog();
+  }
+  const catInfo = (plugin, table) => (catalog[plugin] || []).find(x => x.table === table) || {};
+  const closedGroups = new Set();
+  let groupsInit = false;
+  function renderCatalog() {
+    const q = $('#catSearch').value.trim().toLowerCase();
+    const used = new Set(def.steps.map(s => s.plugin + '.' + s.table));
+    const usedPlugins = new Set(def.steps.map(s => s.plugin));
+    if (!groupsInit) {   // 처음에는 단계에 쓰인 플러그인과 테이블이 적은 플러그인만 펼친다 (플러그인이 많으면 접음)
+      Object.keys(catalog).forEach(p => { if (!usedPlugins.has(p) && Object.keys(catalog).length > 8) closedGroups.add(p); });
+      groupsInit = true;
+    }
+    $('#catalog').innerHTML = Object.keys(catalog).map(p => {
+      const rows = catalog[p].filter(t => !q || t.table.includes(q) || p.includes(q));
+      if (!rows.length) return '';
+      const closed = !q && closedGroups.has(p);
+      return `<div class="cat-group ${closed ? 'closed' : ''}" data-group="${esc(p)}"><span class="arr">▾</span>${esc(p)} <span class="small muted">(${rows.length})</span></div>` + (closed ? '' : rows.map(t => stateBlock(t) ? `<div class="cat-row off" title="${esc(t.table + ' · ' + STATE_LABEL[t.state] + ' 테이블은 단계로 넣을 수 없습니다' + (t.stateReason ? ' (' + t.stateReason + ')' : ''))}"><span class="o">${t.order ? '#' + t.order : ''}</span><span class="t">${esc(t.table)}</span><span class="badge ${esc(t.state)}">${esc(STATE_LABEL[t.state])}</span></div>` : `<div class="cat-row ${used.has(p + '.' + t.table) ? 'used' : ''}" draggable="true" data-plugin="${esc(p)}" data-table="${esc(t.table)}" title="${esc(t.table)} · 더블클릭: 단계 추가">`
+        + `<span class="o">${t.order ? '#' + t.order : ''}</span><span class="t">${esc(t.table)}</span>`
+        + (t.blocked ? '<span class="badge BLOCKED" title="원천 미지정 - 실행 차단">차단</span>' : (t.incomplete ? `<span class="badge WARN" title="미완 코드 ${t.incomplete}건">TODO ${t.incomplete}</span>` : ''))
+        + (t.divisible ? '<span class="badge READER_TEST" title="기간 조건·날짜 분할 가능">분할可</span>' : '')
+        + ((t.sequenceColumns || []).length ? `<span class="badge WARNING" title="채번 ${esc(t.sequenceColumns.join(','))}">채번</span>` : '')
+        + '</div>').join(''));
+    }).join('') || '<div class="empty small">일치하는 테이블이 없습니다</div>';
+    document.querySelectorAll('.cat-group').forEach(g => g.onclick = () => { const p = g.dataset.group; if (closedGroups.has(p)) closedGroups.delete(p); else closedGroups.add(p); renderCatalog(); });
+    document.querySelectorAll('.cat-row:not(.off)').forEach(r => {
+      r.ondblclick = () => addStep(r.dataset.plugin, r.dataset.table);
+      r.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', 'cat:' + r.dataset.plugin + ':' + r.dataset.table); ev.dataTransfer.effectAllowed = 'copy'; };
+    });
+  }
+  $('#catSearch').addEventListener('input', renderCatalog);
+  $('#catReload').onclick = loadCatalog;
+  function addStep(plugin, table, at) {
+    const why = stateBlock(catInfo(plugin, table));
+    if (why) { toast(`${table}: ${why}`, 'err'); return; }
+    const st = { plugin, table };
+    if (at == null || at >= def.steps.length) def.steps.push(st); else def.steps.splice(at, 0, st);
+    selected = at == null ? def.steps.length - 1 : at;
+    renderCanvas(); renderCatalog(); renderProps(); toast(`${table} 단계 추가`, 'ok');
+  }
+
+  // ---------- ② 캔버스
+  const stepUnits = (s) => s.divide && s._units ? s._units : (s.divide ? '?' : 1);
+  function renderCanvas() {
+    $('#stepCnt').textContent = def.steps.length;
+    const cv = $('#canvas');
+    cv.innerHTML = def.steps.map((s, i) => {
+      const info = catInfo(s.plugin, s.table);
+      const warn = (s.onUnitFailure === 'CONTINUE' || s.onStepStop === 'NEXT_STEP');
+      const bad = info.blocked || (s.divide && !info.divisible) || stateBlock(info);
+      const policy = [s.onUnitFailure ? (s.onUnitFailure === 'CONTINUE' ? '구간 실패 계속' : '구간 실패 멈춤') : '', s.onStepStop ? (s.onStepStop === 'NEXT_STEP' ? '단계 멈춤 시 다음' : '단계 멈춤 시 전체') : ''].filter(Boolean).join(' · ');
+      return `<div class="ds-card ${i === selected ? 'sel' : ''} ${bad ? 'bad' : (warn ? 'warn' : '')}" draggable="true" data-i="${i}"><span class="n">${i + 1}</span>
+        <div class="body"><div><span class="p">${esc(s.plugin)}</span> <span class="t">${esc(s.table)}</span> ${s.label ? `<span class="p">${esc(s.label)}</span>` : ''}</div>
+        <div class="p">${s.divide ? `분할 ${esc(s.divide.unit || '1m')} ${esc(s.divide.startDate || '')}~${esc(s.divide.endDate || '')} · 구간 ${stepUnits(s)}` : '분할 없음'}${(info.sequenceColumns || []).length ? ' · 채번 ' + esc(info.sequenceColumns.join(',')) : ''}${policy ? ' · <span class="t-warn">' + esc(policy) + '</span>' : ''}${info.blocked ? ' · <span class="t-danger">원천 미지정(차단)</span>' : ''}${stateBlock(info) ? ' · <span class="t-danger">' + esc(stateBlock(info)) + '</span>' : ''}${s.divide && !info.divisible ? ' · <span class="t-danger">이 테이블은 기간 조건을 받지 않음</span>' : ''}${Object.keys(s.options || {}).length ? ' · 옵션 ' + Object.keys(s.options).length : ''}${PRECHECK_AUTO && (s.options || {}).skipPrecheck ? ' · <span class="t-warn">자동 점검 건너뜀</span>' : ''}${PRECHECK_AUTO && (s.options || {}).ignorePrecheckErrors ? ' · <span class="t-danger">점검 차단 무시</span>' : ''}</div>
+        ${s.divide && typeof s._units === 'number' ? `<div class="units">${'<i></i>'.repeat(Math.min(s._units, 60))}</div>` : ''}</div>
+        <span class="acts"><button class="btn sm" data-up="${i}" title="위로">↑</button><button class="btn sm" data-down="${i}" title="아래로">↓</button><button class="btn sm" data-del="${i}" title="단계 빼기">✕</button></span></div>`;
+    }).join('') || '<div class="empty small">카탈로그에서 테이블을 추가하세요</div>';
+    cv.querySelectorAll('.ds-card').forEach(c => {
+      c.onclick = (ev) => { if (ev.target.closest('button')) return; selected = +c.dataset.i; renderCanvas(); renderProps(); };
+      c.ondragstart = (ev) => { ev.dataTransfer.setData('text/plain', 'step:' + c.dataset.i); c.classList.add('dragging'); };
+      c.ondragend = () => c.classList.remove('dragging');
+      c.ondragover = (ev) => { ev.preventDefault(); };
+      c.ondrop = (ev) => { ev.preventDefault(); ev.stopPropagation(); dropAt(ev, +c.dataset.i); };
+    });
+    cv.querySelectorAll('[data-up]').forEach(b => b.onclick = () => move(+b.dataset.up, -1));
+    cv.querySelectorAll('[data-down]').forEach(b => b.onclick = () => move(+b.dataset.down, 1));
+    cv.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { def.steps.splice(+b.dataset.del, 1); selected = -1; renderCanvas(); renderCatalog(); renderProps(); });
+  }
+  function dropAt(ev, index) {
+    const data = ev.dataTransfer.getData('text/plain') || '';
+    if (data.startsWith('cat:')) { const [, p, t] = data.split(':'); addStep(p, t, index); }
+    else if (data.startsWith('step:')) { const from = +data.slice(5); if (from === index) return; const [s] = def.steps.splice(from, 1); def.steps.splice(index > from ? index - 1 : index, 0, s); selected = index > from ? index - 1 : index; renderCanvas(); renderProps(); }
+  }
+  const cv = $('#canvas');
+  cv.ondragover = (ev) => { ev.preventDefault(); cv.classList.add('over'); };
+  cv.ondragleave = () => cv.classList.remove('over');
+  cv.ondrop = (ev) => { ev.preventDefault(); cv.classList.remove('over'); dropAt(ev, def.steps.length); };
+  function move(i, d) { const j = i + d; if (j < 0 || j >= def.steps.length) return; const t = def.steps[i]; def.steps[i] = def.steps[j]; def.steps[j] = t; selected = j; renderCanvas(); renderProps(); }
+  $('#sortRecommended').onclick = () => {
+    const key = (s) => { const o = catInfo(s.plugin, s.table).order; return [s.plugin, o == null ? 9999 : o]; };
+    // 플러그인 등장 순서는 유지하고, 같은 플러그인 안에서만 추천 순번으로 정렬
+    const order = [...new Set(def.steps.map(s => s.plugin))];
+    def.steps.sort((a, b) => { const ka = key(a), kb = key(b); const pa = order.indexOf(ka[0]), pb = order.indexOf(kb[0]); return pa !== pb ? pa - pb : ka[1] - kb[1]; });
+    renderCanvas(); renderProps(); toast('플러그인 안에서 추천 순서로 정렬했습니다. 플러그인 간 순서는 직접 정하세요', 'ok');
+  };
+
+  // ---------- ② 속성 패널 (단계 옵션 = 공통과 다른 값만 저장)
+  let pAttrShown = 0;
+  function renderProps() {
+    const box = $('#props');
+    if (selected < 0 || !def.steps[selected]) { box.innerHTML = '<div class="empty small">단계를 선택하면 속성이 나옵니다</div>'; return; }
+    const s = def.steps[selected], o = s.options || {}, c = def.common || {}, info = catInfo(s.plugin, s.table);
+    const inh = (k, dflt) => c[k] != null ? c[k] : dflt;
+    const seqDefault = (info.sequenceColumns || []).join(',');
+    box.innerHTML = `<div class="prop">
+      <div><b class="mono">${esc(s.plugin)}.${esc(s.table)}</b> <span class="small muted">${selected + 1}단계</span></div>
+      <div class="mt-4 small">${stateBlock(info) ? `<div class="alert err small">${esc(stateBlock(info))}</div>` : ''}${info.blocked ? '<span class="badge BLOCKED">원천 미지정</span> 실행이 차단됩니다 ' : ''}${info.incomplete ? `<span class="badge WARN">TODO ${info.incomplete}</span> ` : ''}${info.divisible ? '<span class="badge READER_TEST">분할可</span> ' : '<span class="muted">기간 조건 없음</span> '}${seqDefault ? `<span class="badge WARNING">채번 ${esc(seqDefault)}</span>` : ''}
+        <span id="pCount" class="muted">· 기존 ${countCache[s.plugin + '.' + s.table] != null ? esc(countCache[s.plugin + '.' + s.table]) : '?'}</span> <button class="btn sm" id="pCountBtn" type="button">건수 보기</button></div>
+      <h3>설명</h3><input id="pLabel" value="${esc(s.label || '')}" style="width:100%">
+      <h3>날짜 분할 <span class="muted">(구간마다 Job 1개)</span></h3>
+      <div class="inline"><label class="check"><input type="checkbox" id="pDivOn" ${s.divide ? 'checked' : ''}> 사용</label><input class="w-xs" id="pDivUnit" value="${esc(s.divide ? s.divide.unit || '1m' : '1m')}" placeholder="1m" title="1d·1w·1m·1y"><input class="w-sm" id="pDivStart" value="${esc(s.divide ? s.divide.startDate || '' : '')}" placeholder="YYYYMMDD"><input class="w-sm" id="pDivEnd" value="${esc(s.divide ? s.divide.endDate || '' : '')}" placeholder="YYYYMMDD"><button class="btn sm" id="pDivPreview" type="button">구간 보기</button></div>
+      <div class="small muted" id="pDivInfo">${s.divide && typeof s._units === 'number' ? `구간 ${s._units}개` : ''}</div>
+      <h3>기간 조건 <span class="muted">(분할 없이 범위만 걸 때. 분할을 켜면 무시)</span></h3>
+      <div class="inline"><input class="w-sm" id="pStart" value="${esc(o.startDate || '')}" placeholder="YYYYMMDD"><span class="small">~</span><input class="w-sm" id="pEnd" value="${esc(o.endDate || '')}" placeholder="YYYYMMDD"></div>
+      <h3>정책 <span class="muted">(비우면 시나리오 기본값)</span></h3>
+      <div class="inline"><select id="pUnit"><option value="">기본 (${def.onUnitFailure === 'CONTINUE' ? '계속' : '멈춤'})</option><option value="STOP" ${s.onUnitFailure === 'STOP' ? 'selected' : ''}>구간 실패 시 멈춤</option><option value="CONTINUE" ${s.onUnitFailure === 'CONTINUE' ? 'selected' : ''}>구간 실패 시 계속</option></select>
+        <select id="pStep"><option value="">기본 (${def.onStepStop === 'NEXT_STEP' ? '다음 단계' : '전체 멈춤'})</option><option value="STOP_ALL" ${s.onStepStop === 'STOP_ALL' ? 'selected' : ''}>단계 멈춤 시 전체 멈춤</option><option value="NEXT_STEP" ${s.onStepStop === 'NEXT_STEP' ? 'selected' : ''}>단계 멈춤 시 다음 단계</option></select></div>
+      <h3>이 단계만 다르게 <span class="muted">(비우면 공통 값)</span></h3>
+      <div class="inline"><label class="small">청크</label><input class="w-xs" id="pChunk" type="number" min="1" max="10000" value="${o.chunkSize ?? ''}" placeholder="${esc(inh('chunkSize', 500))}">
+        <label class="check"><input type="checkbox" id="pTW" ${o.enableTimeWindow != null ? (o.enableTimeWindow ? 'checked' : '') : (c.enableTimeWindow ? 'checked' : '')}> 시간 윈도우</label></div>
+      <details class="mt-4"><summary class="small">테넌트 덮어쓰기</summary><div class="mt-4 inline">${['1', '2', '3', '4', '5'].map(n => `<input class="w-xs" id="pT${n}" value="${esc(o['tenantLevel' + n] || '')}" placeholder="${esc(inh('tenantLevel' + n, ''))}">`).join('')}</div></details>
+      <h3>채번 <span class="muted">(비우면 테이블 설정${seqDefault ? ': ' + esc(seqDefault) : ' 없음'})</span></h3>
+      <div class="inline"><input class="w-sm" id="pSeqCols" value="${esc((o.sequenceColumns || []).join(','))}" placeholder="컬럼,컬럼"><input class="w-xs" id="pSeqPolicy" value="${esc(o.sequencePolicy || '')}" placeholder="정책(v1)"><select id="pSeqSync"><option value="">동기화 기본</option><option value="true" ${o.sequenceSync === true ? 'selected' : ''}>MAX 동기화 함</option><option value="false" ${o.sequenceSync === false ? 'selected' : ''}>안 함</option></select></div>
+      <h3>실행 전 확인 (NORMAL)</h3>
+      <label class="check"><input type="checkbox" id="pIgnore" ${o.ignoreExistingData ? 'checked' : ''}> 기존 데이터가 있어도 적재 <span class="t-danger muted">(UPSERT·IGNORE 쿼리일 때만)</span></label>
+      ${PRECHECK_AUTO ? `<br><label class="check"><input type="checkbox" id="pSkipPre" ${o.skipPrecheck ? 'checked' : ''}> 자동 점검 건너뜀</label> <label class="check"><input type="checkbox" id="pIgnPre" ${o.ignorePrecheckErrors ? 'checked' : ''}> 점검 차단 무시</label>` : ''}
+      <h3>추가 속성 (이 단계만) <span class="muted" id="pAttrFilled"></span></h3>
+      <div class="f" id="pAttrBox"></div><button class="mt-4 btn sm" id="pAttrMore" type="button">+ 속성 추가</button>
+      <div class="mt-10 inline"><button class="btn primary sm" id="pApply" type="button">적용</button><span class="small muted">적용을 눌러야 단계에 반영됩니다</span></div>
+    </div>`;
+    pAttrShown = 0;
+    const showP = (n) => { n = Math.max(ATTR_MIN, Math.min(ATTR_MAX, n)); for (let i = pAttrShown + 1; i <= n; i++) { const d = document.createElement('div'); d.className = 'field'; d.innerHTML = `<label>attribute${i} <span class="muted small">${c['attribute' + i] ? '공통 ' + esc(c['attribute' + i]) : ''}</span></label><input id="pAttr${i}" value="${esc(o['attribute' + i] ?? '')}" maxlength="500">`; $('#pAttrBox').appendChild(d); } pAttrShown = Math.max(pAttrShown, n); $('#pAttrMore').style.display = pAttrShown >= ATTR_MAX ? 'none' : ''; };
+    let last = 0; for (let i = 1; i <= ATTR_MAX; i++) if (o['attribute' + i] != null && o['attribute' + i] !== '') last = i; showP(last);
+    $('#pAttrMore').onclick = () => showP(pAttrShown + 5);
+    $('#pCountBtn').onclick = async () => { try { const r = await get(`/api/ui/target-count?plugin=${encodeURIComponent(s.plugin)}&table=${encodeURIComponent(s.table)}`); countCache[s.plugin + '.' + s.table] = r.known ? r.display : '확인 실패'; $('#pCount').textContent = '· 기존 ' + countCache[s.plugin + '.' + s.table]; } catch (e) { toast(e.message, 'err'); } };
+    $('#pDivPreview').onclick = async () => { try { const r = await post('/api/scenarios/preview-ranges', { unit: $('#pDivUnit').value, startDate: $('#pDivStart').value, endDate: $('#pDivEnd').value }); $('#pDivInfo').textContent = `구간 ${r.count}개 (${r.unit}) · ${r.ranges.slice(0, 4).join(', ')}${r.count > 4 ? ' …' : ''}`; s._units = r.count; } catch (e) { $('#pDivInfo').textContent = e.plainMessage || e.message; } };
+    $('#pApply').onclick = () => {
+      s.label = $('#pLabel').value.trim() || undefined;
+      if ($('#pDivOn').checked) { s.divide = { unit: $('#pDivUnit').value.trim() || '1m', startDate: $('#pDivStart').value.trim(), endDate: $('#pDivEnd').value.trim() }; } else { delete s.divide; delete s._units; }
+      s.onUnitFailure = $('#pUnit').value || undefined; s.onStepStop = $('#pStep').value || undefined;
+      const n = {};
+      if ($('#pChunk').value) n.chunkSize = Number($('#pChunk').value);
+      if ($('#pTW').checked !== !!c.enableTimeWindow) n.enableTimeWindow = $('#pTW').checked;
+      ['1', '2', '3', '4', '5'].forEach(k => { const v = $('#pT' + k).value.trim(); if (v) n['tenantLevel' + k] = v; });
+      if (!s.divide) { if ($('#pStart').value.trim()) n.startDate = $('#pStart').value.trim(); if ($('#pEnd').value.trim()) n.endDate = $('#pEnd').value.trim(); }
+      const cols = $('#pSeqCols').value.split(',').map(x => x.trim()).filter(Boolean); if (cols.length) n.sequenceColumns = cols;
+      if ($('#pSeqPolicy').value.trim()) n.sequencePolicy = $('#pSeqPolicy').value.trim();
+      if ($('#pSeqSync').value) n.sequenceSync = $('#pSeqSync').value === 'true';
+      if ($('#pIgnore').checked) n.ignoreExistingData = true;
+      if (PRECHECK_AUTO) { if ($('#pSkipPre').checked) n.skipPrecheck = true; if ($('#pIgnPre').checked) n.ignorePrecheckErrors = true; }
+      for (let i = 1; i <= pAttrShown; i++) { const v = $('#pAttr' + i).value.trim(); if (v) n['attribute' + i] = v; }
+      if (Object.keys(n).length) s.options = n; else delete s.options;
+      renderCanvas(); toast('단계에 반영했습니다', 'ok');
+    };
+  }
+
+  // ---------- ③ 검토
+  const cleanDef = () => { syncFromForm(); const d = JSON.parse(JSON.stringify(def)); if (!d.id) d.id = previewId || 'scn-000'; d.steps = d.steps.map(s => { const o = { plugin: s.plugin, table: s.table }; if (s.label) o.label = s.label; if (s.divide) o.divide = s.divide; if (s.onUnitFailure) o.onUnitFailure = s.onUnitFailure; if (s.onStepStop) o.onStepStop = s.onStepStop; if (s.options && Object.keys(s.options).length) o.options = s.options; return o; }); if (!d.description) delete d.description; return d; };
+  function renderReview() {
+    const d = cleanDef();
+    $('#rvSummary').innerHTML = `<table class="small list"><tr><th>#</th><th>플러그인</th><th>테이블</th><th>분할</th><th>정책</th><th>채번</th><th>자동 점검 (NORMAL)</th><th>단계 옵션</th></tr>` + d.steps.map((s, i) => { const info = catInfo(s.plugin, s.table); return `<tr><td>${i + 1}</td><td>${esc(s.plugin)}</td><td class="mono"><b>${esc(s.table)}</b>${s.label ? ' <span class="muted">' + esc(s.label) + '</span>' : ''}</td><td>${s.divide ? esc(s.divide.unit) + ' ' + esc(s.divide.startDate) + '~' + esc(s.divide.endDate) : '-'}</td><td>${esc([s.onUnitFailure, s.onStepStop].filter(Boolean).join(' · ') || '기본')}</td><td>${esc((s.options && s.options.sequenceColumns ? s.options.sequenceColumns : info.sequenceColumns || []).join(','))}</td><td>${UI.autoPrecheckBadge(UI.autoPrecheckState({ auto: PRECHECK_AUTO, mode: 'NORMAL', skip: !!(s.options || {}).skipPrecheck }))}</td><td class="small wrap">${esc(Object.entries(s.options || {}).filter(([k]) => k !== 'sequenceColumns').map(([k, v]) => k + '=' + v).join(' '))}</td></tr>`; }).join('') + '</table>';
+    $('#rvJson').textContent = JSON.stringify(d, null, 2);
+  }
+  async function loadHistory() {
+    try { const h = await get('/api/scenarios/' + encodeURIComponent(editId) + '/history') || [];
+      $('#hist').innerHTML = h.length ? '<table class="small list"><tr><th>v</th><th>작업</th><th>이름</th><th>저장자</th><th>시각</th><th></th></tr>' + h.map(x => `<tr><td>${x.version}</td><td>${esc(x.action)}</td><td>${esc(x.name || '')}</td><td>${esc(x.savedBy || '')}</td><td>${esc(UI.fmtDate(x.savedAt))}</td><td><button class="btn sm" data-hv="${x.id}">그 시점 JSON</button></td></tr>`).join('') + '</table><pre id="histJson" style="display:none;max-height:300px;overflow:auto"></pre>' : '<div class="empty small">이력이 없습니다</div>';
+      document.querySelectorAll('[data-hv]').forEach(b => b.onclick = async () => { const e = await get('/api/scenarios/' + encodeURIComponent(editId) + '/history/' + b.dataset.hv); $('#histJson').style.display = ''; $('#histJson').textContent = e.definitionJson; });
+    } catch (e) { $('#hist').innerHTML = `<div class="small muted">${esc(e.message)}</div>`; }
+  }
+  // 보조 패널(오른쪽 탭 막대): 정의 JSON 은 어느 탭에서 열어도 지금 입력으로, 변경 이력은 저장한 시나리오만
+  UI.panel.on('json', () => { $('#rvJson').textContent = JSON.stringify(cleanDef(), null, 2); });
+  UI.panel.on('hist', () => { if (mode === 'edit' && editId) loadHistory(); else $('#hist').innerHTML = '<div class="empty small">저장한 사용자 정의 시나리오에만 변경 이력이 있습니다 (저장하면 생깁니다)</div>'; });
+  $('#rvCopy').onclick = () => navigator.clipboard.writeText($('#rvJson').textContent).then(() => toast('복사했습니다', 'ok'));
+
+  // ---------- 검증·사전 확인·저장
+  function bar(html, cls) { $('#dsBar').innerHTML = html ? `<div class="alert ${cls || 'info'}" style="margin:0">${html}</div>` : ''; }
+  async function validate(quiet) {
+    const d = cleanDef();
+    try { const r = await post('/api/scenarios/validate', d); if (r.valid) { if (!quiet) bar('✔ 검증 통과 - 저장할 수 있습니다', 'ok'); return []; } bar(`검증 오류 ${r.errors.length}건<ul class="small" style="margin:4px 0 0 16px">${r.errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>`, 'err'); return r.errors; }
+    catch (e) { bar(esc(e.message), 'err'); return [e.message]; }
+  }
+  async function check(modeSel) {
+    const d = cleanDef();
+    try {
+      const c = await post('/api/scenarios/check', { definition: d, testMode: modeSel || 'NORMAL' });
+      const steps = c.steps || [];
+      steps.forEach(s => { const st = def.steps[s.seq - 1]; if (st && st.divideUnit) st._units = s.units; if (st) st._units = s.units; if (s.existingCount != null) countCache[s.plugin + '.' + s.table] = s.existingCount; });
+      renderCanvas();
+      let html = (c.errors || []).length ? `<div class="alert err">정의 오류: ${c.errors.map(esc).join(' / ')}</div>` : (c.runnable ? `<div class="alert ok">✔ ${steps.length} 단계 · 단위 ${num(c.unitTotal)}개 실행 가능 (${esc(c.testMode)})</div>` : `<div class="alert err">실행할 수 없습니다${c.blockedSteps ? ` · 막힌 단계 ${c.blockedSteps}개` : ''}${c.gateBusy ? ' · 다른 이관 실행 중' : ''}</div>`);
+      const rows = steps.filter(s => s.blockers.length || s.warnings.length);
+      if (rows.length) html += '<table class="small"><tr><th>단계</th><th>테이블</th><th>기존</th><th>막는 것</th><th>주의</th></tr>' + rows.map(s => `<tr><td>${s.seq}</td><td>${esc(s.table)}</td><td>${esc(s.existingCount == null ? '?' : s.existingCount)}</td><td class="t-danger">${s.blockers.map(esc).join('<br>')}</td><td>${s.warnings.map(esc).join('<br>')}</td></tr>`).join('') + '</table>';
+      $('#rvCheckBox').innerHTML = html;
+      bar(c.runnable ? `✔ 사전 확인 통과 (${esc(c.testMode)}) · 단위 ${num(c.unitTotal)}개` : `사전 확인: ${(c.errors || []).length ? '정의 오류' : '막힌 단계 ' + c.blockedSteps + '개'} - ③ 검토 탭에서 상세`, c.runnable ? 'ok' : 'err');
+      return c;
+    } catch (e) { bar(esc(e.plainMessage || e.message), 'err'); return null; }
+  }
+  async function save() {
+    const errors = await validate(true); if (errors.length) { toast('검증 오류가 있어 저장하지 않았습니다', 'err'); return false; }
+    const d = cleanDef();
+    const isNew = mode !== 'edit';
+    if (isNew) delete d.id;   // 서버가 scn-NNN 으로 채번
+    if (!await confirmModal(isNew ? '시나리오 추가' : '시나리오 수정', `<span class="mono">${esc(isNew ? (def.id || '자동 채번') : d.id)}</span> <b>${esc(d.name)}</b> · 단계 ${d.steps.length}개${d.steps.some(s => s.onUnitFailure === 'CONTINUE' || s.onStepStop === 'NEXT_STEP') ? '<div class="mt-8 alert warn">실패해도 계속하도록 설정된 단계가 있습니다</div>' : ''}`, '저장')) return false;
+    try {
+      const r = isNew ? await post('/api/scenarios', d) : await UI.api('PUT', '/api/scenarios/' + encodeURIComponent(editId), d);
+      def.id = (r && r.id) || d.id; mode = 'edit'; editId = def.id; $('#fId').value = def.id; $('#dsTitle').textContent = '· 수정 ' + def.id;
+      history.replaceState(null, '', '/ui/scenario-design?mode=edit&id=' + encodeURIComponent(def.id));
+      bar('저장했습니다 ' + esc(def.id), 'ok'); toast('저장했습니다 ' + def.id, 'ok'); return true;
+    } catch (e) { const errs = (e.data && e.data.errors) || [e.plainMessage || e.message]; bar(`저장하지 않았습니다<ul class="small" style="margin:4px 0 0 16px">${errs.map(x => `<li>${esc(x)}</li>`).join('')}</ul>`, 'err'); return false; }
+  }
+  $('#dsValidate').onclick = () => validate(false);
+  $('#dsCheck').onclick = () => check($('#rvMode').value);
+  $('#rvCheck').onclick = () => check($('#rvMode').value);
+  $('#dsSave').onclick = save;
+  $('#dsSaveRun').onclick = async () => { if (await save()) location.href = '/ui/scenario?id=' + encodeURIComponent(def.id) + '&check=1'; };
+  $('#dsDownload').onclick = () => { const d = cleanDef(); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' })); a.download = 'scenario-' + (d.id || 'new') + '.json'; a.click(); };
+
+  // ---------- 시작
+  async function init() {
+    await loadCatalog();
+    const id = qp.get('id');
+    let fromSession = null; try { fromSession = sessionStorage.getItem('ui.scenario.design'); if (fromSession) { sessionStorage.removeItem('ui.scenario.design'); fromSession = JSON.parse(fromSession); } } catch (e) { fromSession = null; }
+    if (fromSession) { def = fromSession; mode = qp.get('mode') || 'new'; }
+    else if (id) {
+      try { const s = await get('/api/scenarios/' + encodeURIComponent(id)); def = s.definition; if (mode === 'copy') { def.name = s.name + ' (복제)'; } else if (!s.editable) { mode = 'copy'; def.name = s.name + ' (복제)'; toast('배포 파일 정의는 복제해서 새로 만듭니다', 'ok'); } }
+      catch (e) { toast(e.message, 'err'); }
+    }
+    if (mode === 'edit') editId = def.id;
+    else { try { previewId = (await get('/api/scenarios/next-id')).id; } catch (e) { previewId = null; } def.id = previewId; }
+    def.steps = def.steps || []; def.common = def.common || {}; def.profiles = def.profiles || [];
+    fillForm(); renderCanvas(); renderProps(); renderCatalog();
+    if (def.steps.length) { selected = 0; document.querySelector('[data-dtab=t2]').click(); renderCanvas(); renderProps(); }
+    // 분할 단계의 구간 수를 미리 센다 (서버 계산, 소스 건수는 세지 않음)
+    for (const st of def.steps) {
+      if (st.divide && typeof st._units !== 'number') {
+        try { const r = await post('/api/scenarios/preview-ranges', { unit: st.divide.unit, startDate: st.divide.startDate, endDate: st.divide.endDate }); st._units = r.count; } catch (e) { /* 설정 오류는 검증에서 알림 */ }
+      }
+    }
+    renderCanvas(); renderProps();
+  }
+  init();
+})();
+</script>
+</body>
+</html>

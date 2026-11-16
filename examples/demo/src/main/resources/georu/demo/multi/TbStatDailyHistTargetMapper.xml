@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Target] target-m tb_stat_daily_hist - 한 번 읽어 두 곳에 쓰기(tb_stat_daily_fanout). 자연키 upsert 라 다시 돌려도 건수가 같다 (멱등 쓰기 기동 확인) -->
+<mapper namespace="georu.demo.multi.TbStatDailyHistTargetMapper">
+    <insert id="insertData" parameterType="com.georu.examples.demo.multi.dto.StatDailyFanoutDto">
+        INSERT INTO tb_stat_daily_hist (STAT_YMD, BOARD_ID, VISIT_CNT, UNIQUE_VISIT_CNT, POST_CNT, COMMENT_CNT, AVG_STAY_SEC, INDATE)
+        VALUES (#{statYmd}, #{boardId}, #{visitCnt}, #{uniqueVisitCnt}, #{postCnt}, #{commentCnt}, #{avgStaySec}, #{indate})
+        ON DUPLICATE KEY UPDATE VISIT_CNT = VALUES(VISIT_CNT), UNIQUE_VISIT_CNT = VALUES(UNIQUE_VISIT_CNT), POST_CNT = VALUES(POST_CNT),
+                                COMMENT_CNT = VALUES(COMMENT_CNT), AVG_STAY_SEC = VALUES(AVG_STAY_SEC), INDATE = VALUES(INDATE)
+    </insert>
+</mapper>

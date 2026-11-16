@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_member_login_log : 로그인이력 ← ASIS(Oracle) MEM_LOGIN_HIS : 로그인 이력 (매핑 추정, 미확정)
+     자동 매핑 6 / 수기 매핑 3 (TOBE 컬럼 9, apply_demo_mapping.py 적용)
+     자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.member.TbMemberLoginLogSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+        <if test="startDate != null and startDate != ''">AND A."LOGIN_DT" &gt;= TO_DATE(#{startDate}, 'YYYYMMDD')</if>
+        <if test="endDate != null and endDate != ''">AND A."LOGIN_DT" &lt; TO_DATE(#{endDate}, 'YYYYMMDD') + 1</if>
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."MEM_LOGIN_HIS" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbMemberLoginLogSourceDto">
+        SELECT
+              NULL AS "LOGIN_LOG_ID"    <!-- 이력ID BIGINT ← 시퀀스 채번 (DemoSequenceColumns) -->
+            , A."LOGIN_HIS_ID" AS "ASIS_ID"    <!-- ASIS이력ID BIGINT ← LOGIN_HIS_ID (원본 보존) -->
+            , A."MEMBER_ID" AS "MEMBER_ID"    <!-- 회원ID INT ← MEMBER_ID (이름 일치 자동, 의미 확인) -->
+            , TO_CHAR(A."LOGIN_DT", 'YYYYMMDDHH24MISS') AS "LOGIN_DATE"    <!-- 로그인일시 VARCHAR(14) ← LOGIN_DT (수기) -->
+            , A."LOGIN_IP" AS "LOGIN_IP"    <!-- IP VARCHAR(45) ← LOGIN_IP (이름 일치 자동, 의미 확인) -->
+            , A."DEVICE_CD" AS "DEVICE_CD"    <!-- 기기 VARCHAR(10) ← DEVICE_CD (이름 일치 자동, 의미 확인) -->
+            , A."RESULT_CD" AS "RESULT_CD"    <!-- 결과 VARCHAR(10) ← RESULT_CD (이름 일치 자동, 의미 확인) -->
+            , A."FAIL_REASON" AS "FAIL_REASON"    <!-- 실패사유 VARCHAR(200) ← FAIL_REASON (이름 일치 자동, 의미 확인) -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 VARCHAR(14) ← REG_DATE (감사 컬럼) -->
+          FROM "DEMO"."MEM_LOGIN_HIS" A
+        <include refid="where"/>
+         ORDER BY A."LOGIN_HIS_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

@@ -1,0 +1,22 @@
+경고: 업무구분 '코드' 의 패키지 이름을 'code' 로 제안했습니다 (사전 (코드)). 바꾸려면 화면에서 입력하거나 파일의 업무 패키지 열에 적으세요
+경고: 업무구분 '02 회원관리' 의 패키지 이름을 'member' 로 제안했습니다 (사전 (회원)). 바꾸려면 화면에서 입력하거나 파일의 업무 패키지 열에 적으세요
+경고: 업무구분 '지점' 의 패키지 이름을 'branch' 로 제안했습니다 (사전 (지점)). 바꾸려면 화면에서 입력하거나 파일의 업무 패키지 열에 적으세요
+경고: 업무구분 '포인트' 의 패키지 이름을 'point' 로 제안했습니다 (사전 (포인트)). 바꾸려면 화면에서 입력하거나 파일의 업무 패키지 열에 적으세요
+경고: 업무구분 '강좌' 의 패키지 이름을 'subj' 로 제안했습니다 (업체 사전 (강좌)). 바꾸려면 화면에서 입력하거나 파일의 업무 패키지 열에 적으세요
+파일 89
+APPLY.md
+src/main/java/com/georu/acme/AcmeApplication.java
+src/main/java/com/georu/acme/common/AcmeConvertUtils.java
+src/main/java/com/georu/acme/common/AcmeAuditRules.java
+src/main/resources/application.yml
+src/main/resources/application-dev.yml
+src/test/java/com/georu/acme/AcmeArchTest.java
+gradle/georu-mapping-status.gradle
+src/main/java/com/georu/acme/code/CodeStrategy.java
+src/main/java/com/georu/acme/member/MemberStrategy.java
+src/main/java/com/georu/acme/board/BoardStrategy.java
+src/main/java/com/georu/acme/stats/StatsStrategy.java
+src/main/java/com/georu/acme/branch/BranchStrategy.java
+src/main/java/com/georu/acme/point/PointStrategy.java
+src/main/java/com/georu/acme/subj/SubjStrategy.java
+generation-report.csv

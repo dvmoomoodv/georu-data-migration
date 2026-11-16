@@ -1,0 +1,23 @@
+package [(${s.basePackage})];
+
+import com.georu.test.GeoruArchRules;
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
+import org.junit.jupiter.api.Test;
+
+/**
+ * [(${s.company})] 업무 코드는 georu 공개 API 만 쓴다 (com.georu..internal.. 금지). 엔진을 올려도 깨지지 않게 하는 규칙.
+ * 자동 생성: georu 코드 생성기 [(${gen.version})]
+ */
+class [(${s.pascal})]ArchTest {
+
+    private static final JavaClasses CLASSES = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+            .importPackages("[(${s.basePackage})]");
+
+    @Test
+    void noInternalAccess() {
+        GeoruArchRules.noInternalAccess("[(${s.basePackage})]..").check(CLASSES);
+    }
+}

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_board : 게시판 ← ASIS(Oracle) BRD_BOARD : 게시판 마스터 (매핑 추정, 미확정)
+     자동 매핑 9 / 수기 매핑 2 (TOBE 컬럼 11, apply_demo_mapping.py 적용)
+     자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.board.TbBoardSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."BRD_BOARD" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbBoardSourceDto">
+        SELECT
+              A."BOARD_ID" AS "BOARD_ID"    <!-- 게시판ID INT ← BOARD_ID (이름 일치 자동, 의미 확인) -->
+            , A."BOARD_CD" AS "BOARD_CD"    <!-- 게시판코드 VARCHAR(30) ← BOARD_CD (이름 일치 자동, 의미 확인) -->
+            , A."BOARD_NM" AS "BOARD_NM"    <!-- 게시판명 VARCHAR(100) ← BOARD_NM (이름 일치 자동, 의미 확인) -->
+            , A."BOARD_TYPE_CD" AS "BOARD_TYPE_CD"    <!-- 유형 VARCHAR(10) ← BOARD_TYPE_CD (이름 일치 자동, 의미 확인) -->
+            , A."USE_YN" AS "USE_YN"    <!-- 사용여부 CHAR(1) ← USE_YN (이름 일치 자동, 의미 확인) -->
+            , A."ANON_YN" AS "ANON_YN"    <!-- 익명허용 CHAR(1) ← ANON_YN (이름 일치 자동, 의미 확인) -->
+            , A."ATTACH_LIMIT" AS "ATTACH_LIMIT"    <!-- 첨부최대수 TINYINT ← ATTACH_LIMIT (이름 일치 자동, 의미 확인) -->
+            , A."REG_ID" AS "INUSERID"    <!-- 등록자 VARCHAR(40) ← REG_ID (수기) -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 VARCHAR(14) ← REG_DATE (감사 컬럼) -->
+            , A."MOD_ID" AS "LUSERID"    <!-- 수정자 VARCHAR(40) ← MOD_ID (수기) -->
+            , TO_CHAR(A."MOD_DATE", 'YYYYMMDDHH24MISS') AS "LDATE"    <!-- 수정일시 VARCHAR(14) ← MOD_DATE (감사 컬럼) -->
+          FROM "DEMO"."BRD_BOARD" A
+        <include refid="where"/>
+         ORDER BY A."BOARD_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

@@ -1,0 +1,55 @@
+{
+  "id": "demo-xdb",
+  "name": "여러 DB 5대 (소스 3 · 타겟 2)",
+  "description": "소스 Oracle · PostgreSQL · SQL Server → 타겟 MySQL · MariaDB 의 여섯 조합 (Oracle → MySQL 은 기존 데모). ./run-scripts/run-docker.sh xdb 로 띄운 뒤 (guides/demo.md 8절)",
+  "profiles": [
+    "docker"
+  ],
+  "onUnitFailure": "STOP",
+  "onStepStop": "STOP_ALL",
+  "common": {
+    "tenantLevel1": "DEMO",
+    "tenantLevel2": "DEMO",
+    "tenantLevel3": "DEMO",
+    "tenantLevel4": "DEMO",
+    "tenantLevel5": "DEMO",
+    "chunkSize": 500
+  },
+  "steps": [
+    {
+      "plugin": "demo.xdb",
+      "table": "tb_code_mart",
+      "label": "코드 (Oracle → MariaDB)"
+    },
+    {
+      "plugin": "demo.xdb",
+      "table": "tb_customer",
+      "label": "고객 (PostgreSQL → MariaDB, 탈퇴 제외 · 등급 코드 변환 · 채번)"
+    },
+    {
+      "plugin": "demo.xdb",
+      "table": "tb_order",
+      "label": "주문 (PostgreSQL → MariaDB)"
+    },
+    {
+      "plugin": "demo.xdb",
+      "table": "tb_order_dw",
+      "label": "완료 주문 (PostgreSQL → MySQL, params status=DONE)"
+    },
+    {
+      "plugin": "demo.xdb",
+      "table": "tb_product",
+      "label": "상품 (SQL Server → MariaDB, 삭제 제외)"
+    },
+    {
+      "plugin": "demo.xdb",
+      "table": "tb_product_dw",
+      "label": "상품 (SQL Server → MySQL)"
+    },
+    {
+      "plugin": "demo.xdb",
+      "table": "tb_stock",
+      "label": "재고 (SQL Server → MariaDB)"
+    }
+  ]
+}

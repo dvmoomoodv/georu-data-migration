@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('코드 생성')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>코드 생성</h1><p class="page-desc">TOBE 컬럼 정의를 올리면 업체 적용 전 필수 파일(기본 셋트 · 업무 Strategy · 테이블별 Reader · Processor · Writer · DTO · XML)을 zip 으로 만든다 · 올린 파일은 저장하지 않는다</p></div>
+    <div class="stack focus-col">
+            <div class="card" data-collapse="files" data-collapse-sum="#tobeName,#asisName,#rulesName">
+                <h2>1. 파일 올리기</h2>
+                <div class="inline small"><span class="muted">TOBE 컬럼 정의서(한 행에 컬럼 하나, xlsx · xls · CSV)를 올린다 · 열 설명은 <a href="#" data-panel-open="help">? 도움말</a></span>
+                    <button class="btn sm" id="btnTemplate" type="button">예제 양식 내려받기 (xlsx)</button></div>
+                <div id="dropTobe" class="mt-10 gen-drop dropzone" tabindex="0">
+                    <b>TOBE 컬럼 정의</b> 를 끌어다 놓거나 클릭 (CSV · xlsx · xls 첫 시트)
+                    <div id="tobeName" class="small mono"></div>
+                </div>
+                <input type="file" id="fileTobe" accept=".csv,.xlsx,.xls" style="display:none">
+                <div class="mt-12 field"><label>원천 메타 (Source SELECT 를 채울 원천 컬럼 정보)</label>
+                    <div class="radio" id="metaRadio">
+                        <label><input type="radio" name="sourceMeta" value="db" checked> 소스 DB 메타데이터</label>
+                        <label><input type="radio" name="sourceMeta" value="file"> ASIS 정의 파일</label>
+                        <label><input type="radio" name="sourceMeta" value="none"> 쓰지 않음 (같은 이름 가정)</label>
+                    </div>
+                </div>
+                <div id="asisBox" style="display:none;margin-top:8px">
+                    <div id="dropAsis" class="gen-drop dropzone" tabindex="0">
+                        <b>ASIS 테이블 정의</b> (테이블명 · 컬럼명 · 타입, 있으면 PK)
+                        <div id="asisName" class="small mono"></div>
+                    </div>
+                    <input type="file" id="fileAsis" accept=".csv,.xlsx,.xls" style="display:none">
+                </div>
+                <div class="mt-12">
+                    <div id="dropRules" class="gen-drop dropzone" tabindex="0">
+                        <b>업체 규칙 파일</b> <span class="muted">선택 · xlsx (기본값 · 사전 · 감사 컬럼 · 명명 규칙)</span>
+                        <div id="rulesName" class="small mono"></div>
+                    </div>
+                    <input type="file" id="fileRules" accept=".xlsx,.xls" style="display:none">
+                    <div class="mt-6 inline small">
+                        <button class="btn sm" id="btnRulesTemplate" type="button">규칙 양식 내려받기</button>
+                        <button class="btn sm" id="btnRulesExport" type="button">현재 규칙 내려받기</button>
+                        <span class="muted">올리면 2. 설정이 파일 값으로 채워진다 · 서버에 남지 않는다</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" data-collapse="settings" data-collapse-sum="#company,#sourceDataSource,#targetDataSource,#writerMode">
+                <div class="card-head"><h2>2. 설정</h2><button class="btn sm" id="btnRecent" type="button" title="최근 생성 기록의 설정으로 폼 다시 채우기">최근 ▾</button></div>
+                <form class="f" id="setForm" onsubmit="return false">
+                    <div class="field"><label>업체 단어 (필수)</label>
+                        <input id="company" placeholder="예: acme" autocomplete="off" maxlength="30"></div>
+                    <div class="field"><label>정해지는 이름</label><div class="small mono" id="companyPreview" style="padding-top:6px">-</div></div>
+                    <div class="field full"><label>업무구분 → 패키지 이름 <span class="muted">(검사하면 채워진다. 파일의 업무 패키지 열 → 영문 그대로 → 사전 · 테이블 접두어 제안 순. 없으면 넣는다)</span></label>
+                        <div id="worksBox" class="small muted">파일을 올리면 업무구분 목록이 나온다</div></div>
+                    <div class="field"><label>소스 DataSource</label><select id="sourceDataSource"></select></div>
+                    <div class="field"><label>소스 DB 종류</label><select id="sourceDialect"><option value="auto">자동 (접속해서 판단)</option><option>oracle</option><option>mysql</option><option>mssql</option><option>postgresql</option></select></div>
+                    <div class="field"><label>소스 스키마 <span class="muted">(FROM 앞에 붙임, 비우면 접속 계정)</span></label><input id="sourceSchema" autocomplete="off"></div>
+                    <div class="field"><label>타겟 DataSource</label><select id="targetDataSource"></select></div>
+                    <div class="field"><label>타겟 DB 종류</label><select id="targetDialect"><option value="auto">자동 (접속해서 판단)</option><option>mysql</option><option>oracle</option><option>mssql</option><option>postgresql</option></select></div>
+                    <div class="field"><label>타겟 스키마 <span class="muted">(INSERT 앞에 붙임)</span></label><input id="targetSchema" autocomplete="off"></div>
+                    <div class="field"><label>Writer 기본 <span class="muted">(Writer 열이 빈 테이블)</span> <a class="small" href="/ui/guide?name=writer-choice" target="_blank">고르는 기준</a></label>
+                        <select id="writerMode"><option value="BATCH">BATCH (기본, 대량)</option><option value="REUSE">REUSE (행마다, 실패 행 확인)</option></select></div>
+                    <div class="field"><label>Reader · Writer 파일 <span class="muted">(엔진 공용이면 테이블당 2파일 적음)</span></label>
+                        <select id="readerWriter"><option value="ENGINE">만들지 않음 (기본, 엔진 공용)</option><option value="FILES">테이블마다 만듦</option></select></div>
+                    <div class="field"><label>공통 컬럼 규칙</label>
+                        <label class="small" title="REG_DATE · REG_ID · UPT_DATE · UPT_ID · USE_YN · DEL_YN 을 원천의 흔한 이름으로 찾고, Processor 에서 비면 기본값"><input type="checkbox" id="commonColumns" checked> REG_DATE · REG_ID · UPT_DATE · UPT_ID · USE_YN · DEL_YN</label></div>
+                    <div class="field full"><label>감사 컬럼 규칙 <span class="muted">(한 줄에 하나, TOBE컬럼=원천컬럼. 공통 컬럼 규칙보다 먼저)</span></label>
+                        <textarea id="audit" rows="2" placeholder="예: INDATE=REG_DATE" spellcheck="false"></textarea></div>
+                    <div class="full inline">
+                        <button class="btn" id="btnCheck" type="button" disabled>검사</button>
+                        <button class="btn primary" id="btnZip" type="button" disabled>zip 내려받기</button>
+                        <span class="small muted" id="status"></span>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card" id="resultCard" style="display:none">
+                <div class="card-head"><h2>3. 검사 결과</h2><span class="inline"><span id="resultBadge"></span><button class="btn sm" type="button" id="btnApply" data-panel-open="apply" hidden>적용 안내 보기</button></span></div>
+                <div class="grid c6 kpi" id="stats"></div>
+                <div id="msgs" class="mt-10"></div>
+                <div id="reportBox" class="mt-10"></div>
+                <div id="todoBox" class="mt-10"></div>
+            </div>
+    </div>
+    <aside class="sp" data-panel="apply" data-title="적용 안내 (APPLY.md)" data-width="600" data-more-desc="zip 안의 APPLY.md 와 같은 내용 · 검사가 통과하면 채워짐" data-dock-label="적용 안내" data-dock-icon="file">
+        <div class="small muted" id="applyNote">zip 안의 APPLY.md 와 같은 내용</div>
+        <div class="md" id="applyBox">
+            <ol class="small" style="margin:0 0 0 18px;padding:0">
+                <li>TOBE 컬럼 정의를 올리고, 업체 단어와 업무구분별 패키지 이름을 넣는다.</li>
+                <li><b>검사</b>로 오류 · 경고 · 테이블별 결과를 본다. 원천 테이블이 없는 테이블은 골격(<code>WHERE 1 = 0</code>)으로 만들어지고 실행 전 확인에서 막힌다.</li>
+                <li><b>zip 내려받기</b> → 저장소 루트에서 <code>unzip -n &lt;zip&gt; -d .</code> (이미 있는 파일은 덮지 않는다).</li>
+                <li>검사가 통과하면 여기에 적용 순서 · 설정 · 해야 할 일이 나온다.</li>
+            </ol>
+        </div>
+    </aside>
+</main>
+<style>/* Hallmark · checked: 2026-10-29 · genre: modern-minimal (inferred) · built: the project · redesign: polish · v2.0.0 */
+    .gen-drop{border:2px dashed var(--line);border-radius:6px;padding:16px;text-align:center;color:var(--muted);cursor:pointer}
+    .gen-drop.over{border-color:var(--primary)}
+    .gen-drop.has{border-style:solid;color:inherit}
+    #worksBox table input{width:100%}
+    #worksBox tr.need td{background:var(--c-fef3c7)}
+    #applyBox pre{white-space:pre-wrap}
+    #reportBox td,#reportBox th,#todoBox td,#todoBox th{white-space:nowrap}
+    #reportBox td.cmt{max-width:180px;overflow:hidden;text-overflow:ellipsis}
+</style>
+<script>
+(function () {
+  const { $, esc, num, toast, get } = UI;
+  const KEY = 'ui.gen.code';
+  const S = { tobe: null, asis: null, works: {}, last: null, maxBytes: 20 * 1024 * 1024 };
+  const F = ['company', 'sourceDataSource', 'sourceDialect', 'sourceSchema', 'targetDataSource', 'targetDialect', 'targetSchema', 'writerMode', 'readerWriter', 'audit'];
+
+  // ---------- 저장해 둔 설정 (이 브라우저만)
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) { return {}; } }
+  function save() {
+    const o = { works: S.works, commonColumns: $('#commonColumns').checked, sourceMeta: meta() };
+    F.forEach(id => o[id] = $('#' + id).value);
+    try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) { /* ignore */ }
+  }
+  const meta = () => document.querySelector('input[name=sourceMeta]:checked').value;
+
+  function settings() {
+    const audit = {};
+    $('#audit').value.split('\n').forEach(l => { const m = l.split('='); if (m.length === 2 && m[0].trim() && m[1].trim()) audit[m[0].trim()] = m[1].trim(); });
+    return { company: $('#company').value.trim(), works: S.works,
+      sourceDataSource: $('#sourceDataSource').value, targetDataSource: $('#targetDataSource').value,
+      sourceDialect: $('#sourceDialect').value, targetDialect: $('#targetDialect').value,
+      sourceSchema: $('#sourceSchema').value.trim(), targetSchema: $('#targetSchema').value.trim(),
+      writerMode: $('#writerMode').value, readerWriter: $('#readerWriter').value, commonColumns: $('#commonColumns').checked, audit, sourceMeta: meta() };
+  }
+
+  function preview() {
+    const c = $('#company').value.trim();
+    const ok = /^[a-z][a-z0-9]*$/.test(c);
+    const p = ok ? c.charAt(0).toUpperCase() + c.slice(1) : '';
+    $('#companyPreview').innerHTML = !c ? '-' : ok
+      ? `com.georu.${esc(c)} · 플러그인 ${esc(c)}.&lt;업무&gt; · ${esc(p)}Application`
+      : '<span class="badge err">소문자 영문으로 시작하는 영문 · 숫자 한 단어</span>';
+  }
+
+  // ---------- 파일
+  function bindDrop(dropId, inputId, nameId, slot) {
+    const drop = $('#' + dropId), input = $('#' + inputId);
+    drop.onclick = () => input.click();
+    drop.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } };
+    input.onchange = () => setFile(input.files[0], drop, nameId, slot);
+    ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', e => { if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0], drop, nameId, slot); });
+  }
+  function setFile(f, drop, nameId, slot) {
+    if (!f) return;
+    if (slot === 'rules' ? !/\.(xlsx|xls)$/i.test(f.name) : !/\.(csv|xlsx|xls)$/i.test(f.name)) {
+      toast(slot === 'rules' ? '규칙 파일은 xlsx 만 올릴 수 있습니다' : 'CSV · xlsx · xls 파일만 올릴 수 있습니다', 'err'); return;
+    }
+    if (f.size > S.maxBytes) { toast(f.name + ' 가 크기 상한(' + Math.round(S.maxBytes / 1048576) + 'MB)을 넘습니다', 'err'); return; }
+    S[slot] = f; drop.classList.add('has');
+    $('#' + nameId).textContent = f.name + ' (' + num(Math.round(f.size / 1024)) + ' KB)';
+    if (slot === 'rules') { readRules(f); return; }
+    $('#btnCheck').disabled = !S.tobe;
+    if (S.tobe) check();
+  }
+
+  // ---------- 업체 규칙 파일: 올리면 설정 칸을 채우고(화면 값이 우선), 요청마다 함께 보낸다. 서버에 남지 않는다
+  async function readRules(f) {
+    const fd = new FormData(); fd.append('rulesFile', f);
+    try {
+      const res = await fetch('/api/generator/rules/read', { method: 'POST', body: fd, headers: UI_DEFAULT_HEADERS() });
+      const json = await res.json().catch(() => ({ success: false, message: 'HTTP ' + res.status }));
+      if (!json.success) throw new Error(json.message);
+      S.rulesData = json.data; applyRules(json.data);
+      toast('규칙 파일을 읽었습니다 (' + (json.data.summary || '') + ')', 'ok');
+      (json.data.warnings || []).slice(0, 3).forEach(w => toast('규칙 파일: ' + w, 'warn'));
+      if (S.tobe) check();
+    } catch (e) { toast(e.message, 'err'); S.rules = null; S.rulesData = null; $('#dropRules').classList.remove('has'); $('#rulesName').textContent = ''; }
+  }
+  function applyRules(r) {
+    const d = r.defaults || {};
+    ['company', 'sourceDialect', 'sourceSchema', 'targetDialect', 'targetSchema', 'writerMode'].forEach(id => { if (d[id]) $('#' + id).value = d[id]; });
+    if (d.readerWriter) $('#readerWriter').value = rwValue(d.readerWriter);
+    ['sourceDataSource', 'targetDataSource'].forEach(id => { if (d[id] && [...$('#' + id).options].some(o => o.value === d[id])) $('#' + id).value = d[id]; });
+    if (d.commonColumns) $('#commonColumns').checked = /^(y|yes|true|1)$/i.test(d.commonColumns);
+    if (r.audit && Object.keys(r.audit).length) $('#audit').value = Object.entries(r.audit).map(([k, v]) => k + '=' + v).join('\n');
+    preview(); save();
+  }
+  /** 규칙 파일 · 기록의 Reader · Writer 파일 값 → 선택 상자 값 (ReaderWriterMode.of 와 같은 규칙, 모르면 기본 ENGINE) */
+  function rwValue(v) {
+    return /^(files?|f|y)$/i.test(String(v).trim()) ? 'FILES' : 'ENGINE';
+  }
+  async function exportRules() {
+    const s = settings();
+    const base = S.rulesData || {};
+    const dto = { defaults: { company: s.company, sourceDataSource: s.sourceDataSource, targetDataSource: s.targetDataSource, sourceDialect: s.sourceDialect, targetDialect: s.targetDialect,
+        sourceSchema: s.sourceSchema, targetSchema: s.targetSchema, writerMode: s.writerMode, readerWriter: s.readerWriter, commonColumns: s.commonColumns ? 'Y' : 'N' },
+      workNames: Object.assign({}, base.workNames || {}, S.works), audit: s.audit, suffixRules: base.suffixRules || [], auditColumns: base.auditColumns || [] };
+    try {
+      const res = await fetch('/api/generator/rules/export', { method: 'POST', body: JSON.stringify(dto), headers: Object.assign({ 'Content-Type': 'application/json' }, UI_DEFAULT_HEADERS()) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const blob = await res.blob();
+      const name = (s.company || 'georu') + '-rules.xlsx';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      toast(name + ' 를 내려받았습니다. 다음부터 이 파일을 올리면 같은 설정입니다', 'ok');
+    } catch (e) { toast(e.message, 'err'); }
+  }
+
+  function form() {
+    const fd = new FormData();
+    fd.append('file', S.tobe);
+    if (meta() === 'file' && S.asis) fd.append('asisFile', S.asis);
+    if (S.rules) fd.append('rulesFile', S.rules);
+    fd.append('settings', JSON.stringify(settings()));
+    return fd;
+  }
+
+  // ---------- 검사
+  let checkSeq = 0;
+  async function check() {
+    if (!S.tobe) return;
+    save();
+    const seq = ++checkSeq;   // 설정을 연달아 바꾸면 검사가 겹친다. 마지막 요청의 응답만 쓴다
+    $('#btnCheck').disabled = true; $('#btnZip').disabled = true; $('#status').textContent = '검사 중…';
+    try {
+      const res = await fetch('/api/generator/code/check', { method: 'POST', body: form(), headers: UI_DEFAULT_HEADERS() });
+      const json = await res.json().catch(() => ({ success: false, message: 'HTTP ' + res.status + (res.status === 413 ? ' - 업로드 상한을 넘었습니다' : '') }));
+      if (seq !== checkSeq) return;
+      if (!json.success) throw new Error(json.message);
+      S.last = json.data; render(json.data);
+      $('#btnZip').disabled = !json.data.ok;
+      $('#status').textContent = json.data.ok ? '생성할 수 있습니다' : '고칠 것이 있습니다';
+    } catch (e) { if (seq === checkSeq) { toast(e.message, 'err'); $('#status').textContent = ''; } }
+    finally { if (seq === checkSeq) $('#btnCheck').disabled = !S.tobe; }
+  }
+
+  function renderWorks(works) {
+    if (!works.length) { $('#worksBox').innerHTML = '업무구분이 없습니다'; return; }
+    const SRC = { input: ['입력', 'INFO'], file: ['파일', 'ok'], value: ['영문 그대로', 'ok'], suggested: ['제안', 'warn'] };
+    const rows = works.map((w, i) => {
+      const val = S.works[w.value] ?? (w.pkg || '');
+      const src = S.works[w.value] ? SRC.input : (SRC[w.source] || null);
+      return `<tr class="${w.needsName && !val ? 'need' : ''}"><td>${esc(w.value)}</td><td class="mono">${num(w.tables)} (${num(w.migrate)})</td>
+        <td><input data-work="${i}" value="${esc(val)}" placeholder="${w.migrate ? '예: member' : '이관대상 없음'}" ${w.migrate ? '' : 'disabled'} autocomplete="off"></td>
+        <td>${src ? `<span class="badge ${src[1]}" title="${esc(w.how || '')}">${src[0]}</span>` : (w.migrate ? '<span class="badge err">입력 필요</span>' : '')}${w.source === 'suggested' ? ` <span class="muted">${esc(w.how)}</span>` : ''}</td></tr>`;
+    }).join('');
+    $('#worksBox').classList.remove('muted');
+    $('#worksBox').innerHTML = `<table class="small"><tr><th>업무구분 값</th><th>테이블 (이관대상)</th><th>패키지 이름</th><th>출처</th></tr>${rows}</table>
+      <div class="small muted">출처: 입력 = 이 화면에서 넣은 값 · 파일 = 정의 파일의 업무 패키지 열 · 제안 = 사전(회원→member …) 또는 테이블 이름 접두어로 찾은 값(확인 후 바꿀 수 있다)</div>`;
+    $('#worksBox').querySelectorAll('input[data-work]').forEach(inp => {
+      inp.onchange = () => { const w = works[+inp.dataset.work]; const v = inp.value.trim().toLowerCase(); inp.value = v; if (v) S.works[w.value] = v; else delete S.works[w.value]; check(); };
+    });
+  }
+
+  function stat(k, v, sub) { return `<div class="card stat"><span class="k">${esc(k)}</span><span class="v">${v}</span>${sub ? `<span class="sub">${sub}</span>` : ''}</div>`; }
+
+  function render(d) {
+    renderWorks(d.works || []);
+    $('#resultCard').style.display = '';
+    $('#resultBadge').innerHTML = d.ok ? '<span class="badge ok">생성할 수 있음</span>' : '<span class="badge err">고칠 것 있음</span>';
+    const todo = d.todoCounts || {}, todoAll = Object.values(todo).reduce((a, b) => a + b, 0);
+    $('#stats').innerHTML = stat('테이블', num(d.tables)) + stat('이관대상', num(d.migrate))
+      + stat('파일', d.ok ? num(d.fileCount) : '-') + stat('할 일 (TODO)', d.ok ? num(todoAll) : '-', d.ok ? '원천 미지정 ' + num(todo.SOURCE_UNDEFINED || 0) : '')
+      + stat('소스 DB', esc(d.sourceDialect)) + stat('타겟 DB', esc(d.targetDialect));
+    const errs = (d.errors || []).map(e => `<div class="alert err small">${esc(e)}</div>`).join('');
+    const warns = d.warnings || [];
+    const warnHtml = warns.length ? `<details ${errs ? '' : 'open'}><summary class="small">경고 ${num(warns.length)}</summary>${warns.slice(0, 200).map(w => `<div class="alert warn small">${esc(w)}</div>`).join('')}${warns.length > 200 ? '<div class="small muted">… 앞 200개만</div>' : ''}</details>` : '';
+    $('#msgs').innerHTML = errs + warnHtml;
+    if (d.ok) {
+      const rows = (d.report || []).map(r => `<tr class="${r.migrate ? '' : 'muted'}"><td>${esc(r.pkg || r.work)}</td><td class="mono">${esc(r.table)}</td>
+        <td>${r.status === '생성' ? '<span class="badge ok">생성</span>' : r.status === '제외' ? '<span class="badge RAW">제외</span>' : '<span class="badge warn">' + esc(r.status) + '</span>'}</td>
+        <td class="small">${esc(r.writer || '')}</td><td class="mono">${r.todo ? num(r.todo) : ''}</td><td class="mono small">${esc(r.source || '')}</td>
+        <td class="small">${esc(r.mapping || '')}</td><td class="small cmt" title="${esc(r.comment || '')}">${esc(r.comment || '')}</td></tr>`).join('');
+      $('#reportBox').innerHTML = `<details open><summary><b>테이블별 결과</b> <span class="small muted">zip 의 generation-report.csv 와 같음</span></summary><div class="scroll-y" style="max-height:420px">
+        <table class="small"><tr><th>업무</th><th>테이블</th><th>상태</th><th>Writer</th><th>TODO</th><th>원천</th><th>매핑</th><th>설명</th></tr>${rows}</table></div></details>`;
+      const todos = d.todos || [];
+      $('#todoBox').innerHTML = todos.length ? `<details><summary><b>할 일</b> <span class="small muted">${Object.entries(todo).map(([k, v]) => esc(k) + ' ' + num(v)).join(' · ')}${todoAll > todos.length ? ' · 앞 ' + num(todos.length) + '개' : ''}</span></summary>
+        <table class="small"><tr><th>테이블</th><th>종류</th><th>위치</th><th>내용</th></tr>${todos.map(t => `<tr><td class="mono">${esc(t.table)}</td><td>${esc(t.type)}</td><td class="mono small">${esc(t.file.split('/').pop())}:${t.line}</td><td class="mono small">${esc(t.text)}</td></tr>`).join('')}</table></details>` : '';
+      if (S.applyMd !== (d.applyMd || '')) { S.applyMd = d.applyMd || ''; $('#applyBox').innerHTML = UI.md(S.applyMd); UI.panel.mark('apply'); }   // 원문이 바뀔 때만 새 내용 점
+      $('#applyNote').textContent = d.zipName + ' 의 APPLY.md';
+      $('#btnApply').hidden = false;
+    } else {
+      $('#reportBox').innerHTML = ''; $('#todoBox').innerHTML = '';
+      $('#btnApply').hidden = true;
+    }
+  }
+
+  // ---------- 내려받기
+  async function download() {
+    save();
+    $('#btnZip').disabled = true; $('#status').textContent = '만드는 중…';
+    try {
+      const res = await fetch('/api/generator/code/generate', { method: 'POST', body: form(), headers: UI_DEFAULT_HEADERS() });
+      const type = res.headers.get('Content-Type') || '';
+      if (!res.ok || type.includes('json')) {
+        const json = await res.json().catch(() => ({ message: 'HTTP ' + res.status }));
+        if (json.data) render(json.data);
+        throw new Error(json.message || 'HTTP ' + res.status);
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get('Content-Disposition') || '';
+      const m = cd.match(/filename\*=UTF-8''([^;]+)/) || cd.match(/filename="?([^";]+)"?/);
+      const name = m ? decodeURIComponent(m[1]) : 'codegen.zip';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      toast(name + ' 를 내려받았습니다', 'ok'); $('#status').textContent = name;
+    } catch (e) { toast(e.message, 'err'); $('#status').textContent = ''; }
+    finally { $('#btnZip').disabled = !(S.last && S.last.ok); }
+  }
+
+  // ---------- 기록
+  // 기록 행을 누르면 그때의 설정으로 폼을 다시 채운다 (파일은 다시 올린다). 브라우저 저장값은 바꾸지 않는다 — 바꾸고 검사하면 그때 저장된다
+  function applySettings(s) {
+    if (!s || typeof s !== 'object') return;
+    const known = ['company', 'sourceDataSource', 'targetDataSource', 'sourceDialect', 'targetDialect', 'sourceSchema', 'targetSchema', 'writerMode', 'readerWriter', 'commonColumns', 'audit', 'sourceMeta', 'works'];
+    Object.keys(s).filter(k => !known.includes(k)).forEach(k => console.debug('[gen-code] 기록 설정의 모르는 키 무시:', k));
+    ['company', 'sourceDialect', 'sourceSchema', 'targetDialect', 'targetSchema', 'writerMode'].forEach(id => { if (s[id] != null) $('#' + id).value = s[id]; });
+    if (s.readerWriter != null) $('#readerWriter').value = rwValue(s.readerWriter);
+    ['sourceDataSource', 'targetDataSource'].forEach(id => { if (s[id] && [...$('#' + id).options].some(o => o.value === s[id])) $('#' + id).value = s[id]; });
+    if (typeof s.commonColumns === 'boolean') $('#commonColumns').checked = s.commonColumns;
+    if (s.audit && typeof s.audit === 'object') $('#audit').value = Object.entries(s.audit).map(([k, v]) => k + '=' + v).join('\n');
+    if (s.sourceMeta) { const r = document.querySelector(`input[name=sourceMeta][value=${s.sourceMeta}]`); if (r) r.checked = true; }
+    if (s.works && typeof s.works === 'object') S.works = { ...s.works };
+    $('#asisBox').style.display = meta() === 'file' ? '' : 'none';
+    preview();
+    if (S.tobe) check();
+  }
+  // ---------- 시작
+  async function init() {
+    const saved = load();
+    let opt = { dataSources: [], company: '' };
+    try { opt = await get('/api/generator/options'); S.maxBytes = opt.maxFileBytes || S.maxBytes; } catch (e) { toast(e.message, 'err'); }
+    const names = (opt.dataSources || []).filter(n => n !== 'operation');
+    const fill = (id, def) => { $('#' + id).innerHTML = names.map(n => `<option>${esc(n)}</option>`).join(''); $('#' + id).value = names.includes(saved[id]) ? saved[id] : (names.includes(def) ? def : names[0] || ''); };
+    fill('sourceDataSource', 'source-m'); fill('targetDataSource', 'target-m');
+    ['company', 'sourceDialect', 'sourceSchema', 'targetDialect', 'targetSchema', 'writerMode', 'audit'].forEach(id => { if (saved[id] != null) $('#' + id).value = saved[id]; });
+    if (saved.readerWriter != null) $('#readerWriter').value = rwValue(saved.readerWriter);
+    if (!$('#company').value && opt.company) $('#company').value = opt.company;
+    if (saved.commonColumns === false) $('#commonColumns').checked = false;
+    if (saved.sourceMeta) { const r = document.querySelector(`input[name=sourceMeta][value=${saved.sourceMeta}]`); if (r) r.checked = true; }
+    S.works = saved.works || {};
+    $('#asisBox').style.display = meta() === 'file' ? '' : 'none';
+    preview();
+    bindDrop('dropTobe', 'fileTobe', 'tobeName', 'tobe');
+    bindDrop('dropAsis', 'fileAsis', 'asisName', 'asis');
+    bindDrop('dropRules', 'fileRules', 'rulesName', 'rules');
+    $('#btnRulesTemplate').onclick = () => { location.href = '/api/generator/rules/template'; };
+    $('#btnRulesExport').onclick = exportRules;
+    document.querySelectorAll('input[name=sourceMeta]').forEach(r => r.onchange = () => { $('#asisBox').style.display = meta() === 'file' ? '' : 'none'; if (S.tobe) check(); });
+    $('#company').oninput = preview;
+    ['company', 'sourceDataSource', 'sourceDialect', 'sourceSchema', 'targetDataSource', 'targetDialect', 'targetSchema', 'writerMode', 'readerWriter', 'commonColumns', 'audit']
+      .forEach(id => $('#' + id).addEventListener('change', () => { save(); if (S.tobe) check(); }));
+    $('#btnTemplate').onclick = () => { location.href = '/api/generator/code/template'; };
+    $('#btnCheck').onclick = check;
+    $('#btnZip').onclick = download;
+    UI.genRecent($('#btnRecent'), 'CODE', '최근 생성', applySettings);
+  }
+  init();
+})();
+</script>
+</body>
+</html>

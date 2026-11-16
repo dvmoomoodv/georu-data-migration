@@ -1,0 +1,138 @@
+// 데모 앱: georu 라이브러리를 starter 하나로 가져다 쓴다. 배포하지 않는다.
+// 업체 프로젝트도 아래 두 줄의 의존성만 다르지 않다. 개발 중에는 settings.gradle 의 includeBuild 가 좌표를 저장소 소스로 바꿔 끼운다.
+plugins {
+    id 'georu.boot-app'
+}
+
+version = '0.0.1'
+description = 'georu 데모 앱 (Oracle DEMO → MySQL demo_tobe)'
+
+def georuVersion = '0.0.1'
+
+dependencies {
+    implementation "com.georu:georu-spring-boot-starter:${georuVersion}"
+
+    // JDBC 드라이버는 앱이 고른다 (starter 에 없다). 데모: 소스 Oracle · 타겟 MySQL. 다른 DB 는 안내서 jdbc-driver
+    runtimeOnly libs.ojdbc11
+    runtimeOnly libs.orai18n          // Oracle 한글 문자셋
+    runtimeOnly libs.mysql.connector  // com.mysql:mysql-connector-j
+    // 여러 DB 예제 demo.xdb: 소스 PostgreSQL · SQL Server, 타겟 MariaDB
+    runtimeOnly libs.postgresql
+    runtimeOnly libs.mssql.jdbc
+    runtimeOnly libs.mariadb
+
+    testImplementation "com.georu:georu-test:${georuVersion}"
+    testImplementation libs.spring.batch.test
+    testImplementation libs.archunit.junit5
+}
+
+// =============================================================================
+// 매핑 상태 집계 - 생성 코드의 미완 표시(TODO, WHERE 1 = 0, PK TODO, @mig-ok)를 모아 mapping-status.json 으로 (UI /api/ui/mapping-status)
+// =============================================================================
+
+def mappingScanDirs = ['src/main/java', 'src/main/resources']
+def mappingStatusOutDir = layout.buildDirectory.dir('generated/mapping-status')
+
+tasks.register('scanMappingStatus') {
+    group = 'verification'
+    description = '생성 코드의 미완 표시(TODO, WHERE 1 = 0, PK TODO, @mig-ok)를 모아 mapping-status.json 을 만듭니다'
+    mappingScanDirs.each { inputs.dir(it).withPropertyName("scan_${it.replace('/', '_')}").optional() }
+    outputs.dir(mappingStatusOutDir)
+    doLast {
+        def suffixes = ['SourceMapper', 'TargetMapper', 'Mapper', 'Reader', 'Writer', 'Processor', 'SourceDto', 'TargetDto']
+        def toTable = { String fileName ->
+            String base = fileName.replaceFirst(/\.(java|xml)$/, '')
+            String hit = suffixes.find { base.endsWith(it) && base.length() > it.length() }
+            if (hit == null) return null
+            base = base.substring(0, base.length() - hit.length())
+            return base.replaceAll(/([a-z0-9])([A-Z])/, '$1_$2').replaceAll(/([A-Z]+)([A-Z][a-z])/, '$1_$2').toLowerCase()
+        }
+        def root = project.projectDir.toPath()
+        def tables = new TreeMap<String, Map>()
+        int fileCount = 0
+        mappingScanDirs.each { dirName ->
+            def dir = file(dirName)
+            if (!dir.exists()) return
+            dir.eachFileRecurse(groovy.io.FileType.FILES) { f ->
+                String name = f.name
+                boolean isJava = name.endsWith('.java')   // 테이블 접미어(Processor·SourceDto 등)로 거른다
+                boolean isMapperXml = name.endsWith('Mapper.xml')
+                if (!isJava && !isMapperXml) return
+                String table = toTable(name)
+                if (table == null) return
+                fileCount++
+                String rel = root.relativize(f.toPath()).toString().replace('\\', '/')
+                int lineNo = 0
+                f.eachLine('UTF-8') { String line ->
+                    lineNo++
+                    String type = null
+                    String reviewed = null
+                    int ok = line.indexOf('@mig-ok')
+                    if (ok >= 0) {
+                        reviewed = line.substring(ok + 7).replaceFirst(/^\s*:?\s*/, '').replaceFirst(/\s*(-->|\*\/)\s*$/, '').trim()
+                    } else if (isMapperXml && line ==~ /^\s*WHERE\s+1\s*=\s*0\b.*/) {
+                        type = 'SOURCE_UNDEFINED'
+                    } else if (line.contains('TODO')) {
+                        // 생성기 요약 주석("자동 매핑 0 / TODO 8", "(TODO)")은 실제 작업 위치가 아니라 제외
+                        if (line ==~ /.*TODO\s+\d+\b.*/ || line.contains('(TODO)')) return
+                        if (line.contains('TODO PK')) type = 'PK_TODO'
+                        else if (line.contains('TODO 정렬키')) type = 'SORT_KEY_TODO'
+                        else if (line.contains('TODO ←') || line.contains('TODO <-')) type = 'COLUMN_TODO'
+                        else type = 'TODO'
+                    }
+                    if (type == null && reviewed == null) return
+                    def t = tables.computeIfAbsent(table) { [counts: new TreeMap(), reviewedCount: 0, issues: [], reviewed: []] }
+                    if (reviewed != null) {
+                        t.reviewedCount++
+                        if (t.reviewed.size() < 50) t.reviewed << [file: rel, line: lineNo, reason: reviewed]
+                    } else {
+                        t.counts[type] = (t.counts[type] ?: 0) + 1
+                        // 위치는 유형별로 최대 20개까지만 담는다 (파일 크기 제한). 원천 미지정은 모두 담는다
+                        int sameType = t.issues.count { it.type == type }
+                        if (type == 'SOURCE_UNDEFINED' || sameType < 20) {
+                            t.issues << [type: type, file: rel, line: lineNo, text: line.trim().take(160)]
+                        }
+                    }
+                }
+            }
+        }
+        def out = mappingStatusOutDir.get().asFile
+        out.mkdirs()
+        def json = groovy.json.JsonOutput.toJson([generatedAt: new Date().format("yyyy-MM-dd'T'HH:mm:ss"), scannedFiles: fileCount, tables: tables])
+        new File(out, 'mapping-status.json').setText(json, 'UTF-8')
+        logger.lifecycle("mapping-status.json: 파일 ${fileCount}개, 표시가 있는 테이블 ${tables.size()}개")
+    }
+}
+
+tasks.named('processResources') {
+    dependsOn 'scanMappingStatus'
+    from(mappingStatusOutDir)
+}
+
+// =============================================================================
+// 로컬 실행 (docker 프로파일: docker compose 의 oracle/mysql 컨테이너 사용)
+//   DB 접속정보는 application-docker.yml 기본값(localhost) 또는 SOURCE_DB_*/TARGET_DB_* 환경변수.
+//   포트는 compose 의 app 컨테이너(8081)와 겹치지 않게 8082.
+// =============================================================================
+tasks.register('bootRunDocker', org.springframework.boot.gradle.tasks.run.BootRun) {
+    group = 'application'
+    description = '로컬(docker 프로파일)에서 데모 앱을 실행합니다 - docker compose DB 필요'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.georu.examples.demo.DemoApplication'
+
+    environment 'SPRING_PROFILES_ACTIVE', 'docker'
+    environment 'SERVER_PORT', System.getenv('SERVER_PORT') ?: '8082'
+
+    // JVM 옵션 - 로컬 소량 데이터 기준. 대량 테스트 시 -Xmx 상향 (run-scripts/JVM_OPTIONS_REFERENCE.md)
+    jvmArgs = [
+        '-Xms1g',
+        '-Xmx4g',
+        '-XX:+UseZGC',
+        '-Dfile.encoding=UTF-8',
+        '-Duser.timezone=Asia/Seoul',
+        '-XX:+HeapDumpOnOutOfMemoryError',
+        '-XX:HeapDumpPath=logs/heapdump.hprof',
+        '-XX:+ExitOnOutOfMemoryError',
+        '-Xlog:gc*:file=logs/gc.log:time,uptime,level,tags:filecount=5,filesize=10m'
+    ]
+}

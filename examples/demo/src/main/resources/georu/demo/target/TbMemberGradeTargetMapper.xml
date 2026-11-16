@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_member_grade : 회원등급 (업무 02 회원관리) / 자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.member.TbMemberGradeTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbMemberGradeTargetDto">
+        INSERT INTO `demo_tobe`.`tb_member_grade` (
+              `GRADE_CD`    <!-- VARCHAR(10) 등급코드 -->
+            , `GRADE_NM`    <!-- VARCHAR(50) 등급명 -->
+            , `MIN_POINT`    <!-- INT 최소포인트 -->
+            , `DISCOUNT_RATE`    <!-- DECIMAL(5,2) 할인율 -->
+            , `USE_YN`    <!-- CHAR(1) 사용여부 -->
+            , `INUSERID`    <!-- VARCHAR(40) 등록자 -->
+            , `INDATE`    <!-- VARCHAR(14) 등록일시 -->
+            , `LUSERID`    <!-- VARCHAR(40) 수정자 -->
+            , `LDATE`    <!-- VARCHAR(14) 수정일시 -->
+        ) VALUES (
+              #{gradeCd}
+            , #{gradeNm}
+            , #{minPoint}
+            , #{discountRate}
+            , #{useYn}
+            , #{inuserid}
+            , #{indate}
+            , #{luserid}
+            , #{ldate}
+        )
+        <!-- PK 있음. 재실행은 제품 정책상 "기존 데이터 있으면 경고 후 중단" → 데모 리셋 SQL(21_demo_tobe_reset.sql) 후 재실행 -->
+    </insert>
+
+</mapper>

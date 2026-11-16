@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE [(${t.physical})][(${t.xmlComment})] ([(${s.targetDataSource})], [(${s.targetDialect})])
+     자동 생성: georu 코드 생성기 [(${gen.version})] -->
+<mapper namespace="georu.[(${w.plugin})].[(${t.pascal})]TargetMapper">
+
+    <insert id="insertData" parameterType="[(${w.pkg})].dto.[(${t.pascal})]TargetDto">
+        INSERT INTO [(${t.targetTable})] (
+[# th:each="c, st : ${t.columns}"]            [(${st.first} ? '  ' : ', ')][(${c.targetColumn})]    <!-- [(${c.dbType})][(${c.xmlComment.isEmpty()} ? '' : ' ' + ${c.xmlComment})] -->
+[/]        ) VALUES (
+[# th:each="c, st : ${t.columns}"]            [(${st.first} ? '  ' : ', ')]#{[(${c.field})]}
+[/]        )
+    </insert>
+
+</mapper>

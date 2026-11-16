@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Lookup] 회원 포인트 - SourceLookup.byKeys (청크에서 읽은 회원 ID 로 IN 조회 한 번, 1,000개씩) -->
+<mapper namespace="georu.demo.multi.BrMemberPointLookupMapper">
+    <select id="selectByKeys" resultType="map">
+        SELECT "MEMBER_ID", "BRANCH_CD", "POINT_BAL"
+          FROM "DEMO_BR"."BR_MEMBER_POINT"
+         WHERE "MEMBER_ID" IN
+        <foreach collection="keys" item="k" open="(" separator="," close=")">#{k}</foreach>
+    </select>
+</mapper>

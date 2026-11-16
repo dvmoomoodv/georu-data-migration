@@ -1,0 +1,19 @@
+# 이미지 빌드에 불필요한 것. 빌드 컨텍스트는 저장소 루트 (examples/demo/Dockerfile)
+.git
+.gradle
+.idea
+.vscode
+.claude
+.github
+**/build/
+**/bin/
+**/logs/
+**/data/
+**/.gradle/
+examples/demo/docker/
+examples/demo/docker-compose*.yml
+examples/demo/run-scripts/
+examples/demo/tools/
+mig-script/
+*.md
+!**/src/main/resources/**/*.md

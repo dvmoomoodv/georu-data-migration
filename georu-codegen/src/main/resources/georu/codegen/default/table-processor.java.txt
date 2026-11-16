@@ -1,0 +1,63 @@
+package [(${w.pkg})].processor;
+
+import [(${w.pkg})].dto.[(${t.pascal})]SourceDto;
+import [(${w.pkg})].dto.[(${t.pascal})]TargetDto;
+[# th:if="${t.usesConvertUtils}"]import [(${s.basePackage})].common.[(${s.pascal})]ConvertUtils;
+[/]import com.georu.core.processor.AbstractItemProcessor;
+import com.georu.core.utils.ValidationUtils;
+
+/**
+ * [Processor] [(${t.physical})][(${t.javaComment})]
+ * [(${t.pascal})]SourceDto (Reader 출력) → [(${t.pascal})]TargetDto (Writer 입력).
+ * 컬럼 변환은 [(${t.pascal})]SourceMapper.xml 의 SELECT 에서 하고, 여기서는 필수값 검증 · 옮겨 담기 · 감사 컬럼 기본값만 한다.
+ * 자동 생성: georu 코드 생성기 [(${gen.version})]
+ */
+public class [(${t.pascal})]Processor extends AbstractItemProcessor<[(${t.pascal})]SourceDto, [(${t.pascal})]TargetDto> {
+
+    public [(${t.pascal})]Processor() {
+        super("MIGRATION", "SOURCE");
+    }
+
+    @Override
+    protected ValidationUtils.ValidationResult validateItem([(${t.pascal})]SourceDto item) {
+        if (item == null) {
+            return ValidationUtils.ValidationResult.failure("item is null");
+        }
+[# th:each="c : ${t.pkChecked}"]        if (item.[(${c.getter})]() == null) {
+            return ValidationUtils.ValidationResult.failure("[(${c.name})] 누락");
+        }
+[/][# th:each="c : ${t.pkUnmapped}"]        // TODO PK: [(${c.name})] 원천 없음 - 채번이면 Strategy 에 .options(TableOptions.builder().sequenceColumns(List.of("[(${c.name})]")).build()), 아니면 SELECT 를 채운 뒤 비었는지 검증을 더한다
+[/]        return ValidationUtils.ValidationResult.success();
+    }
+
+    /** Source → Target 옮겨 담기 (SQL 에서 변환이 끝난 값. Java 후처리가 필요한 컬럼만 여기서 바꾼다) */
+    @Override
+    protected [(${t.pascal})]TargetDto transformItem([(${t.pascal})]SourceDto item) {
+        return [(${t.pascal})]TargetDto.builder()
+[# th:each="c : ${t.columns}"]                .[(${c.field})](item.[(${c.getter})]())
+[/]                .build();
+    }
+
+    @Override
+    protected Object getItemId([(${t.pascal})]SourceDto item) {
+[# th:if="${t.idExpr != null}"]        return item != null ? [(${t.idExpr})] : null;    // PK
+[/][# th:unless="${t.idExpr != null}"]        return null;    // TODO PK: PK 가 없어 행을 식별할 수 없다. 중복 없는 컬럼을 돌려준다
+[/]    }
+
+    @Override
+    protected Object getOutputItemId([(${t.pascal})]TargetDto item) {
+[# th:if="${t.idExpr != null}"]        return item != null ? [(${t.idExpr})] : null;    // PK
+[/][# th:unless="${t.idExpr != null}"]        return null;
+[/]    }
+
+    /** 공통 컬럼 기본값 (원천 값이 있으면 유지): 일시 = 지금 · 등록자 · 수정자 = 이관 등록자 · USE_YN = Y · DEL_YN = N */
+    @Override
+    protected void setUpdateTimestamp([(${t.pascal})]TargetDto item) {
+        if (item == null) {
+            return;
+        }
+[# th:each="c : ${t.defaults}"]        if (item.[(${c.getter})]() == null) {
+            item.[(${c.setter})]([(${c.defaultValue})]);
+        }
+[/]    }
+}

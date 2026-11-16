@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!--
+  [core] 시퀀스 채번 v1 / generic 방언 (SELECT FOR UPDATE + UPDATE). MySQL·Oracle·PostgreSQL·H2 공통 구문.
+  - 관리 테이블명·컬럼명은 yml(georu.sequence.*) → SequenceTableSpec(cfg) 로만 받는다 (${cfg.*}).
+  - selectForUpdate 와 increment 는 같은 트랜잭션에서 호출해야 한다 (V1BlockReservePolicy 가 감싼다).
+  - 값 열이 NULL 인 관리행은 initial 로 본다 (COALESCE). 행 없음(null)과 NULL 값을 구분하고, NULL + N 이 NULL 로 남지 않게 한다.
+  참조: src/main/java/com/georu/core/sequence/README.md
+-->
+<mapper namespace="com.georu.core.internal.sequence.v1.generic.mapper.V1GenericSequenceMapper">
+
+    <select id="selectCurrent" resultType="java.lang.Long">
+        /* seq v1/generic selectCurrent */
+        SELECT ${cfg.valueColumn}
+          FROM ${cfg.table}
+         WHERE ${cfg.tableNameColumn}  = #{key.table}
+           AND ${cfg.columnNameColumn} = #{key.column}
+    </select>
+
+    <select id="selectForUpdate" resultType="java.lang.Long">
+        /* seq v1/generic selectForUpdate */
+        SELECT COALESCE(${cfg.valueColumn}, #{initial})
+          FROM ${cfg.table}
+         WHERE ${cfg.tableNameColumn}  = #{key.table}
+           AND ${cfg.columnNameColumn} = #{key.column}
+           FOR UPDATE
+    </select>
+
+    <update id="increment">
+        /* seq v1/generic increment */
+        UPDATE ${cfg.table}
+           SET ${cfg.valueColumn} = COALESCE(${cfg.valueColumn}, #{initial}) + #{count}
+         WHERE ${cfg.tableNameColumn}  = #{key.table}
+           AND ${cfg.columnNameColumn} = #{key.column}
+    </update>
+
+    <insert id="insertRow">
+        /* seq v1/generic insertRow */
+        INSERT INTO ${cfg.table} (${cfg.tableNameColumn}, ${cfg.columnNameColumn}, ${cfg.valueColumn})
+        VALUES (#{key.table}, #{key.column}, #{value})
+    </insert>
+
+    <update id="setValue">
+        /* seq v1/generic setValue */
+        UPDATE ${cfg.table}
+           SET ${cfg.valueColumn} = #{value}
+         WHERE ${cfg.tableNameColumn}  = #{key.table}
+           AND ${cfg.columnNameColumn} = #{key.column}
+    </update>
+
+    <select id="selectMaxOfTarget" resultType="java.lang.Long">
+        /* seq v1/generic selectMaxOfTarget */
+        SELECT MAX(${column}) FROM ${targetTable}
+    </select>
+
+    <select id="selectAll" resultType="map">
+        /* seq v1/generic selectAll */
+        SELECT ${cfg.tableNameColumn}  AS SEQ_TBL
+             , ${cfg.columnNameColumn} AS SEQ_COL
+             , ${cfg.valueColumn}      AS SEQ_VAL
+          FROM ${cfg.table}
+         ORDER BY 1, 2
+    </select>
+
+</mapper>

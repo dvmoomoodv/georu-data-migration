@@ -1,0 +1,200 @@
+# 그룹
+no,type,asisTables,tobe,status,basis,rows
+1,1:1,CD_GROUP,tb_code_group,원천 지정,TOBE 정의의 원천 테이블 열,8
+2,1:1,CD_CODE,tb_code,원천 지정,TOBE 정의의 원천 테이블 열,10
+3,1:1,MEM_GRADE,tb_member_grade,원천 지정,TOBE 정의의 원천 테이블 열,9
+4,1:1,MEM_MEMBER,tb_member,원천 지정,TOBE 정의의 원천 테이블 열,18
+5,1:1,MEM_LOGIN_HIS,tb_member_login_log,원천 지정,TOBE 정의의 원천 테이블 열,10
+6,1:1,BRD_BOARD,tb_board,원천 지정,TOBE 정의의 원천 테이블 열,11
+7,1:1,BRD_POST,tb_post,원천 지정,TOBE 정의의 원천 테이블 열,13
+8,1:1,BRD_POST_FILE,tb_post_file,원천 지정,TOBE 정의의 원천 테이블 열,14
+9,1:1,BRD_COMMENT,tb_post_comment,원천 지정,TOBE 정의의 원천 테이블 열,11
+10,1:1,STAT_DAILY_VISIT,tb_stat_daily,원천 지정,TOBE 정의의 원천 테이블 열,9
+11,1:1,STAT_MENU_HIT,tb_stat_menu,원천 지정,TOBE 정의의 원천 테이블 열,9
+12,TOBE 신규 (ASIS 미정),,tb_branch,ASIS 대응 확인 필요,,4
+13,TOBE 신규 (ASIS 미정),,tb_member_point,ASIS 대응 확인 필요,"후보 낮음: MEM_MEMBER (컬럼 겹침 2/5, 이름 유사 33%)",5
+14,1:1,SUBJ_COURSE,tb_subj_course,원천 지정,TOBE 정의의 원천 테이블 열,8
+15,ASIS 미매핑,SEQ_MASTER,,TOBE 대상 미정,,7
+16,ASIS 미매핑,ORG_DEPT,,TOBE 대상 미정,,5
+17,ASIS 미매핑,MEM_MEMBER_DETAIL,,TOBE 대상 미정,,3
+18,ASIS 미매핑,BRD_POST_LIKE,,TOBE 대상 미정,,5
+# 행
+group,asisTable,asisCol,gubun,rule,auto,tobeTable,tobeCol,tobeNo
+1,CD_GROUP,GROUP_CD,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_code_group,GROUP_CD,1
+1,CD_GROUP,GROUP_NM,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_code_group,GROUP_NM,2
+1,CD_GROUP,USE_YN,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_code_group,USE_YN,3
+1,CD_GROUP,SORT_NO,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_code_group,SORT_NO,4
+1,CD_GROUP,REG_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_code_group,INUSERID,5
+1,CD_GROUP,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_code_group,INDATE,6
+1,CD_GROUP,MOD_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_code_group,LUSERID,7
+1,CD_GROUP,MOD_DATE,변환,"TO_CHAR(MOD_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_code_group,LDATE,8
+2,CD_CODE,GROUP_CD,코드,"공통코드 매핑 정의서 참조 (같은 이름, 의미 확인)",true,tb_code,GROUP_CD,1
+2,CD_CODE,CODE,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_code,CODE,2
+2,CD_CODE,CODE_NM,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_code,CODE_NM,3
+2,CD_CODE,CODE_DESC,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_code,CODE_DESC,4
+2,CD_CODE,USE_YN,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_code,USE_YN,5
+2,CD_CODE,SORT_NO,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_code,SORT_NO,6
+2,CD_CODE,REG_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_code,INUSERID,7
+2,CD_CODE,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_code,INDATE,8
+2,CD_CODE,MOD_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_code,LUSERID,9
+2,CD_CODE,MOD_DATE,변환,"TO_CHAR(MOD_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_code,LDATE,10
+3,MEM_GRADE,GRADE_CD,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member_grade,GRADE_CD,1
+3,MEM_GRADE,GRADE_NM,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member_grade,GRADE_NM,2
+3,MEM_GRADE,MIN_POINT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member_grade,MIN_POINT,3
+3,MEM_GRADE,DISCOUNT_RATE,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member_grade,DISCOUNT_RATE,4
+3,MEM_GRADE,USE_YN,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member_grade,USE_YN,5
+3,MEM_GRADE,REG_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_member_grade,INUSERID,6
+3,MEM_GRADE,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_member_grade,INDATE,7
+3,MEM_GRADE,MOD_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_member_grade,LUSERID,8
+3,MEM_GRADE,MOD_DATE,변환,"TO_CHAR(MOD_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_member_grade,LDATE,9
+4,MEM_MEMBER,MEMBER_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member,MEMBER_ID,1
+4,MEM_MEMBER,LOGIN_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member,LOGIN_ID,2
+4,MEM_MEMBER,MEMBER_NM,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member,MEMBER_NM,3
+4,MEM_MEMBER,PASSWORD_HASH,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member,PASSWORD_HASH,4
+4,MEM_MEMBER,GENDER,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member,GENDER,5
+4,MEM_MEMBER,BIRTH_DT,변환,"TO_CHAR(BIRTH_DT, 'YYYYMMDD') (이름 정규화 일치, 의미 확인)",true,tb_member,BIRTH_YMD,6
+4,MEM_MEMBER,EMAIL,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member,EMAIL,7
+4,MEM_MEMBER,PHONE,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member,PHONE,8
+4,MEM_MEMBER,GRADE_CD,코드,"공통코드 매핑 정의서 참조 (같은 이름, 의미 확인)",true,tb_member,GRADE_CD,9
+4,MEM_MEMBER,STATUS,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member,STATUS,10
+4,MEM_MEMBER,JOIN_DT,변환,"TO_CHAR(JOIN_DT, 'YYYYMMDDHH24MISS') (이름 정규화 일치, 의미 확인)",true,tb_member,JOIN_DATE,11
+4,MEM_MEMBER,LAST_LOGIN_DT,변환,"TO_CHAR(LAST_LOGIN_DT, 'YYYYMMDDHH24MISS') (이름 정규화 일치, 의미 확인)",true,tb_member,LAST_LOGIN_DATE,12
+4,MEM_MEMBER,POINT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member,POINT,13
+4,MEM_MEMBER,REG_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_member,INUSERID,14
+4,MEM_MEMBER,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_member,INDATE,15
+4,MEM_MEMBER,MOD_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_member,LUSERID,16
+4,MEM_MEMBER,MOD_DATE,변환,"TO_CHAR(MOD_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_member,LDATE,17
+4,MEM_MEMBER,REMARK,,TOBE 대응 컬럼 미정 (대상아님 여부 포함 검토),false,,,0
+5,,,,,false,tb_member_login_log,LOGIN_LOG_ID,1
+5,,,,,false,tb_member_login_log,ASIS_ID,2
+5,MEM_LOGIN_HIS,MEMBER_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member_login_log,MEMBER_ID,3
+5,MEM_LOGIN_HIS,LOGIN_DT,변환,"TO_CHAR(LOGIN_DT, 'YYYYMMDDHH24MISS') (이름 정규화 일치, 의미 확인)",true,tb_member_login_log,LOGIN_DATE,4
+5,MEM_LOGIN_HIS,LOGIN_IP,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member_login_log,LOGIN_IP,5
+5,MEM_LOGIN_HIS,DEVICE_CD,코드,"공통코드 매핑 정의서 참조 (같은 이름, 의미 확인)",true,tb_member_login_log,DEVICE_CD,6
+5,MEM_LOGIN_HIS,RESULT_CD,코드,"공통코드 매핑 정의서 참조 (같은 이름, 의미 확인)",true,tb_member_login_log,RESULT_CD,7
+5,MEM_LOGIN_HIS,FAIL_REASON,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_member_login_log,FAIL_REASON,8
+5,MEM_LOGIN_HIS,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_member_login_log,INDATE,9
+5,MEM_LOGIN_HIS,LOGIN_HIS_ID,,TOBE 대응 컬럼 미정 (대상아님 여부 포함 검토),false,,,0
+6,BRD_BOARD,BOARD_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_board,BOARD_ID,1
+6,BRD_BOARD,BOARD_CD,코드,"공통코드 매핑 정의서 참조 (같은 이름, 의미 확인)",true,tb_board,BOARD_CD,2
+6,BRD_BOARD,BOARD_NM,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_board,BOARD_NM,3
+6,BRD_BOARD,BOARD_TYPE_CD,코드,"공통코드 매핑 정의서 참조 (같은 이름, 의미 확인)",true,tb_board,BOARD_TYPE_CD,4
+6,BRD_BOARD,USE_YN,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_board,USE_YN,5
+6,BRD_BOARD,ANON_YN,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_board,ANON_YN,6
+6,BRD_BOARD,ATTACH_LIMIT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_board,ATTACH_LIMIT,7
+6,BRD_BOARD,REG_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_board,INUSERID,8
+6,BRD_BOARD,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_board,INDATE,9
+6,BRD_BOARD,MOD_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_board,LUSERID,10
+6,BRD_BOARD,MOD_DATE,변환,"TO_CHAR(MOD_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_board,LDATE,11
+7,BRD_POST,POST_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post,POST_ID,1
+7,BRD_POST,BOARD_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post,BOARD_ID,2
+7,BRD_POST,TITLE,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post,TITLE,3
+7,BRD_POST,CONTENT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post,CONTENT,4
+7,BRD_POST,WRITER_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post,WRITER_ID,5
+7,BRD_POST,VIEW_CNT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post,VIEW_CNT,6
+7,BRD_POST,NOTICE_YN,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post,NOTICE_YN,7
+7,BRD_POST,SECRET_YN,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post,SECRET_YN,8
+7,BRD_POST,STATUS,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post,STATUS,9
+7,BRD_POST,REG_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_post,INUSERID,10
+7,BRD_POST,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_post,INDATE,11
+7,BRD_POST,MOD_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_post,LUSERID,12
+7,BRD_POST,MOD_DATE,변환,"TO_CHAR(MOD_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_post,LDATE,13
+8,BRD_POST_FILE,FILE_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_file,FILE_ID,1
+8,,,,,false,tb_post_file,ASIS_ID,2
+8,BRD_POST_FILE,POST_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_file,POST_ID,3
+8,BRD_POST_FILE,ORIGIN_NM,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_file,ORIGIN_NM,4
+8,,,,,false,tb_post_file,FILE_PATH,5
+8,BRD_POST_FILE,FILE_SIZE,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_file,FILE_SIZE,6
+8,BRD_POST_FILE,MIME_TYPE,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_file,MIME_TYPE,7
+8,BRD_POST_FILE,DOWNLOAD_CNT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_file,DOWNLOAD_CNT,8
+8,BRD_POST_FILE,REG_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_post_file,INUSERID,9
+8,BRD_POST_FILE,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_post_file,INDATE,10
+8,BRD_POST_FILE,MOD_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_post_file,LUSERID,11
+8,BRD_POST_FILE,MOD_DATE,변환,"TO_CHAR(MOD_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_post_file,LDATE,12
+8,BRD_POST_FILE,STORED_PATH,,TOBE 대응 컬럼 미정 (대상아님 여부 포함 검토),false,,,0
+8,BRD_POST_FILE,REMARK,,TOBE 대응 컬럼 미정 (대상아님 여부 포함 검토),false,,,0
+9,BRD_COMMENT,COMMENT_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_comment,COMMENT_ID,1
+9,BRD_COMMENT,POST_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_comment,POST_ID,2
+9,BRD_COMMENT,PARENT_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_comment,PARENT_ID,3
+9,BRD_COMMENT,WRITER_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_comment,WRITER_ID,4
+9,BRD_COMMENT,CONTENT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_comment,CONTENT,5
+9,BRD_COMMENT,DEPTH,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_comment,DEPTH,6
+9,BRD_COMMENT,STATUS,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_post_comment,STATUS,7
+9,BRD_COMMENT,REG_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_post_comment,INUSERID,8
+9,BRD_COMMENT,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_post_comment,INDATE,9
+9,BRD_COMMENT,MOD_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_post_comment,LUSERID,10
+9,BRD_COMMENT,MOD_DATE,변환,"TO_CHAR(MOD_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_post_comment,LDATE,11
+10,,,,,false,tb_stat_daily,STAT_ID,1
+10,STAT_DAILY_VISIT,STAT_DT,변환,"TO_CHAR(STAT_DT, 'YYYYMMDD') (이름 정규화 일치, 의미 확인)",true,tb_stat_daily,STAT_YMD,2
+10,STAT_DAILY_VISIT,BOARD_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_daily,BOARD_ID,3
+10,STAT_DAILY_VISIT,VISIT_CNT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_daily,VISIT_CNT,4
+10,STAT_DAILY_VISIT,UNIQUE_VISIT_CNT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_daily,UNIQUE_VISIT_CNT,5
+10,STAT_DAILY_VISIT,POST_CNT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_daily,POST_CNT,6
+10,STAT_DAILY_VISIT,COMMENT_CNT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_daily,COMMENT_CNT,7
+10,STAT_DAILY_VISIT,AVG_STAY_SEC,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_daily,AVG_STAY_SEC,8
+10,STAT_DAILY_VISIT,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_stat_daily,INDATE,9
+11,,,,,false,tb_stat_menu,STAT_MENU_ID,1
+11,STAT_MENU_HIT,STAT_YM,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_menu,STAT_YM,2
+11,STAT_MENU_HIT,MENU_CD,코드,"공통코드 매핑 정의서 참조 (같은 이름, 의미 확인)",true,tb_stat_menu,MENU_CD,3
+11,STAT_MENU_HIT,DEVICE_CD,코드,"공통코드 매핑 정의서 참조 (같은 이름, 의미 확인)",true,tb_stat_menu,DEVICE_CD,4
+11,STAT_MENU_HIT,HIT_CNT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_menu,HIT_CNT,5
+11,STAT_MENU_HIT,MEMBER_HIT_CNT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_menu,MEMBER_HIT_CNT,6
+11,STAT_MENU_HIT,GUEST_HIT_CNT,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_stat_menu,GUEST_HIT_CNT,7
+11,STAT_MENU_HIT,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_stat_menu,INDATE,8
+11,STAT_MENU_HIT,REMARK,,TOBE 대응 컬럼 미정 (대상아님 여부 포함 검토),false,,,0
+12,,,,,false,tb_branch,BRANCH_CD,1
+12,,,,,false,tb_branch,BRANCH_NM,2
+12,,,,,false,tb_branch,REGION,3
+12,,,기본값,"'Y' (ASIS 대응 없음, 공통 컬럼 자동 제안)",true,tb_branch,USE_YN,4
+13,,,,,false,tb_member_point,MEMBER_ID,1
+13,,,,,false,tb_member_point,MEMBER_NM,2
+13,,,,공통코드 컬럼 - 공통코드 매핑 정의서와 함께 정의,true,tb_member_point,BRANCH_CD,3
+13,,,,,false,tb_member_point,BRANCH_NM,4
+13,,,,,false,tb_member_point,POINT_BAL,5
+14,SUBJ_COURSE,COURSE_ID,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_subj_course,COURSE_ID,1
+14,SUBJ_COURSE,COURSE_NM,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_subj_course,COURSE_NM,2
+14,SUBJ_COURSE,CLASS,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_subj_course,CLASS,3
+14,SUBJ_COURSE,CAPACITY,변환,"TO_CHAR(CAPACITY) (같은 이름, 의미 확인)",true,tb_subj_course,CAPACITY,4
+14,SUBJ_COURSE,OPEN_YMD,변환,"TO_CHAR(OPEN_YMD, 'YYYYMMDD') (같은 이름, 의미 확인)",true,tb_subj_course,OPEN_YMD,5
+14,SUBJ_COURSE,USE_YN,매핑,같은 이름 자동 매칭 (의미 확인),true,tb_subj_course,USE_YN,6
+14,SUBJ_COURSE,REG_ID,매핑,감사 컬럼 규칙 자동 매칭 (의미 확인),true,tb_subj_course,INUSERID,7
+14,SUBJ_COURSE,REG_DATE,변환,"TO_CHAR(REG_DATE, 'YYYYMMDDHH24MISS') (감사 컬럼 규칙, 의미 확인)",true,tb_subj_course,INDATE,8
+15,SEQ_MASTER,SEQ_NM,,TOBE 대상 테이블 미정,false,,,0
+15,SEQ_MASTER,TARGET_TABLE,,TOBE 대상 테이블 미정,false,,,0
+15,SEQ_MASTER,TARGET_COLUMN,,TOBE 대상 테이블 미정,false,,,0
+15,SEQ_MASTER,CURRENT_VAL,,TOBE 대상 테이블 미정,false,,,0
+15,SEQ_MASTER,INCREMENT_BY,,TOBE 대상 테이블 미정,false,,,0
+15,SEQ_MASTER,MAX_VAL,,TOBE 대상 테이블 미정,false,,,0
+15,SEQ_MASTER,MOD_DATE,,TOBE 대상 테이블 미정,false,,,0
+16,ORG_DEPT,DEPT_CD,,TOBE 대상 테이블 미정,false,,,0
+16,ORG_DEPT,DEPT_NM,,TOBE 대상 테이블 미정,false,,,0
+16,ORG_DEPT,PARENT_DEPT_CD,,TOBE 대상 테이블 미정,false,,,0
+16,ORG_DEPT,REG_ID,,TOBE 대상 테이블 미정,false,,,0
+16,ORG_DEPT,REG_DATE,,TOBE 대상 테이블 미정,false,,,0
+17,MEM_MEMBER_DETAIL,MEMBER_ID,,TOBE 대상 테이블 미정,false,,,0
+17,MEM_MEMBER_DETAIL,ADDRESS,,TOBE 대상 테이블 미정,false,,,0
+17,MEM_MEMBER_DETAIL,DEPT_CD,,TOBE 대상 테이블 미정,false,,,0
+18,BRD_POST_LIKE,LIKE_ID,,TOBE 대상 테이블 미정,false,,,0
+18,BRD_POST_LIKE,POST_ID,,TOBE 대상 테이블 미정,false,,,0
+18,BRD_POST_LIKE,LIKE_MEMBER,,TOBE 대상 테이블 미정,false,,,0
+18,BRD_POST_LIKE,REG_MEMBER,,TOBE 대상 테이블 미정,false,,,0
+18,BRD_POST_LIKE,REG_DATE,,TOBE 대상 테이블 미정,false,,,0
+# 제외 ASIS
+excluded,MEM_MEMBER_BAK
+excluded,TMP_STAT_20250101
+# 코드그룹
+no,asisGroup,tobeGroup,basis,rows
+1,GENDER,GENDER,코드명 일치 2건 (100%),2
+2,MEM_STATUS,STATUS,코드명 일치 2건 (100%),3
+3,DEVICE,DEVICE_CD,코드명 일치 2건 (100%),3
+# 코드행
+group,asisCode,asisName,gubun,rule,auto,tobeCode,tobeName
+1,M,남자,변환,'M' → '1' (코드명 일치),true,1,남자
+1,F,여자,변환,'F' → '2' (코드명 일치),true,2,여자
+2,A,정상,변환,'A' → 'ACTIVE' (코드명 일치),true,ACTIVE,정상
+2,I,탈퇴,변환,'I' → 'INACTIVE' (코드명 일치),true,INACTIVE,탈퇴
+2,D,휴면,,TOBE STATUS 에 대응 코드 없음 - 신규 등록 또는 대체 코드 결정,false,,
+3,P,PC,변환,'P' → 'PC' (코드명 일치),true,PC,PC
+3,M,모바일,변환,'M' → 'MO' (코드명 일치),true,MO,모바일
+3,,,,TOBE 코드 (ASIS 대응 없음) - 사용 여부 확인,false,TB,태블릿
+# 경고

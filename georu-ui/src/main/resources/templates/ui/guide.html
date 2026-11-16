@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('안내서')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>안내서</h1><p class="page-desc">시작 · 운영 · 개발 안내서 · 왼쪽 목차에서 고르거나 검색</p></div>
+    <div class="split side">
+        <div class="card guide-toc" id="toc">
+            <input id="gq" type="search" placeholder="안내서 검색 (제목·본문)" autocomplete="off" style="width:100%" data-refresh-ignore>
+            <div id="gqResult" class="mt-6 small"></div>
+            <div id="tocList" class="mt-8"><div class="empty small loading">목록 불러오는 중…</div></div>
+        </div>
+        <div class="card">
+            <div class="toolbar" style="margin-bottom:8px">
+                <b id="gTitle">안내서</b>
+                <span class="small muted" id="gMeta"></span>
+                <a class="btn sm" id="raw" target="_blank" style="margin-left:auto">원문 (Markdown)</a>
+                <button class="btn sm" id="copyLink" type="button" title="이 안내서 주소 복사">주소 복사</button>
+            </div>
+            <div id="body" class="md"><div class="empty loading">불러오는 중…</div></div>
+        </div>
+    </div>
+</main>
+<style>/* Hallmark · checked: 2026-10-29 · genre: modern-minimal (inferred) · built: the project · redesign: polish · v2.0.0 */
+.guide-toc{position:sticky;top:calc(var(--top-h) + 12px);max-height:calc(100vh - var(--top-h) - 24px);overflow:auto}
+.guide-toc .grp{font-size:12px;color:var(--muted);margin:10px 0 4px}
+.guide-toc a.item{display:block;padding:5px 8px;border-radius:5px;color:var(--text)}
+.guide-toc a.item:hover{background:var(--c-f3f4f6);text-decoration:none}
+.guide-toc a.item.active{background:var(--primary-weak);color:var(--primary);font-weight:600}
+.guide-toc a.item .d{display:block;font-size:11.5px;color:var(--muted);font-weight:400}
+.guide-toc .sub{margin:0 0 4px 14px;border-left:2px solid var(--line);padding-left:8px}
+.guide-toc .sub a{display:block;font-size:12px;color:var(--muted);padding:2px 0}
+#gqResult .r{padding:4px 6px;border-radius:4px}#gqResult .r:hover{background:var(--c-f3f4f6)}#gqResult mark{background:var(--c-fef08a)}
+</style>
+<script>
+(function () {
+  const { esc, toast, $, md } = UI;
+  const qs = new URLSearchParams(location.search);
+  let name = qs.get('name') || 'start';
+  let index = [];       // {group, title, file, desc}
+  const cache = {};     // file -> markdown text
+
+  async function fetchGuide(file) {
+    if (cache[file]) return cache[file];
+    const r = await fetch('/api/ui/guides/' + encodeURIComponent(file));
+    if (!r.ok) throw new Error('안내서를 찾을 수 없습니다: ' + file);
+    const t = await r.text(); cache[file] = t; return t;
+  }
+  function parseIndex(text) {
+    const out = [];
+    for (const line of text.split('\n')) {
+      const m = /^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([a-z0-9-]+)\s*\|\s*([^|]*?)\s*\|\s*$/.exec(line);
+      if (m && m[1] !== '그룹' && !/^-+$/.test(m[1])) out.push({ group: m[1], title: m[2], file: m[3], desc: m[4] });
+    }
+    return out;
+  }
+  function renderToc() {
+    const groups = [...new Set(index.map(i => i.group))];
+    let html = '';
+    for (const g of groups) {
+      html += `<div class="grp">${esc(g)}</div>`;
+      for (const i of index.filter(x => x.group === g)) {
+        const href = i.file === 'start' ? '/ui/start' : '/ui/guide?name=' + encodeURIComponent(i.file);
+        html += `<a class="item ${i.file === name ? 'active' : ''}" href="${href}" data-file="${esc(i.file)}">${esc(i.title)}<span class="d">${esc(i.desc)}</span></a>`;
+        if (i.file === name) html += `<div class="sub" id="subToc"></div>`;
+      }
+    }
+    $('#tocList').innerHTML = html;
+  }
+  function renderSubToc() {
+    const sub = $('#subToc'); if (!sub) return;
+    const hs = Array.from($('#body').querySelectorAll('h2, h3')).slice(0, 40);
+    sub.innerHTML = hs.map(h => `<a href="#${h.id}" style="${h.tagName === 'H3' ? 'margin-left:10px' : ''}">${esc(h.textContent.replace(/^#/, ''))}</a>`).join('');
+    sub.style.display = hs.length ? '' : 'none';
+  }
+  async function load() {
+    try {
+      const t = await fetchGuide(name);
+      $('#body').innerHTML = md(t);
+      const h1 = $('#body').querySelector('h2'); const title = h1 ? h1.textContent.replace(/^#/, '') : name;
+      $('#gTitle').textContent = title; document.title = title + ' - ' + ((document.querySelector('meta[name=georu-brand]') || {}).content || 'Georu');
+      const it = index.find(i => i.file === name); $('#gMeta').textContent = it ? it.group + ' · ' + it.desc : '';
+      $('#raw').href = '/api/ui/guides/' + encodeURIComponent(name);
+      renderSubToc();
+      if (location.hash) { const el = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (el) el.scrollIntoView(); }
+    } catch (e) { $('#body').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  // 전체 검색: 모든 안내서를 받아 두고 제목·본문에서 찾는다 (작아서 한 번에)
+  let allLoaded = false;
+  async function loadAll() { if (allLoaded) return; await Promise.all(index.filter(i => i.file !== 'start').map(i => fetchGuide(i.file).catch(() => ''))); allLoaded = true; }
+  function sections(text) {
+    const out = []; let title = '', buf = [];
+    for (const line of text.split('\n')) { const m = /^(#{1,3})\s+(.*)/.exec(line); if (m) { if (buf.length) out.push({ title, body: buf.join('\n') }); title = m[2]; buf = []; } else buf.push(line); }
+    if (buf.length) out.push({ title, body: buf.join('\n') });
+    return out;
+  }
+  let qTimer = null;
+  async function search() {
+    const q = $('#gq').value.trim().toLowerCase(); const box = $('#gqResult');
+    if (!q) { box.innerHTML = ''; $('#tocList').style.display = ''; return; }
+    await loadAll();
+    const ws = q.split(/\s+/).filter(Boolean); const hits = [];
+    for (const i of index) {
+      const t = cache[i.file]; if (!t) continue;
+      for (const s of sections(t)) {
+        const hay = (s.title + '\n' + s.body).toLowerCase();
+        if (ws.every(w => hay.includes(w))) { const pos = hay.indexOf(ws[0]); hits.push({ file: i.file, guide: i.title, title: s.title, snip: s.body.replace(/[|#*`>-]/g, ' ').replace(/\s+/g, ' ').slice(Math.max(0, pos - 40), pos + 80) }); }
+        if (hits.length >= 40) break;
+      }
+    }
+    const mark = (t) => { let e = esc(t); ws.forEach(w => { e = e.replace(new RegExp(esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), m => `<mark>${m}</mark>`); }); return e; };
+    box.innerHTML = hits.length ? `<div class="muted" style="margin-bottom:4px">${hits.length}곳</div>` + hits.map(h => `<div class="r"><a href="/ui/guide?name=${encodeURIComponent(h.file)}#${encodeURIComponent(UI.slug(h.title))}"><b>${esc(h.guide)}</b> › ${mark(h.title || '(머리말)')}</a><div class="muted">${mark(h.snip)}…</div></div>`).join('') : '<div class="muted">맞는 내용이 없습니다</div>';
+    $('#tocList').style.display = 'none';
+  }
+  $('#gq').addEventListener('input', () => { clearTimeout(qTimer); qTimer = setTimeout(search, 200); });
+  $('#gq').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('#gq').value = ''; search(); } });
+  $('#copyLink').onclick = async () => { try { await navigator.clipboard.writeText(location.href); toast('주소 복사됨', 'ok'); } catch (e) { toast('복사 실패', 'err'); } };
+  window.addEventListener('hashchange', () => { const el = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (el) el.scrollIntoView(); });
+
+  (async () => {
+    try { index = parseIndex(await fetchGuide('index')); } catch (e) { index = [{ group: '안내서', title: name, file: name, desc: '' }]; }
+    // 앱이 guides/index-app.md 로 자기 안내서(예제 앱 가이드 등)를 더할 수 있다. 없으면 무시
+    try { index = index.concat(parseIndex(await fetchGuide('index-app'))); } catch (e) { /* 앱 안내서 없음 */ }
+    if (!index.some(i => i.file === name)) index.push({ group: '기타', title: name, file: name, desc: '' });
+    renderToc(); await load();
+    const q0 = qs.get('q'); if (q0) { $('#gq').value = q0; search(); }
+  })();
+})();
+</script>
+</body>
+</html>

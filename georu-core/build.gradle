@@ -1,0 +1,31 @@
+plugins {
+    id 'georu.java-library'
+}
+
+description = 'georu 엔진: 실행 게이트, Strategy, Reader/Processor/Writer 기반, 사전 점검, 채번, 시나리오, 운영 저장소'
+
+dependencies {
+    // 사용자 플러그인 코드가 직접 쓰는 것은 api 로 노출 (Spring Batch, MyBatis, Bean Validation)
+    api libs.spring.boot.starter.batch
+    api libs.mybatis.spring.boot.starter
+    api libs.spring.boot.starter.validation
+    api libs.jackson.databind
+    api libs.jackson.jsr310
+    implementation libs.spring.data.commons              // 내부 LogManagementService 등이 Page 를 반환 (공개 API 에는 없음)
+    implementation libs.jsr305
+
+    implementation libs.spring.boot.starter.web          // 로그 조회 응답(servlet), Jackson
+    implementation libs.spring.boot.starter.webflux      // 텔레그램 알림 WebClient
+    implementation libs.spring.boot.starter.actuator     // DataSource health, /actuator/info 기여자, 지표
+    implementation libs.spring.retry
+    implementation libs.spring.aspects
+    implementation libs.swagger.annotations              // 요청 DTO 의 @Schema
+    implementation libs.poi                              // 엑셀 이관 (core/excel)
+    implementation libs.poi.ooxml
+
+    runtimeOnly libs.h2                                  // 운영 저장소 기본값 (내장 H2 파일)
+
+    annotationProcessor libs.spring.boot.configuration.processor   // @ConfigurationProperties 키 메타데이터 (IDE 자동 완성·설명)
+    testImplementation libs.spring.batch.test
+    testImplementation libs.archunit.junit5
+}

@@ -1,0 +1,68 @@
+// 라이브러리 모듈 공통 규칙: Java 17, UTF-8, lombok, JUnit 5, Spring Boot BOM, maven-publish
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'io.spring.dependency-management'
+}
+
+group = 'com.georu'
+version = rootProject.version
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+    withSourcesJar()
+}
+
+def libs = extensions.getByType(VersionCatalogsExtension).named('libs')
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.boot:spring-boot-dependencies:${libs.findVersion('spring-boot').get().requiredVersion}"
+    }
+}
+
+dependencies {
+    compileOnly libs.findLibrary('lombok').get()
+    annotationProcessor libs.findLibrary('lombok').get()
+    testCompileOnly libs.findLibrary('lombok').get()
+    testAnnotationProcessor libs.findLibrary('lombok').get()
+
+    testImplementation libs.findLibrary('spring-boot-starter-test').get()
+    testRuntimeOnly libs.findLibrary('junit-platform-launcher').get()
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs += ['-Xlint:deprecation', '-Xlint:unchecked', '-Xlint:-options', '-parameters']
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty 'file.encoding', 'UTF-8'
+}
+
+publishing {
+    // 고객 앱에 전달할 묶음: ./gradlew publishAllPublicationsToBundleRepository → build/repo (Maven 저장소 모양).
+    // 고객 저장소의 libs/ 로 복사하고 settings 에 maven { url = uri('libs') } 를 둔다. 공개 저장소 배포는 보류(7단계)
+    repositories {
+        maven {
+            name = 'bundle'
+            url = rootProject.layout.buildDirectory.dir('repo')
+        }
+    }
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                licenses {
+                    license {
+                        name = 'Apache License, Version 2.0'
+                        url = 'https://www.apache.org/licenses/LICENSE-2.0'
+                    }
+                }
+            }
+        }
+    }
+}

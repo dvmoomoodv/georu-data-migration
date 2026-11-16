@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Source] 1:2 조건 분기: 게시판 종류가 #{params.boardType} 인 글만 (TableDef.params("boardType", "NOTICE")). 삭제 제외 -->
+<mapper namespace="georu.demo.multi.TbPostNoticeSourceMapper">
+    <sql id="where">
+         WHERE A."STATUS" &lt;&gt; 'D'
+           AND B."BOARD_TYPE_CD" = #{params.boardType}
+    </sql>
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."BRD_POST" A JOIN "DEMO"."BRD_BOARD" B ON B."BOARD_ID" = A."BOARD_ID"
+        <include refid="where"/>
+    </select>
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto" resultType="com.georu.examples.demo.source.dto.TbPostSourceDto">
+        SELECT A."POST_ID", A."BOARD_ID", A."TITLE", A."WRITER_ID", A."VIEW_CNT"
+             , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"
+          FROM "DEMO"."BRD_POST" A JOIN "DEMO"."BRD_BOARD" B ON B."BOARD_ID" = A."BOARD_ID"
+        <include refid="where"/>
+         ORDER BY A."POST_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+</mapper>

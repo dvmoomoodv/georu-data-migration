@@ -1,0 +1,36 @@
+package [(${w.pkg})];
+
+import [(${w.pkg})].dto.*;
+import [(${w.pkg})].processor.*;
+[# th:if="${w.anyReaderFile}"]import [(${w.pkg})].reader.*;
+[/][# th:if="${w.anyWriterFile}"]import [(${w.pkg})].writer.*;
+[/]import com.georu.core.plugin.GeoruPlugin;
+import com.georu.core.plugin.TableCatalog;
+import com.georu.core.plugin.TableDef;
+
+import java.util.List;
+
+/**
+ * 업무 [(${w.description})] ([(${w.key})]): 이 업무의 이관 테이블 목록과 테이블별 옵션.
+ * 목록 순서가 권장 실행 순서(부모 → 자식)다. 테이블마다 Processor 를 연결한다.
+[# th:if="${!w.anyReaderFile}"] * Reader · Writer 를 적지 않은 테이블은 엔진 공용 Reader · Writer 가 SourceMapper · TargetMapper 를 이름 규칙으로 부른다.
+ * 테이블만 따로 손볼 일이 생기면 그 테이블의 Reader · Writer 를 만들어 .reader(…) · .writer(…) 로 연결한다.
+[/][# th:if="${w.anyReaderFile}"] * Reader · Writer 도 테이블마다 연결한다. 지우면 엔진 공용 Reader · Writer 가 같은 일을 한다 (파일과 이 줄을 함께 지운다).
+[/] * 테이블 옵션(채번 · 대상 테이블 등)은 .options(TableOptions.builder()...build()) 로 더한다.
+ * 실행 구성(Job · Step)은 엔진이 이 선언을 읽어 붙인다. 끄기: georu.plugins.[(${w.plugin})].enabled=false
+ * 자동 생성: georu 코드 생성기 [(${gen.version})]
+ */
+@GeoruPlugin(name = "[(${w.plugin})]", description = "[(${w.description})]", source = "[(${s.sourceDataSource})]", target = "[(${s.targetDataSource})]")
+public class [(${w.pascal})]Strategy implements TableCatalog {
+
+    @Override
+    public List<TableDef> tables() {
+        return List.of(
+[# th:each="t, st : ${w.tables}"]                TableDef.of("[(${t.table})]", [(${t.pascal})]SourceDto.class, [(${t.pascal})]TargetDto.class)    //[(${t.javaText.isEmpty()} ? '' : ' ' + ${t.javaText})][(${t.mapped} ? '' : ' (원천 미지정)')]
+[# th:if="${t.readerFile}"]                        .reader([(${t.pascal})]Reader.class)
+[/]                        .processor([(${t.pascal})]Processor.class)[# th:if="${t.writerFile}"]
+                        .writer([(${t.pascal})]Writer.class)[/][# th:if="${!t.readerFile and t.customPageSize}"]
+                        .pageSize([(${t.pageSize})])[/][(${st.last} ? '' : ',')]
+[/]        );
+    }
+}

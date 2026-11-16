@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Target] target-m demo_tobe.tb_branch -->
+<mapper namespace="georu.demo.multi.TbBranchTargetMapper">
+    <insert id="insertData" parameterType="com.georu.examples.demo.multi.dto.BrBranchDto">
+        INSERT INTO tb_branch (BRANCH_CD, BRANCH_NM, REGION, USE_YN)
+        VALUES (#{branchCd}, #{branchNm}, #{region}, #{useYn})
+    </insert>
+</mapper>

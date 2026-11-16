@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('권한 관리')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>사용자 · 권한</h1><p class="page-desc">총관리자만 · 권한마다 볼 수 있는 메뉴 · 실행 여부 · 유휴 잠금</p></div>
+    <div th:replace="~{ui/layout :: userTabs}"></div>
+    <div class="card">
+        <div class="card-head"><h2>권한 <span class="small muted" id="summary"></span></h2>
+            <div class="inline"><button class="btn primary sm" id="btnNew" type="button">+ 권한 추가</button></div></div>
+        <div id="list"><div class="empty loading">불러오는 중…</div></div>
+    </div>
+    <div class="card" id="formCard" hidden>
+        <div class="card-head"><h2 id="formTitle">권한 추가</h2>
+            <div class="inline" id="presetBox"><label class="small" for="preset">기본 권한에서 복사</label><select id="preset"><option value="">고르기</option><option value="EXECUTOR">실행자</option><option value="VIEWER">조회자</option><option value="NONE">모두 없음</option></select></div></div>
+        <form class="f" onsubmit="return false" autocomplete="off">
+            <div class="field"><label for="rName">권한 이름</label><input id="rName" maxlength="50"></div>
+            <div class="field"><label for="rIdle">유휴 잠금 (분) <span class="muted">0 = 끔, 최대 1440 · 이 권한 사용자 모두에게</span></label><input id="rIdle" type="number" min="0" max="1440" step="1" value="30"></div>
+            <div class="field full"><label for="rDesc">설명</label><input id="rDesc" maxlength="200"></div>
+        </form>
+        <div id="adminNote" class="alert info small" hidden>관리자 권한은 총관리자 한 사람의 권한입니다. 모든 메뉴를 실행할 수 있고, 바꿀 수 있는 것은 유휴 잠금 시간뿐입니다.</div>
+        <div id="menuBox">
+            <h2 class="mt-12">메뉴 <span class="small muted">조회 = 화면 보기 · 내려받기, 실행 = 조회 + 실행 · 저장 · 삭제</span></h2>
+            <div id="menuTable"></div>
+            <div class="mt-6 small muted" id="adminOnly"></div>
+        </div>
+        <div class="mt-12 inline"><button class="btn primary" id="btnSave" type="button">만들기</button><button class="btn" id="btnCancel" type="button">취소</button><span class="small muted" id="saveStatus"></span></div>
+    </div>
+</main>
+<script>
+(function () {
+  const { get, post, del, api, esc, fmtDate, toast, $, confirmModal } = UI;
+  const LV = { N: '없음', R: '조회', W: '실행' };
+  let roles = [], menus = [], presets = {}, editing = null;
+
+  async function load() {
+    try {
+      const [rs, m] = await Promise.all([get('/api/roles'), menus.length ? null : get('/api/roles/menus')]);
+      roles = rs || [];
+      if (m) { menus = m.menus || []; presets = m.presets || {}; $('#adminOnly').textContent = '관리자만 (권한으로 줄 수 없음): ' + (m.adminOnly || []).join(' · '); }
+      render();
+    } catch (e) { $('#list').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+
+  function permSummary(r) {
+    if (r.admin) return '<b>모든 메뉴 실행</b> · 권한 · 사용자 관리';
+    const p = r.perms || {}, read = [], write = [];
+    menus.forEach(m => { if (p[m.key] === 'W') write.push(m.name); else if (p[m.key] === 'R') read.push(m.name); });
+    if (!read.length && !write.length) return '<span class="muted">메뉴 없음</span>';
+    return (write.length ? `<span title="${esc(write.join(', '))}">실행 ${write.length}</span>` : '') + (write.length && read.length ? ' · ' : '')
+      + (read.length ? `<span title="${esc(read.join(', '))}">조회 ${read.length}</span>` : '');
+  }
+
+  function render() {
+    $('#summary').textContent = `${roles.length}개`;
+    // 행 동작은 아이콘 버튼 (todo-task 33 G4)
+    const ib = UI.iconBtn;
+    $('#list').innerHTML = '<table class="list"><tr><th>권한</th><th>설명</th><th>메뉴</th><th class="num">유휴 잠금</th><th class="num">사용자</th><th>바꾼 때</th><th>작업</th></tr>' + roles.map(r =>
+      `<tr><td><b>${esc(r.name)}</b> <span class="mono small muted">${esc(r.id)}</span></td><td class="small">${esc(r.description || '')}</td><td class="small">${permSummary(r)}</td>`
+      + `<td class="num">${r.idleLockMinutes ? r.idleLockMinutes + '분' : '끔'}</td><td class="num">${r.users}</td>`
+      + `<td class="small">${r.updatedAt ? fmtDate(r.updatedAt) + (r.updatedBy ? ' · ' + esc(r.updatedBy) : '') : ''}</td>`
+      + `<td class="nowrap"><span class="row-acts">${ib(`data-edit="${esc(r.id)}"`, 'edit', '고치기')}${r.admin ? '' : ib(`data-del="${esc(r.id)}"`, 'trash', '삭제', 'danger')}</span></td></tr>`).join('') + '</table>';
+    document.querySelectorAll('[data-edit]').forEach(b => b.onclick = () => openForm(roles.find(r => r.id === b.dataset.edit)));
+    document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => remove(roles.find(r => r.id === b.dataset.del)));
+  }
+
+  /** 메뉴 표: 묶음 · 메뉴 · 없음/조회/실행 라디오. 실행 API 가 없는 메뉴(대시보드 등)는 조회까지만 */
+  function menuTable(perms, disabled) {
+    let group = null;
+    return '<table class="list"><tr><th>묶음</th><th>메뉴</th><th>단계</th></tr>' + menus.map(m => {
+      const v = perms[m.key] || 'N', g = m.group !== group ? (group = m.group) : '';
+      const opts = ['N', 'R'].concat(m.hasWrite ? ['W'] : []).map(l =>
+        `<label class="check" style="margin-right:12px"><input type="radio" name="p_${esc(m.key)}" value="${l}" ${v === l ? 'checked' : ''} ${disabled ? 'disabled' : ''}> ${LV[l]}</label>`).join('');
+      return `<tr><td class="small muted">${g === '-' ? '' : esc(g)}</td><td>${esc(m.name)}</td><td>${opts}</td></tr>`;
+    }).join('') + '</table>';
+  }
+  function readPerms() {
+    const out = {};
+    menus.forEach(m => { const c = document.querySelector(`input[name="p_${m.key}"]:checked`); if (c && c.value !== 'N') out[m.key] = c.value; });
+    return out;
+  }
+
+  function openForm(r) {
+    editing = r ? r.id : null;
+    const admin = !!(r && r.admin);
+    $('#formCard').hidden = false;
+    $('#formTitle').textContent = r ? '권한 고치기 · ' + r.name : '권한 추가';
+    $('#btnSave').textContent = r ? '저장' : '만들기';
+    $('#rName').value = r ? r.name : ''; $('#rName').disabled = admin;
+    $('#rDesc').value = r ? (r.description || '') : ''; $('#rDesc').disabled = admin;
+    $('#rIdle').value = r ? r.idleLockMinutes : 30;
+    $('#adminNote').hidden = !admin; $('#menuBox').hidden = admin; $('#presetBox').hidden = admin;
+    $('#preset').value = '';
+    $('#menuTable').innerHTML = menuTable(r ? (r.perms || {}) : {}, admin);
+    $('#saveStatus').textContent = r && r.users ? `이 권한의 사용자 ${r.users}명에게 다음 요청부터 적용됩니다` : '';
+    $('#formCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    (admin ? $('#rIdle') : $('#rName')).focus();
+  }
+  function close() { editing = null; $('#formCard').hidden = true; }
+
+  async function remove(r) {
+    if (!r) return;
+    let names = [];
+    try { names = await get('/api/roles/' + encodeURIComponent(r.id) + '/users') || []; } catch (e) { toast(e.message, 'err'); return; }
+    const who = names.length
+      ? `<div class="alert err small" style="margin:8px 0 0">이 권한의 <b>사용자 ${names.length}명도 같이 삭제됩니다</b>: <span class="mono">${names.map(esc).join(', ')}</span></div>`
+        + '<div class="mt-6 small muted">사용자를 남기려면 먼저 사용자 탭에서 다른 권한으로 옮긴 뒤 지우세요.</div>'
+      : '<div class="small muted">이 권한의 사용자는 없습니다.</div>';
+    if (!await confirmModal('권한 삭제 · ' + r.name, `<b>${esc(r.name)}</b> 권한을 지웁니다. 되돌릴 수 없습니다.${who}`, names.length ? `권한과 사용자 ${names.length}명 삭제` : '삭제', r.name)) return;
+    try {
+      const d = await del('/api/roles/' + encodeURIComponent(r.id) + '?confirm=' + encodeURIComponent(r.name));
+      toast(d && d.deletedUsers && d.deletedUsers.length ? `권한과 사용자 ${d.deletedUsers.length}명을 지웠습니다` : '권한을 지웠습니다', 'ok');
+      if (editing === r.id) close();
+      await load();
+    } catch (e) { toast(e.plainMessage || e.message, 'err'); }
+  }
+
+  $('#btnNew').onclick = () => openForm(null);
+  $('#btnCancel').onclick = close;
+  $('#preset').onchange = () => {
+    const v = $('#preset').value; if (!v) return;
+    $('#menuTable').innerHTML = menuTable(v === 'NONE' ? {} : (presets[v] || {}), false);
+  };
+  $('#btnSave').onclick = async () => {
+    const idle = parseInt($('#rIdle').value, 10);
+    if (isNaN(idle) || idle < 0 || idle > 1440) { toast('유휴 잠금은 0~1440 분', 'err'); return; }
+    const body = { name: $('#rName').value.trim(), description: $('#rDesc').value.trim(), idleLockMinutes: idle, perms: readPerms() };
+    const isAdmin = editing && roles.some(r => r.id === editing && r.admin);
+    if (!isAdmin && !body.name) { toast('권한 이름을 적으세요', 'err'); return; }
+    $('#btnSave').disabled = true;
+    try {
+      if (editing) { await api('PUT', '/api/roles/' + encodeURIComponent(editing), body); toast('저장했습니다 (사용자의 다음 요청부터)', 'ok'); }
+      else { await post('/api/roles', body); toast('권한을 만들었습니다. 사용자 탭에서 이 권한으로 사용자를 만드세요', 'ok'); }
+      close(); await load();
+    } catch (e) { toast(e.plainMessage || e.message, 'err'); }
+    finally { $('#btnSave').disabled = false; }
+  };
+  load();
+})();
+</script>
+</body>
+</html>

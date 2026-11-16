@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_stat_daily : 일별통계 (업무 04 통계) / 자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.stats.TbStatDailyTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbStatDailyTargetDto">
+        INSERT INTO `demo_tobe`.`tb_stat_daily` (
+              `STAT_ID`    <!-- BIGINT 통계ID -->
+            , `STAT_YMD`    <!-- VARCHAR(8) 통계일 -->
+            , `BOARD_ID`    <!-- INT 게시판ID -->
+            , `VISIT_CNT`    <!-- INT 방문수 -->
+            , `UNIQUE_VISIT_CNT`    <!-- INT 순방문수 -->
+            , `POST_CNT`    <!-- INT 게시글수 -->
+            , `COMMENT_CNT`    <!-- INT 댓글수 -->
+            , `AVG_STAY_SEC`    <!-- DECIMAL(8,2) 평균체류초 -->
+            , `INDATE`    <!-- VARCHAR(14) 등록일시 -->
+        ) VALUES (
+              #{statId}
+            , #{statYmd}
+            , #{boardId}
+            , #{visitCnt}
+            , #{uniqueVisitCnt}
+            , #{postCnt}
+            , #{commentCnt}
+            , #{avgStaySec}
+            , #{indate}
+        )
+        <!-- PK 있음. 재실행은 제품 정책상 "기존 데이터 있으면 경고 후 중단" → 데모 리셋 SQL(21_demo_tobe_reset.sql) 후 재실행 -->
+    </insert>
+
+</mapper>

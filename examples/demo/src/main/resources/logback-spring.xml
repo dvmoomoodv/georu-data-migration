@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  로그 출력(appender) 정의. 레벨은 application.yml 의 georu.log.* 한 곳에서만 정한다.
+    georu.log.level       com.georu (애플리케이션)
+    georu.log.sql-level   MyBatis / JDBC / SQL_LOGGER (SQL·파라미터) → logs/sql.log
+    georu.log.root-level  그 외
+  Spring Boot 의 logging.level.* (application.yml) 이 같은 값을 참조하므로 두 곳이 어긋나지 않는다.
+-->
+<configuration>
+    <springProperty scope="context" name="APP_LEVEL"  source="georu.log.level"       defaultValue="INFO"/>
+    <springProperty scope="context" name="SQL_LEVEL"  source="georu.log.sql-level"   defaultValue="INFO"/>
+    <springProperty scope="context" name="ROOT_LEVEL" source="georu.log.root-level"  defaultValue="INFO"/>
+    <springProperty scope="context" name="LOG_PATH"   source="logging.file.path"   defaultValue="logs"/>
+
+    <property name="PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} | %-5level | [%thread] | %logger{36} | %msg%n"/>
+
+    <!-- Console Appender -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- File Appender (월별 롤링 + GZIP 압축) -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/application.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/application.%d{yyyy-MM}.%i.log.gz</fileNamePattern>
+            <maxFileSize>100MB</maxFileSize>
+            <maxHistory>120</maxHistory>
+            <totalSizeCap>10GB</totalSizeCap>
+            <cleanHistoryOnStart>false</cleanHistoryOnStart>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- MyBatis SQL 쿼리 전용 Appender (개행을 &#10; 로 치환해 한 줄 유지) -->
+    <appender name="SQL_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/sql.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/sql.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>50MB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>7</maxHistory>
+        </rollingPolicy>
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="ch.qos.logback.classic.PatternLayout">
+                <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %replace(%msg){'[\r\n]+', '&#10;'}%n</pattern>
+            </layout>
+        </encoder>
+    </appender>
+
+    <!-- Root -->
+    <root level="${ROOT_LEVEL}">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+
+    <!-- 애플리케이션 -->
+    <logger name="com.georu" level="${APP_LEVEL}" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+
+    <!-- SQL 계열 → sql.log (콘솔에도 출력) -->
+    <logger name="com.georu.core.internal.common.mapper" level="${SQL_LEVEL}" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="SQL_FILE"/>
+    </logger>
+    <logger name="SQL_LOGGER" level="${SQL_LEVEL}" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="SQL_FILE"/>
+    </logger>
+    <logger name="org.apache.ibatis" level="${SQL_LEVEL}" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="SQL_FILE"/>
+    </logger>
+    <logger name="org.mybatis" level="${SQL_LEVEL}" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="SQL_FILE"/>
+    </logger>
+    <logger name="org.springframework.jdbc" level="${SQL_LEVEL}" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="SQL_FILE"/>
+    </logger>
+    <logger name="java.sql" level="${SQL_LEVEL}" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="SQL_FILE"/>
+    </logger>
+
+    <!-- 인프라 -->
+    <logger name="com.zaxxer.hikari" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+    <logger name="org.springframework.batch" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </logger>
+</configuration>

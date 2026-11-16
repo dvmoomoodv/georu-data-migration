@@ -1,0 +1,70 @@
+# =============================================================================
+# dev 프로파일 - 개발 서버
+#   접속정보는 환경변수 필수 (기본값 없음 → 누락 시 기동 실패가 의도)
+#     OPERATION_DB_URL / OPERATION_DB_USERNAME / OPERATION_DB_PASSWORD   (H2 파일 또는 MySQL mig_ops)
+#     SOURCE_DB_URL / SOURCE_DB_USERNAME / SOURCE_DB_PASSWORD
+#     TARGET_DB_HOST / TARGET_DB_PORT / TARGET_DB_NAME / TARGET_DB_USERNAME / TARGET_DB_PASSWORD
+#     TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (테스트 채팅방)
+# =============================================================================
+spring:
+  thymeleaf:
+    cache: false                    # 운영 UI 템플릿 즉시 반영
+
+georu:
+  datasource:
+    operation:
+      hikari:
+        jdbc-url: ${OPERATION_DB_URL}
+        username: ${OPERATION_DB_USERNAME}
+        password: ${OPERATION_DB_PASSWORD}
+    source-m:
+      hikari:
+        jdbc-url: ${SOURCE_DB_URL}
+        username: ${SOURCE_DB_USERNAME}
+        password: ${SOURCE_DB_PASSWORD}
+        maximum-pool-size: 6                                   # J(1)×2+2 = 4 면 충분, 여유로 유지
+        minimum-idle: 2
+        leak-detection-threshold: 120000
+    target-m:
+      hikari:
+        jdbc-url: jdbc:mysql://${TARGET_DB_HOST}:${TARGET_DB_PORT:3306}/${TARGET_DB_NAME}
+        username: ${TARGET_DB_USERNAME}
+        password: ${TARGET_DB_PASSWORD}
+        maximum-pool-size: 12                                  # J(1)×W(5)+2 = 7 이면 충분, 여유로 유지
+        minimum-idle: 2
+        leak-detection-threshold: 120000
+
+  plugins:
+    demo:
+      enabled: true                      # 데모 플러그인 (DEMO→demo_tobe). source-m + target-m 필요
+  log:
+    level: DEBUG
+    sql-level: INFO
+    root-level: INFO
+  operation:
+    schema-init: auto
+  batch:
+    executor:
+      core-pool-size: 1                      # 단일 실행 규칙: 1 고정 (2 이상이면 기동 실패)
+      max-pool-size: 1
+    queue:
+      writer-thread-count: 5
+
+  notification:
+    telegram:
+      enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,logfile,threaddump,env,loggers,scheduledtasks,mappings,beans,configprops,conditions   # 서버 진단 화면(/admin)의 기능 범위
+  endpoint:
+    health:
+      show-details: always
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true

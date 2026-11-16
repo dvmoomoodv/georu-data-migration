@@ -1,0 +1,17 @@
+{
+  "id": "demo-member",
+  "name": "데모 회원",
+  "description": "회원 등급 → 회원 → 로그인 로그(월별 분할). 같은 플러그인 3 테이블을 순서대로",
+  "onUnitFailure": "STOP",
+  "onStepStop": "STOP_ALL",
+  "common": {
+    "tenantLevel1": "DEMO", "tenantLevel2": "DEMO", "tenantLevel3": "DEMO", "tenantLevel4": "DEMO", "tenantLevel5": "DEMO",
+    "chunkSize": 500
+  },
+  "steps": [
+    { "plugin": "demo.member", "table": "tb_member_grade",     "label": "회원 등급" },
+    { "plugin": "demo.member", "table": "tb_member",           "label": "회원 (탈퇴 제외)" },
+    { "plugin": "demo.member", "table": "tb_member_login_log", "label": "로그인 로그 (월별)",
+      "divide": { "unit": "1m", "startDate": "20251001", "endDate": "20261031" } }
+  ]
+}

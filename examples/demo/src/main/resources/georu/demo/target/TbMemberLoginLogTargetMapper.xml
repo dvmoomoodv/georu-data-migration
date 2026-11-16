@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_member_login_log : 로그인이력 (업무 02 회원관리) / 자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.member.TbMemberLoginLogTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbMemberLoginLogTargetDto">
+        INSERT INTO `demo_tobe`.`tb_member_login_log` (
+              `LOGIN_LOG_ID`    <!-- BIGINT 이력ID -->
+            , `ASIS_ID`    <!-- BIGINT ASIS이력ID -->
+            , `MEMBER_ID`    <!-- INT 회원ID -->
+            , `LOGIN_DATE`    <!-- VARCHAR(14) 로그인일시 -->
+            , `LOGIN_IP`    <!-- VARCHAR(45) IP -->
+            , `DEVICE_CD`    <!-- VARCHAR(10) 기기 -->
+            , `RESULT_CD`    <!-- VARCHAR(10) 결과 -->
+            , `FAIL_REASON`    <!-- VARCHAR(200) 실패사유 -->
+            , `INDATE`    <!-- VARCHAR(14) 등록일시 -->
+        ) VALUES (
+              #{loginLogId}
+            , #{asisId}
+            , #{memberId}
+            , #{loginDate}
+            , #{loginIp}
+            , #{deviceCd}
+            , #{resultCd}
+            , #{failReason}
+            , #{indate}
+        )
+        <!-- PK 있음. 재실행은 제품 정책상 "기존 데이터 있으면 경고 후 중단" → 데모 리셋 SQL(21_demo_tobe_reset.sql) 후 재실행 -->
+    </insert>
+
+</mapper>

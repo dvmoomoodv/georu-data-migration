@@ -1,0 +1,8 @@
+﻿코드그룹,코드,코드명,순서,사용여부
+GENDER,1,남자,1,Y
+GENDER,2,여자,2,Y
+STATUS,ACTIVE,정상,1,Y
+STATUS,INACTIVE,탈퇴,2,Y
+DEVICE_CD,PC,PC,1,Y
+DEVICE_CD,MO,모바일,2,Y
+DEVICE_CD,TB,태블릿,3,Y

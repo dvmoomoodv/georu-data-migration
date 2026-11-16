@@ -1,0 +1,25 @@
+package [(${w.pkg})].dto;
+
+import com.georu.core.plugin.MigrationId;
+[# th:each="i : ${t.imports}"]import [(${i})];
+[/]
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+/**
+ * [Target] [(${t.physical})][(${t.javaComment})] ([(${s.targetDataSource})])
+ * Processor 출력 = Writer 입력. [(${t.pascal})]TargetMapper.insertData 의 파라미터.
+ * 자동 생성: georu 코드 생성기 [(${gen.version})]
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class [(${t.pascal})]TargetDto {[# th:each="c : ${t.columns}"]
+
+    /** [(${c.name})] [(${c.dbType})][(${c.javaComment.isEmpty()} ? '' : ' : ' + ${c.javaComment})] */
+[# th:if="${c.pk}"]    @MigrationId
+[/]    private [(${c.javaType})] [(${c.field})];[/]
+}

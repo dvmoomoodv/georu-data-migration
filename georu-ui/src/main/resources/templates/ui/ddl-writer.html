@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('DDL → Writer')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>DDL → Writer</h1><p class="page-desc">TOBE DDL 로 Target 매퍼의 INSERT · INSERT IGNORE · UPSERT · UPDATE 문(MyBatis XML)과 매퍼 인터페이스를 만듭니다 · 브라우저에서만 처리</p></div>
+    <div th:replace="~{ui/layout :: ddlTabs}"></div>
+    <div th:if="${codegenEnabled}" class="small muted" style="margin-bottom:10px">테이블이 여럿이거나 업체 적용을 시작한다면 <b>이관 설계 › <a th:href="@{/ui/gen-code}">코드 생성</a></b> · 이 탭은 DDL 하나로 Target XML 만 빠르게 볼 때</div>
+    <div class="split">
+        <div class="card">
+            <div class="card-head">
+                <h2>TOBE DDL</h2>
+                <div class="inline"><label class="small">DBMS <select id="dialect"><option value="auto">자동 감지</option><option>MySQL</option><option>Oracle</option><option>MSSQL</option><option>PostgreSQL</option></select></label>
+                    <button class="btn sm" id="clear" type="button">지우기</button></div>
+            </div>
+            <div class="mt-8 inline small"><button class="btn sm" id="sample" type="button" title="예제 DDL 을 넣고 바로 생성 - 방식 · DBMS 별로 어떤 문이 나오는지">예제 ▾</button><span class="muted">관련 규칙은 <a href="#" data-panel-open="help">? 도움말</a></span></div>
+            <textarea id="ddl" class="mono" style="width:100%;height:28vh;margin-top:8px;font-size:12px" placeholder="CREATE TABLE ... ( ... );  여러 테이블 가능"></textarea>
+            <h2 class="mt-12">적재 방식</h2>
+            <div class="choice col">
+                <label><input type="radio" name="mode" value="insert" checked> INSERT <span class="muted small">기본. 기존 데이터가 있으면 제품이 경고 후 중단</span></label>
+                <label><input type="radio" name="mode" value="ignore"> INSERT IGNORE <span class="muted small">중복 키는 건너뜀 (MySQL IGNORE / PostgreSQL DO NOTHING / Oracle·MSSQL MERGE WHEN NOT MATCHED). 재실행은 ignoreExistingData=true</span></label>
+                <label><input type="radio" name="mode" value="upsert"> UPSERT <span class="muted small">중복 키는 갱신 (MySQL ON DUPLICATE KEY UPDATE / PostgreSQL ON CONFLICT DO UPDATE / Oracle·MSSQL MERGE)</span></label>
+                <label><input type="radio" name="mode" value="update"> UPDATE <span class="muted small">키로 찾아 갱신만</span></label>
+            </div>
+            <h2 class="mt-12">옵션</h2>
+            <div class="f split r11" style="gap:8px">
+                <div class="field"><label>업체 접두어</label><input id="company" value="Sample" title="패키지 plugins.<업체소문자>.target.mapper / target.dto"></div>
+                <div class="field"><label>스키마 접두어 <span class="muted">(비우면 DDL 의 스키마, 없으면 생략)</span></label><input id="schemaName" placeholder="예: tobe"></div>
+                <div class="field full"><label>키 컬럼 <span class="muted">(UPSERT·IGNORE·UPDATE 기준. 비우면 PK. 쉼표 구분)</span></label><input id="keys" placeholder="PK 자동"></div>
+                <div class="field full"><label>등록 전용 컬럼 <span class="muted">(UPSERT 때 갱신하지 않음)</span></label><input id="insertOnly" value="INDATE, INUSERID"></div>
+                <div class="field"><label class="check"><input type="checkbox" id="excludeAuto" checked> 자동증가 컬럼은 INSERT 에서 제외</label></div>
+                <div class="field"><label class="check"><input type="checkbox" id="batch"> 다건 VALUES (foreach, List 파라미터)</label></div>
+                <div class="field full"><label class="check"><input type="checkbox" id="xml" checked> MyBatis XML 로 감싸기 <span class="muted">· 끄면 SQL 만</span></label></div>
+            </div>
+            <div class="mt-10 inline"><button class="btn primary" id="run" type="button">생성</button><span class="small muted">Ctrl+Enter. 옵션을 바꾸면 바로 다시 생성됩니다</span></div>
+        </div>
+        <div class="card">
+            <div class="card-head">
+                <h2>생성 결과 <span class="small muted" id="meta"></span></h2>
+                <div class="inline"><select id="tableSel"></select><select id="view"><option value="xml">매퍼 XML</option><option value="iface">매퍼 인터페이스</option><option value="sql">SQL 만</option></select><button class="btn primary sm" id="copy" type="button">복사</button><button class="btn sm" id="download" type="button">다운로드</button></div>
+            </div>
+            <div id="warn"></div>
+            <div id="info" class="mt-6 small muted"></div>
+            <pre id="out" class="mono codebox">왼쪽에 TOBE DDL 을 넣고 생성을 누르세요.</pre>
+        </div>
+    </div>
+</main>
+<script th:src="@{/ui-assets/ddl-parser.js}"></script>
+<script th:src="@{/ui-assets/ddl-codegen.js}"></script>
+<script th:src="@{/ui-assets/ddl-samples.js}"></script>
+<script>
+(function () {
+  const { esc, toast, $ } = UI; const P = window.DdlParser, G = window.DdlCodegen;
+  // 입력 DDL 을 브라우저에 공유: 다른 DDL 도구로 가도 같은 입력이 남는다 (저장소 아님)
+  const SHARE_KEY = 'ui.ddl.input';
+  try { const sv = localStorage.getItem(SHARE_KEY); if (sv && !$('#ddl').value) $('#ddl').value = sv; } catch (e) { /* ignore */ }
+  $('#ddl').addEventListener('change', () => { try { localStorage.setItem(SHARE_KEY, $('#ddl').value); } catch (e) { /* ignore */ } });
+  let result = null, outputs = [];
+  const list = (v) => v.split(/[\s,]+/).map(x => x.trim()).filter(Boolean);
+  function opts() { return { mode: document.querySelector('input[name=mode]:checked').value, company: $('#company').value.trim() || 'Sample', schemaName: $('#schemaName').value.trim() || undefined, schema: true, keys: list($('#keys').value), insertOnly: list($('#insertOnly').value), excludeAuto: $('#excludeAuto').checked, batch: $('#batch').checked, xml: $('#xml').checked }; }
+  function run() {
+    const sql = $('#ddl').value; try { localStorage.setItem(SHARE_KEY, sql); } catch (e) { /* ignore */ } if (!sql.trim()) { toast('TOBE DDL 을 넣어 주세요', 'err'); return; }
+    try { result = P.parse(sql, { dialect: $('#dialect').value }); } catch (e) { $('#warn').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; return; }
+    const keep = $('#tableSel').value;
+    $('#tableSel').innerHTML = result.tables.map((t, i) => `<option value="${i}">${esc(t.name)}${t.comment ? ' · ' + esc(t.comment) : ''}</option>`).join('');
+    if (keep && Number(keep) < result.tables.length) $('#tableSel').value = keep;
+    $('#meta').textContent = `${result.dialect} · 테이블 ${result.tables.length}개`;
+    regen();
+  }
+  function regen() {
+    if (!result) return;
+    const o = opts(); outputs = result.tables.map(t => Object.assign({ table: t.name }, G.generateWriter(t, Object.assign({ dialect: result.dialect }, o))));
+    const parseWarn = result.warnings.map(w => '[DDL] ' + w);
+    show(parseWarn);
+  }
+  function current() { return outputs[Number($('#tableSel').value || 0)]; }
+  function show(parseWarn) {
+    const c = current(); if (!c) { $('#out').textContent = '읽은 테이블이 없습니다.'; return; }
+    const v = $('#view').value; const o = opts();
+    if (!o.xml && v !== 'sql') $('#view').value = 'sql';
+    const vv = $('#view').value;
+    $('#out').textContent = vv === 'xml' ? (c.xml || c.sql) : vv === 'iface' ? (c.iface || '// XML 옵션을 켜면 인터페이스가 생성됩니다') : c.sql;
+    const warns = (parseWarn || []).concat(c.warnings);
+    $('#warn').innerHTML = warns.length ? `<div class="mt-6 alert ${c.warnings.length ? 'err' : 'warn'}"><ul class="small" style="margin:0">${warns.slice(0, 20).map(w => `<li>${esc(w)}</li>`).join('')}</ul></div>` : '';
+    $('#info').innerHTML = `적재 방식 <b>${esc(o.mode)}</b> · 키 <span class="mono">${esc(c.keys.join(', ') || '(없음)')}</span>${o.mode === 'upsert' ? ` · 갱신 ${c.updCols.length}개 컬럼` : ''} · 제품은 TRUNCATE·DELETE 를 하지 않습니다. 재실행이 필요하면 UPSERT 나 IGNORE 로 두고 <code>ignoreExistingData=true</code> 로 실행하세요.`;
+  }
+  async function copyText(t) { try { await navigator.clipboard.writeText(t); toast('복사됨', 'ok'); } catch (e) { toast('클립보드 복사 실패 - 결과 영역에서 직접 복사하세요', 'err'); } }
+  function download(name, text) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' })); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500); }
+  $('#run').onclick = run; $('#tableSel').onchange = () => show(); $('#view').onchange = () => show();
+  ['company', 'schemaName', 'keys', 'insertOnly', 'excludeAuto', 'batch', 'xml'].forEach(id => $('#' + id).addEventListener('change', regen));
+  document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', regen));
+  $('#copy').onclick = () => { if (current()) copyText($('#out').textContent); };
+  $('#download').onclick = () => { const c = current(); if (!c) return; const v = $('#view').value; download(v === 'xml' ? c.xmlFile : v === 'iface' ? c.ifaceFile : G.pascal(c.table) + '-' + opts().mode + '.sql', $('#out').textContent); };
+  $('#clear').onclick = () => { $('#ddl').value = ''; result = null; outputs = []; $('#out').textContent = '왼쪽에 TOBE DDL 을 넣고 생성을 누르세요.'; $('#tableSel').innerHTML = ''; $('#meta').textContent = ''; $('#warn').innerHTML = ''; $('#info').innerHTML = ''; };
+  $('#ddl').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); run(); } });
+  window.DdlSamples.pop($('#sample'), window.DdlSamples.samples.writer, (smp) => {
+    $('#ddl').value = smp.sql; $('#dialect').value = smp.dialect || 'auto'; $('#schemaName').value = smp.schemaName || ''; $('#keys').value = smp.keys || ''; $('#batch').checked = !!smp.batch; $('#xml').checked = true;
+    document.querySelector('input[name=mode][value=' + (smp.mode || 'insert') + ']').checked = true;
+    run();
+    if (smp.table && result) { const i = result.tables.findIndex(t => t.name === smp.table); if (i >= 0) { $('#tableSel').value = String(i); show(); } }
+  });
+})();
+</script>
+</body>
+</html>

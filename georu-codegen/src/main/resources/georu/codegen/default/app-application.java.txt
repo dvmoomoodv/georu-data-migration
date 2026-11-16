@@ -1,0 +1,17 @@
+package [(${s.basePackage})];
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+/**
+ * [(${s.company})] 이관 앱. 엔진 · API · 운영 UI 는 georu-spring-boot-starter 의 자동 설정이 등록하고,
+ * 이 클래스는 [(${s.basePackage})] 아래 업무 Strategy(@GeoruPlugin)를 찾는다.
+ * 자동 생성: georu 코드 생성기 [(${gen.version})]
+ */
+@SpringBootApplication
+public class [(${s.pascal})]Application {
+
+    public static void main(String[] args) {
+        SpringApplication.run([(${s.pascal})]Application.class, args);
+    }
+}

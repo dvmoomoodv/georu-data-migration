@@ -1,0 +1,21 @@
+# =============================================================================
+# dev 프로파일 - 개발 서버 접속 정보. 값은 환경 변수로 넘기거나 이 파일에 직접 적는다 (운영 비밀번호는 적지 않는다).
+# 자동 생성: georu 코드 생성기 [(${gen.version})]
+# =============================================================================
+georu:
+  datasource:
+    [(${s.sourceDataSource})]:
+      hikari:
+        jdbc-url: ${SOURCE_DB_URL}               # 예: [(${s.sourceUrlExample})]
+        username: ${SOURCE_DB_USERNAME}
+        password: ${SOURCE_DB_PASSWORD}
+        maximum-pool-size: 4
+    [(${s.targetDataSource})]:
+      hikari:
+        jdbc-url: ${TARGET_DB_URL}               # 예: [(${s.targetUrlExample})]
+        username: ${TARGET_DB_USERNAME}
+        password: ${TARGET_DB_PASSWORD}
+        maximum-pool-size: 8
+  log:
+    level: DEBUG
+    sql-level: INFO

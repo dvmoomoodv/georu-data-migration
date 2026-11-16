@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_stat_menu : 메뉴통계 ← ASIS(Oracle) STAT_MENU_HIT : 메뉴 클릭 통계(월) (매핑 추정, 미확정)
+     자동 매핑 7 / 수기 매핑 1 (TOBE 컬럼 8, apply_demo_mapping.py 적용)
+     자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.stats.TbStatMenuSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."STAT_MENU_HIT" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbStatMenuSourceDto">
+        SELECT
+              NULL AS "STAT_MENU_ID"    <!-- 메뉴통계ID BIGINT ← 시퀀스 채번 (TOBE 대리키) -->
+            , A."STAT_YM" AS "STAT_YM"    <!-- 통계연월 VARCHAR(6) ← STAT_YM (이름 일치 자동, 의미 확인) -->
+            , A."MENU_CD" AS "MENU_CD"    <!-- 메뉴코드 VARCHAR(20) ← MENU_CD (이름 일치 자동, 의미 확인) -->
+            , UPPER(A."DEVICE_CD") AS "DEVICE_CD"    <!-- 기기 VARCHAR(10) ← DEVICE_CD (이름 일치 자동, 의미 확인) -->
+            , A."HIT_CNT" AS "HIT_CNT"    <!-- 클릭수 BIGINT ← HIT_CNT (이름 일치 자동, 의미 확인) -->
+            , A."MEMBER_HIT_CNT" AS "MEMBER_HIT_CNT"    <!-- 회원클릭 BIGINT ← MEMBER_HIT_CNT (이름 일치 자동, 의미 확인) -->
+            , A."GUEST_HIT_CNT" AS "GUEST_HIT_CNT"    <!-- 비회원클릭 BIGINT ← GUEST_HIT_CNT (이름 일치 자동, 의미 확인) -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 VARCHAR(14) ← REG_DATE (감사 컬럼) -->
+          FROM "DEMO"."STAT_MENU_HIT" A
+        <include refid="where"/>
+         ORDER BY A."STAT_YM", A."MENU_CD", A."DEVICE_CD"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

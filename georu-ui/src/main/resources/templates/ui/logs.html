@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('로그')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>로그</h1><p class="page-desc">앱 로그 파일을 끝에서부터 최근 1만 줄 읽어 최신 순으로 보여 줍니다</p></div>
+    <div class="card">
+            <div class="toolbar">
+                <button class="btn sm" type="button" id="fileBtn" data-panel-open="files" title="로그 파일 고르기 (application · sql · gc)">파일 <span class="mono" id="curFile">application.log</span> ▾</button>
+                <select id="level"><option value="">전체 레벨</option><option>ERROR</option><option>WARN</option><option>INFO</option><option>DEBUG</option><option value="RAW">형식 없음(RAW)</option></select>
+                <input class="w-lg ico-search" id="search" placeholder="검색어 (메시지·로거·스레드, migrationId 등)">
+                <select id="size"><option>50</option><option>100</option><option>200</option></select>
+                <button class="btn primary" id="go">조회</button>
+                <label class="check switch"><input type="checkbox" id="auto" data-refresh-ignore> 5초 자동 갱신</label>
+            </div>
+            <div id="logs"><div class="empty">조회 조건을 선택하고 조회를 누르세요</div></div>
+            <div class="pager"><button class="btn sm" id="prev">이전</button><span id="pageInfo" class="small muted"></span><button class="btn sm" id="next">다음</button></div>
+    </div>
+    <aside class="sp" data-panel="files" data-title="로그 파일" data-width="460" data-dock-label="로그 파일" data-dock-icon="file">
+        <div class="small muted">눌러서 고르면 그 파일로 다시 조회하고 닫힙니다 · application.log: 앱 로그 · sql.log: SQL 로그 · gc.log: GC 로그(형식 없음, 줄 그대로)</div>
+        <div id="files"><div class="empty loading">조회 중…</div></div>
+    </aside>
+    <!-- 로그 줄 (todo-task 33 9-2): 목록에는 메시지 한 줄, 누르면 여기에 전체 (스택 포함) -->
+    <aside class="sp" data-panel="line" data-title="로그 줄" data-width="680" data-dock-label="로그 줄" data-dock-icon="code">
+        <div id="lineBox"><div class="empty small">목록에서 줄을 누르면 여기에 메시지 전체가 나옵니다.</div></div>
+    </aside>
+</main>
+<script>
+(function () {
+  const { get, fmtDate, esc, badge, toast, $ } = UI;
+  let page = 0, timer = null, file = 'application.log', rows = [], selKey = null;   // selKey: 로그 줄 패널에 띄운 줄 (자동 갱신 뒤에도 고른 표시 유지)
+  const keyOf = (l) => [l.timestamp, l.thread, l.logger, l.message].join('|');
+  async function load() {
+    const q = new URLSearchParams({ page, size: $('#size').value });
+    if ($('#level').value) q.set('level', $('#level').value);
+    if ($('#search').value.trim()) q.set('search', $('#search').value.trim());
+    q.set('file', file);
+    try {
+      const d = await get('/api/status/logs?' + q);
+      const list = rows = d.content || [];
+      // 메시지는 한 줄(넘치면 …), 여러 줄(스택)이면 +N줄. 줄을 누르면 오른쪽 로그 줄 패널에 전체 (todo-task 33 9-2)
+      $('#logs').innerHTML = list.length ? `<table class="list"><tr><th>시각</th><th>레벨</th><th>로거</th><th>메시지</th></tr>` +
+        list.map((l, i) => `<tr class="clickable${keyOf(l) === selKey ? ' sel' : ''}" data-i="${i}" tabindex="0" title="누르면 메시지 전체"><td class="nowrap mono">${l.timestamp ? UI.fmtDate(l.timestamp) : ''}</td><td>${badge(l.level)}</td><td class="small muted" title="${esc(l.logger || '')} [${esc(l.thread || '')}]">${esc((l.logger || '').split('.').pop())}</td><td class="mono log-msg">${msg(l.message)}</td></tr>`).join('') + '</table>'
+        : '<div class="empty">결과 없음</div>';
+      document.querySelectorAll('#logs tr[data-i]').forEach(tr => {
+        tr.onclick = (e) => { if (!e.target.closest('a,button')) select(Number(tr.dataset.i)); };
+        tr.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); select(Number(tr.dataset.i)); } };
+      });
+      if (selKey != null && UI.panel.isOpen('line')) { const i = list.findIndex(l => keyOf(l) === selKey); if (i >= 0) fill(i); }
+      const p = d.page || {}; $('#pageInfo').textContent = `${(p.number ?? page) + 1} / ${p.totalPages ?? '?'} 페이지 · 총 ${p.totalElements ?? '?'}건`;
+      $('#prev').disabled = page <= 0; $('#next').disabled = p.last === true;
+    } catch (e) { $('#logs').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  /** 목록 칸: 첫 줄만 한 줄로, 이어지는 줄이 있으면 +N줄 배지 (전체는 로그 줄 패널) */
+  function msg(m) {
+    const t = String(m ?? ''), i = t.indexOf('\n');
+    const n = i < 0 ? 0 : t.slice(i + 1).split('\n').length;
+    return `<div class="lm"><span class="cut1">${esc(i < 0 ? t : t.slice(0, i))}</span>${n ? `<span class="badge" title="여러 줄 - 눌러서 전체">+${n}줄</span>` : ''}</div>`;
+  }
+  /** i 번째 줄을 패널에 (이전 · 다음 = 목록의 앞뒤 줄) */
+  function fill(i) {
+    const l = rows[i]; if (!l) return;
+    const m = String(l.message ?? '');
+    const mid = (/migrationId[=:]\s*([0-9a-fA-F-]{8,})/.exec(m) || [])[1];
+    const logger = l.logger || '';
+    $('#lineBox').innerHTML = `<div class="sp-sum"><div><b class="mono">${esc(logger.split('.').pop() || '-')}</b> <span class="muted small">· ${l.timestamp ? fmtDate(l.timestamp) : ''}</span></div><div class="inline">${badge(l.level)}</div></div>`
+      + '<table class="list"><tbody>'
+      + `<tr><th>시각</th><td class="mono">${l.timestamp ? fmtDate(l.timestamp) : '-'}</td></tr>`
+      + `<tr><th>로거</th><td class="mono small">${esc(logger || '-')}</td></tr>`
+      + `<tr><th>스레드</th><td class="mono small">${esc(l.thread || '-')}</td></tr>`
+      + (mid ? `<tr><th>migrationId</th><td class="mono small">${esc(mid)}</td></tr>` : '')
+      + '</tbody></table>'
+      + `<h3 class="sp-h">메시지</h3><pre class="msg-pre log">${esc(m)}</pre>`
+      + '<div class="inline mt-10"><button class="btn sm" type="button" id="lineCopy">복사</button>'
+      + (mid ? `<a class="btn sm" href="/ui/history?migrationId=${encodeURIComponent(mid)}">이 실행 이력</a><button class="btn sm" type="button" id="lineFind" data-panel-close>이 migrationId 로 검색</button>` : '')
+      + '</div>';
+    $('#lineCopy').onclick = async () => { try { await navigator.clipboard.writeText(m); toast('복사됨', 'ok'); } catch (e) { toast('클립보드에 쓸 수 없습니다: ' + e.message, 'err'); } };
+    if (mid) $('#lineFind').onclick = () => { $('#search').value = mid; page = 0; load(); };
+    UI.panel.nav('line', i > 0 ? () => select(i - 1) : null, i < rows.length - 1 ? () => select(i + 1) : null);
+  }
+  function select(i) {
+    const l = rows[i]; if (!l) return;
+    selKey = keyOf(l);
+    document.querySelectorAll('#logs tr[data-i]').forEach(tr => tr.classList.toggle('sel', Number(tr.dataset.i) === i));
+    fill(i);
+    UI.panel.open('line');
+  }
+  async function loadFiles() {
+    try {
+      const files = await get('/api/status/logs/files') || [];
+      // 목록 묶음 (todo-task 33 C2 · T23): 파일 아이콘 · 이름 · 크기 · 수정 시각. 지금 파일은 aria-current
+      $('#files').innerHTML = files.length ? '<div class="file-list">' + files.map(f => `<button type="button" class="file-item" data-file="${esc(f.name)}" data-panel-close${f.name === file ? ' aria-current="true"' : ''}><span class="f-ico">${UI.ico('file')}</span><span class="f-txt"><b class="mono">${esc(f.name)}</b><span>${esc(f.size)} · ${UI.fmtShort(f.lastModified)}</span></span></button>`).join('') + '</div>' : '<div class="empty">없음</div>';
+      document.querySelectorAll('#files [data-file]').forEach(el => el.onclick = () => { file = el.dataset.file; $('#curFile').textContent = file; page = 0; load(); loadFiles(); });
+    } catch (e) { $('#files').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  $('#go').onclick = () => { page = 0; load(); };
+  $('#search').addEventListener('keydown', e => { if (e.key === 'Enter') { page = 0; load(); } });
+  $('#prev').onclick = () => { if (page > 0) { page--; load(); } };
+  $('#next').onclick = () => { page++; load(); };
+  $('#auto').onchange = (e) => { if (e.target.checked) { load(); timer = setInterval(load, 5000); } else { clearInterval(timer); timer = null; } };
+  UI.panel.on('files', loadFiles);   // 열 때마다 크기 · 수정 시각을 새로
+  loadFiles(); load();
+})();
+</script>
+</body>
+</html>

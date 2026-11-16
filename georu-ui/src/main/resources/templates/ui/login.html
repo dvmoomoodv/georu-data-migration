@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="'로그인 - ' + ${brand ?: 'Georu'}">로그인 - Georu</title>
+    <link rel="icon" type="image/svg+xml" th:href="@{/ui-assets/georu-mark.svg}">
+    <link rel="stylesheet" th:href="@{/ui-assets/ui.css}">
+    <link rel="stylesheet" th:href="@{/ui-assets/theme-georu.css}">
+    <link rel="stylesheet" th:href="@{/ui-assets/components.css}">
+</head>
+<body class="login">
+<main class="login-card" role="main">
+    <h1><img th:src="@{/ui-assets/georu-mark.svg}" alt="" width="40" height="40"><span class="brand-name" th:text="${brand ?: 'Georu'}">Georu</span></h1>
+    <p class="sub">운영 UI 로그인</p>
+
+    <div class="alert err small" th:if="${param.error}">아이디 또는 비밀번호가 맞지 않습니다.</div>
+    <div class="alert err small" th:if="${param.locked}">로그인 5회 실패로 잠겼습니다. 약 <b th:text="${param.locked[0]}">15</b>분 뒤 다시 시도하세요.</div>
+    <div class="alert warn small" th:if="${param.logout}">로그아웃했습니다.</div>
+    <div class="alert err small" th:if="${param.disabled}">사용 중지되었거나 지워진 계정입니다. 관리자에게 문의하세요.</div>
+    <div class="alert ok small" th:if="${param.setup}">관리자 비밀번호를 정했습니다. 그 비밀번호로 로그인하세요.</div>
+    <div class="alert warn small" th:if="${param.reason == null ? false : param.reason[0] == 'idle'}">입력이 없어 자동으로 로그아웃했습니다 (유휴 잠금). 다시 로그인하세요.</div>
+    <div class="alert warn small" th:if="${param.reason == null ? false : param.reason[0] == 'expired'}">세션이 끝났습니다. 다시 로그인하세요.</div>
+
+    <form method="post" th:action="@{/login}">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        <div class="field"><label for="username">아이디</label><input id="username" name="username" autocomplete="username" autofocus required></div>
+        <div class="field"><label for="password">비밀번호</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
+        <button class="btn primary" type="submit">로그인</button>
+    </form>
+
+    <details th:open="${param.error != null or param.locked != null}">
+        <summary>비밀번호를 잊었거나 처음 띄웠나요?</summary>
+        <ol>
+            <li><b>처음 띄웠을 때</b>: 관리자 계정이 없으면 이 화면 대신 <b>초기 설정</b> 화면이 떠서 거기서 <code>admin</code> 의 비밀번호를 정합니다. 서버는 비밀번호를 만들지도 로그에 남기지도 않습니다.</li>
+            <li><b>잊었을 때</b>: 서버 운영자가 환경 변수 <code>GEORU_ADMIN_RESET_PASSWORD=true</code> 로 앱을 한 번 재기동하면 비밀번호가 지워지고, 다음 접속이 다시 초기 설정 화면이 됩니다. 정한 뒤 그 환경 변수를 지웁니다.</li>
+            <li>잠겼을 때는 15분 뒤 다시 시도하거나, 위 리셋을 하면 바로 풀립니다.</li>
+        </ol>
+        <div class="mt-6">자세한 절차: <a th:href="@{/api/ui/guides/login}" target="_blank">안내서 "로그인 · 접근 통제"</a></div>
+    </details>
+    <div class="ver" th:if="${georuVersion}" th:text="'Georu ' + ${georuVersion}">Georu</div>
+</main>
+</body>
+</html>

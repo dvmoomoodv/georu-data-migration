@@ -1,0 +1,24 @@
+plugins {
+    id 'georu.java-library'
+}
+
+description = 'georu REST API: 이관 실행·조회·보고서(CSV·XLSX·PDF), Swagger'
+
+dependencies {
+    api project(':georu-core')
+    implementation project(':georu-codegen')             // 이관 설계 도구 (코드 생성)
+    implementation libs.spring.data.commons              // 로그 조회 API 가 엔진 내부 서비스의 Page 를 받는다
+
+    implementation libs.spring.boot.starter.web
+    implementation libs.spring.boot.starter.thymeleaf    // PDF 보고서 템플릿 (templates/report)
+    implementation libs.springdoc.webmvc.ui
+    implementation libs.springdoc.webmvc.api
+    implementation libs.swagger.annotations
+    implementation libs.swagger.models
+    implementation libs.openhtmltopdf.pdfbox             // HTML → PDF
+    implementation libs.poi                              // XLSX 보고서
+    implementation libs.poi.ooxml
+
+    testImplementation libs.spring.batch.test
+    testRuntimeOnly libs.h2
+}

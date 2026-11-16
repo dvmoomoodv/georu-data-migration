@@ -1,0 +1,4 @@
+// 루트: 버전만 정한다. 모듈 규칙은 build-logic/ (georu.java-library, georu.boot-app), 의존성 버전은 gradle/libs.versions.toml
+allprojects {
+    version = '0.0.1'
+}

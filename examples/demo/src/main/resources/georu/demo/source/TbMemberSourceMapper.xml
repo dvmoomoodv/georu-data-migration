@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_member : 회원 ← ASIS(Oracle) MEM_MEMBER : 회원 (매핑 추정, 미확정)
+     자동 매핑 12 / 수기 매핑 5 (TOBE 컬럼 17, apply_demo_mapping.py 적용)
+     자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.member.TbMemberSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+        AND A."STATUS" &lt;&gt; 'D'    <!-- 탈퇴(삭제) 회원 제외 -->
+        <if test="startDate != null and startDate != ''">AND A."JOIN_DT" &gt;= TO_DATE(#{startDate}, 'YYYYMMDD')</if>
+        <if test="endDate != null and endDate != ''">AND A."JOIN_DT" &lt; TO_DATE(#{endDate}, 'YYYYMMDD') + 1</if>
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."MEM_MEMBER" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbMemberSourceDto">
+        SELECT
+              A."MEMBER_ID" AS "MEMBER_ID"    <!-- 회원ID INT ← MEMBER_ID (이름 일치 자동, 의미 확인) -->
+            , A."LOGIN_ID" AS "LOGIN_ID"    <!-- 로그인ID VARCHAR(50) ← LOGIN_ID (이름 일치 자동, 의미 확인) -->
+            , A."MEMBER_NM" AS "MEMBER_NM"    <!-- 회원명 VARCHAR(50) ← MEMBER_NM (이름 일치 자동, 의미 확인) -->
+            , A."PASSWORD_HASH" AS "PASSWORD_HASH"    <!-- 비밀번호해시 VARCHAR(128) ← PASSWORD_HASH (이름 일치 자동, 의미 확인) -->
+            , A."GENDER" AS "GENDER"    <!-- 성별 CHAR(1) ← GENDER (이름 일치 자동, 의미 확인) -->
+            , TO_CHAR(A."BIRTH_DT", 'YYYYMMDD') AS "BIRTH_YMD"    <!-- 생년월일 VARCHAR(8) ← BIRTH_DT (수기) -->
+            , A."EMAIL" AS "EMAIL"    <!-- 이메일 VARCHAR(100) ← EMAIL (이름 일치 자동, 의미 확인) -->
+            , REPLACE(A."PHONE", '-', '') AS "PHONE"    <!-- 전화 VARCHAR(20) ← PHONE (이름 일치 자동, 의미 확인) -->
+            , A."GRADE_CD" AS "GRADE_CD"    <!-- 등급코드 VARCHAR(10) ← GRADE_CD (이름 일치 자동, 의미 확인) -->
+            , A."STATUS" AS "STATUS"    <!-- 상태 VARCHAR(10) ← STATUS (이름 일치 자동, 의미 확인) -->
+            , TO_CHAR(A."JOIN_DT", 'YYYYMMDDHH24MISS') AS "JOIN_DATE"    <!-- 가입일시 VARCHAR(14) ← JOIN_DT (수기) -->
+            , TO_CHAR(A."LAST_LOGIN_DT", 'YYYYMMDDHH24MISS') AS "LAST_LOGIN_DATE"    <!-- 최근로그인 VARCHAR(14) ← LAST_LOGIN_DT (수기) -->
+            , A."POINT" AS "POINT"    <!-- 포인트 INT ← POINT (이름 일치 자동, 의미 확인) -->
+            , A."REG_ID" AS "INUSERID"    <!-- 등록자 VARCHAR(40) ← REG_ID (수기) -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 VARCHAR(14) ← REG_DATE (감사 컬럼) -->
+            , A."MOD_ID" AS "LUSERID"    <!-- 수정자 VARCHAR(40) ← MOD_ID (수기) -->
+            , TO_CHAR(A."MOD_DATE", 'YYYYMMDDHH24MISS') AS "LDATE"    <!-- 수정일시 VARCHAR(14) ← MOD_DATE (감사 컬럼) -->
+          FROM "DEMO"."MEM_MEMBER" A
+        <include refid="where"/>
+         ORDER BY A."MEMBER_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

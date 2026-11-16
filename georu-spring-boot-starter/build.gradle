@@ -1,0 +1,15 @@
+plugins {
+    id 'georu.java-library'
+}
+
+description = 'georu starter: 사용자 앱이 추가하는 georu 의존성 (엔진 + API + UI + 자동 설정). 소스 · 타겟 JDBC 드라이버는 사용자 앱이 고른다'
+
+dependencies {
+    api project(':georu-spring-boot-autoconfigure')
+    api project(':georu-core')
+    api project(':georu-api')
+    api project(':georu-ui')
+
+    // 운영 저장소 기본값(내장 H2 파일)만 넣는다. 소스 · 타겟 DB 드라이버(Oracle · MySQL 등)는 사용자 앱이 고른다 (안내서 jdbc-driver)
+    runtimeOnly libs.h2
+}

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('권한 없음')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>권한 없음</h1></div>
+    <div class="card error-page"><span class="err-ico"><span data-ico="lock" data-ico-class="ico lg"></span></span><div class="err-code">403</div>
+        <h2>이 메뉴를 볼 권한이 없습니다<span th:if="${forbiddenPath != null and forbiddenPath != ''}"> <span class="mono small" th:text="${forbiddenPath}">/ui/…</span></span></h2>
+        <p>볼 수 있는 메뉴는 왼쪽에 있습니다. 이 메뉴가 필요하면 관리자에게 권한을 요청하세요<span th:if="${loginRole != null and loginRole != ''}"> (지금 권한: <b th:text="${loginRole}">조회자</b>)</span>.</p>
+        <div class="inline"><a class="btn primary" th:href="@{/ui}">첫 화면으로</a><a class="btn" th:href="@{/ui/account}">내 계정</a></div>
+    </div>
+</main>
+</body>
+</html>

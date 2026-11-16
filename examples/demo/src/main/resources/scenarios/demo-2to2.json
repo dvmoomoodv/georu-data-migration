@@ -1,0 +1,55 @@
+{
+  "id": "demo-2to2",
+  "name": "여러 DB 2:2",
+  "description": "본사·지사 2곳 → 운영·분석 2곳: 짝지어 나누기, 합치기 후 2단계 적재, 결합 후 나누기. 분석 DB 채번은 demo_dw 자체의 seq_master (이름·열이 다른 관리 테이블) (docker 프로파일, guides/demo.md 의 \"여러 DB\")",
+  "profiles": [
+    "docker"
+  ],
+  "onUnitFailure": "STOP",
+  "onStepStop": "STOP_ALL",
+  "common": {
+    "tenantLevel1": "DEMO",
+    "tenantLevel2": "DEMO",
+    "tenantLevel3": "DEMO",
+    "tenantLevel4": "DEMO",
+    "tenantLevel5": "DEMO",
+    "chunkSize": 500
+  },
+  "steps": [
+    {
+      "plugin": "demo.member",
+      "table": "tb_member",
+      "label": "회원 (→ target-m)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "tb_br_member",
+      "label": "지사 회원 (2:2 짝지어 나누기 → target-1, target-m 에서 채번)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "stg_member_hq",
+      "label": "회원 합치기 - 본사 (2:1 합치기, src_cd HQ)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "stg_member_br",
+      "label": "회원 합치기 - 지사 (2:1 합치기, src_cd BR)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "tb_member_all",
+      "label": "전체 회원 (2:2 2단계 적재: target-m → target-1)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "tb_member_point",
+      "label": "회원 포인트 (2:1 결합: SourceLookup)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "tb_member_point_dw",
+      "label": "회원 포인트 (2:2 결합 후 나누기 → target-1)"
+    }
+  ]
+}

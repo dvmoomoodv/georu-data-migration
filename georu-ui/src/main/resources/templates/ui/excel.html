@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('엑셀 이관')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<div th:replace="~{ui/layout :: gate}"></div>
+<main>
+    <div class="page-head"><h1>엑셀 이관</h1><p class="page-desc">업로드한 엑셀(TOBE 컬럼 헤더)을 테이블 이관과 같은 순서로 적재 · 한 번에 한 이관만</p></div>
+    <div id="envStrip"></div>
+    <!-- 단계 표시 (todo-task 33 C3): 고른 파일의 상태를 따른다 (없으면 1) -->
+    <div class="stepper" id="xlSteps" aria-label="엑셀 이관 단계"><span class="step active" data-step="1"><span class="no">1</span><span><b>업로드</b><small>템플릿 · 파일 올리기</small></span></span><span class="line"></span><span class="step" data-step="2"><span class="no">2</span><span><b>검증</b><small>올리면 바로 · 차단 / 경고</small></span></span><span class="line"></span><span class="step" data-step="3"><span class="no">3</span><span><b>적재</b><small>시험 모드 → NORMAL</small></span></span></div>
+    <div class="split">
+        <div class="stack">
+            <div class="card" data-collapse="upload" data-collapse-sum="#pluginName,#tableName">
+                <h2>1. 템플릿 · 업로드</h2>
+                <form class="f" id="upForm" onsubmit="return false">
+                    <div class="field"><label>플러그인</label>
+                        <select id="pluginName"><option value="">선택</option>
+                            <option th:each="e : ${catalog}" th:value="${e.key}" th:text="${e.key} + ' (' + ${#lists.size(e.value)} + ')'"></option>
+                        </select></div>
+                    <div class="field"><label>테이블 <span class="muted" id="tableCount"></span></label>
+                        <input id="tableName" list="tableList" placeholder="플러그인을 먼저 선택" autocomplete="off"><datalist id="tableList"></datalist></div>
+                    <div class="full inline">
+                        <button class="btn sm" id="btnBinding" type="button" title="타겟 컬럼 ↔ DTO 대응, 필수·감사·채번 컬럼">컬럼 대응표</button>
+                        <button class="btn sm" id="btnTemplate" type="button" title="헤더 + 컬럼 설명 시트가 든 xlsx">템플릿 내려받기</button>
+                        <span class="small muted">헤더는 타겟 컬럼명 · 형식은 <a href="#" data-panel-open="help">? 도움말</a></span>
+                    </div>
+                    <div class="field full">
+                        <div id="drop" class="dropzone" tabindex="0"><span class="dz-ico"><span data-ico="upload" data-ico-class="ico lg"></span></span><span class="dz-main">파일을 끌어다 놓거나 <u>찾아보기</u></span><span class="dz-sub">xlsx · csv · 최대 50MB</span><div id="dropName" class="small mono"></div></div>
+                        <input type="file" id="file" accept=".xlsx,.csv" style="display:none">
+                        <div class="mt-6 small muted" id="limitInfo"></div>
+                        <div id="sizeAlert" class="mt-6"></div>
+                    </div>
+                    <div class="full inline"><button class="btn primary" id="btnUpload" type="button" data-write>업로드 (저장 후 즉시 검증)</button><span class="small muted" id="upStatus"></span></div>
+                </form>
+            </div>
+        </div>
+        <div class="stack">
+            <div class="card">
+                <div class="card-head"><h2>파일 목록 <span class="small muted" id="counts"></span></h2>
+                    <div class="inline"><select id="fStatus"><option value="">상태 전체</option><option>UPLOADED</option><option>VALIDATED</option><option>INVALID</option><option>RUNNING</option><option>COMPLETED</option><option>FAILED</option></select>
+                        <input class="w-sm ico-search" id="fTable" placeholder="테이블"><button class="btn sm" id="btnReload" type="button">새로고침</button></div></div>
+                <div id="list" class="mt-8"><div class="empty small loading">불러오는 중…</div></div>
+            </div>
+            <div class="card" id="runCard">
+                <h2>2. 실행 <span class="small muted" id="runTarget">파일 목록에서 파일을 선택하세요</span></h2>
+                <form class="f" id="runForm" onsubmit="return false">
+                    <div class="field full">
+                        <label>테스트 모드 <span class="muted">(기본 WRITER_TEST. NORMAL 은 실제 적재 후 파일을 completed 로 이동)</span></label>
+                        <div class="choice">
+                            <label><input type="radio" name="testMode" value="WRITER_TEST" checked> WRITER_TEST <span class="muted small">실제 적재 ≤100건, 등록자 MIG-TEST</span></label>
+                            <label><input type="radio" name="testMode" value="READER_TEST"> READER_TEST <span class="muted small">읽기만</span></label>
+                            <label><input type="radio" name="testMode" value="PROCESSOR_TEST"> PROCESSOR_TEST <span class="muted small">변환 검증, 적재 없음</span></label>
+                            <label class="danger"><input type="radio" name="testMode" value="NORMAL"> NORMAL <span class="muted small">전체 적재</span></label>
+                        </div>
+                    </div>
+                    <div class="field full"><span class="badge NOT_RUN" title="엑셀 이관은 소스 샘플이 없어 자동 실행 전 점검을 하지 않습니다">자동 점검 해당 없음</span> <span class="small muted">엑셀 이관은 자동 실행 전 점검 대신 <b>업로드 검증</b>(타겟 컬럼 길이 · NOT NULL · 타입)을 씁니다. 이관 상태 · 기존 데이터 확인은 테이블 실행과 같습니다.</span></div>
+                    <div class="field"><label>오류 행 처리 <span class="muted">(onRowError)</span></label>
+                        <select id="onRowError"><option value="STOP">STOP - 검증 차단이 있으면 실행 안 함, 실행 중 오류는 Job 실패 (기본)</option><option value="SKIP">SKIP - 오류 행만 건너뛰고 적재, 목록 기록</option></select></div>
+                    <div class="field"><label>청크 크기</label><input id="chunkSize" type="number" min="1" max="10000" value="200"></div>
+                    <div class="field"><label>테스트 최대 건수 <span class="muted">(1~100, 비우면 모드 기본값)</span></label><input id="testMaxItems" type="number" min="1" max="100" placeholder="READER 5 / 그 외 100"></div>
+                    <div class="field"><label class="check"><input type="checkbox" id="ignoreExistingData"> 기존 데이터가 있어도 적재 <span class="muted small">(NORMAL · 쿼리가 UPSERT·IGNORE 일 때)</span></label></div>
+                    <div class="field full"><details><summary>테넌트 (기본 DEFAULT)</summary>
+                        <div class="mt-8 tenant5"><input id="t1" value="DEFAULT" placeholder="그룹" title="tenantLevel1 (그룹)"><input id="t2" value="DEFAULT" placeholder="계열사" title="tenantLevel2 (계열사)"><input id="t3" value="DEFAULT" placeholder="사업부" title="tenantLevel3 (사업부)"><input id="t4" value="DEFAULT" placeholder="부서" title="tenantLevel4 (부서)"><input id="t5" value="DEFAULT" placeholder="팀" title="tenantLevel5 (팀)"></div><div class="hint">그룹 · 계열사 · 사업부 · 부서 · 팀 - 소스에 단위 컬럼이 없으면 회사명으로 모두 채웁니다</div></details></div>
+                    <div class="full inline">
+                        <button class="btn primary" id="btnRun" type="button" disabled data-write>지금 실행</button>
+                        <button class="btn" id="btnCopyJson" type="button" disabled>JSON 복사</button>
+                        <span class="small muted">실행 결과는 실행 현황·이력 화면에서 추적합니다 (migrationId).</span>
+                    </div>
+                </form>
+                <div id="runResult" class="mt-8"></div>
+            </div>
+        </div>
+    </div>
+    <!-- 파일 상세 (todo-task 33 9-2): 목록 행을 누르면 열린다. 예전 "선택 파일" 카드 - id(#dTitle · #detail)는 그대로 -->
+    <aside class="sp" data-panel="file" data-title="파일 상세" data-width="70%" data-dock-label="파일 상세" data-dock-icon="file">
+        <h3 class="sp-h" id="dTitle">선택 파일</h3>
+        <div id="detail"><div class="empty small">파일 목록에서 행을 누르면 여기에 검증 결과 · 건너뛴 행이 나옵니다.</div></div>
+    </aside>
+    <aside class="sp" data-panel="binding" data-title="컬럼 대응표" data-width="760" data-dock-label="컬럼 대응" data-dock-icon="table">
+        <div class="small muted">타겟 컬럼 ↔ DTO 대응, 필수 · 감사 · 채번 컬럼 (1. 템플릿 · 업로드의 플러그인 · 테이블 기준)</div>
+        <div id="bindingBox"></div>
+    </aside>
+    <aside class="sp" data-panel="preview" data-title="미리보기" data-width="70%" data-dock-label="미리보기" data-dock-icon="search">
+        <div id="previewBox"><div class="empty small">파일 목록에서 파일을 고르고 <b>미리보기</b> 를 누르면 앞 20행이 나옵니다.</div></div>
+    </aside>
+    <aside class="sp" data-panel="split" data-title="큰 파일 나눠 올리기" data-width="600" data-more-desc="상한을 넘거나 넘을 것 같으면 행 범위로 나눠 파일 여러 개로" data-dock-label="나눠 올리기" data-dock-icon="zip">
+        <div class="small muted">상한을 넘거나 넘을 것 같으면 한 테이블을 행 범위로 나눠 파일 여러 개로 올립니다</div>
+                    <ol class="small" style="margin:8px 0 8px 18px;padding:0">
+                        <li>데이터 행 수와 열 수를 넣고 "계산" → 파일당 행 수와 파일별 범위가 나옵니다 (예: 1~1,000행 파일 1개, 1,001~2,000행 파일 1개).</li>
+                        <li>원본을 범위대로 나눕니다. <b>파일마다 1행 헤더를 그대로 둡니다.</b> 이름은 제안 이름처럼 순번·범위를 붙이면 순서를 잃지 않습니다.</li>
+                        <li>같은 테이블로 하나씩 업로드 → 검증 통과를 확인합니다. 파일 사이 PK 중복은 검증하지 않으니 범위가 겹치지 않게 나눕니다.</li>
+                        <li>첫 파일부터 차례로 실행합니다. 두 번째 파일부터는 앞 파일이 넣은 데이터 때문에 NORMAL 이 "기존 데이터" 로 멈추므로 <b>"기존 데이터가 있어도 적재"</b>를 켭니다.</li>
+                        <li>행이 많으면 xlsx 대신 CSV(UTF-8) 로 저장하면 셀 수 제한이 없습니다 (파일 크기 상한만 적용).</li>
+                    </ol>
+                    <div class="inline">
+                        <label class="small">데이터 행 수 <input class="w-sm" id="spRows" type="number" min="1" placeholder="헤더 제외"></label>
+                        <label class="small">열 수 <input class="w-xs" id="spCols" type="number" min="1"></label>
+                        <button class="btn sm" id="btnSplit" type="button">계산</button>
+                    </div>
+                    <div id="splitResult" class="mt-8"></div>
+    </aside>
+</main>
+<script th:inline="javascript">
+(function () {
+  const { get, post, del, esc, badge, num, fmtDate, toast, confirmModal, $ } = UI;
+  const CATALOG = /*[[${catalog}]]*/ {};
+  const v = (id) => ($('#' + id).value || '').trim();
+  let selected = null, pollTimer = null, LIMITS = null;
+  const mb = (b) => (b / 1024 / 1024).toFixed(b < 10 * 1024 * 1024 ? 1 : 0) + 'MB';
+
+  // ---------- 크기 제한 (서버 설정값)
+  async function loadLimits() {
+    try {
+      LIMITS = await get('/api/excel-load/limits');
+      $('#limitInfo').innerHTML = `크기 제한: 파일 <b>${mb(LIMITS.maxUploadBytes)}</b> 이하 · xlsx 셀(행×열, 헤더 포함) <b>${num(LIMITS.xlsxMaxCells)}</b> 개 이하 (권장 ${num(LIMITS.xlsxRecommendedCells)} 개)`
+        + (LIMITS.csvMaxRows > 0 ? ` · CSV ${num(LIMITS.csvMaxRows)}행 이하` : ' · CSV 는 셀 수 제한 없음')
+        + ` · 넘으면 <a href="#" id="openSplit">나눠 올리기</a>`;
+      const os = $('#openSplit'); if (os) os.onclick = (e) => { e.preventDefault(); openSplit(); };
+    } catch (e) { $('#limitInfo').textContent = '크기 제한을 불러오지 못했습니다: ' + e.message; }
+  }
+  function openSplit(rows, cols) {
+    UI.panel.open('split');
+    if (rows) $('#spRows').value = rows;
+    if (cols) $('#spCols').value = cols;
+    if (rows && cols) $('#btnSplit').onclick();
+  }
+  function planHtml(p, title) {
+    const rows = (p.ranges || []).map(r => `<tr><td>${r.no}</td><td>${num(r.fromRow)} ~ ${num(r.toRow)}</td><td class="small">엑셀 ${num(r.fromRow + 1)} ~ ${num(r.toRow + 1)}행</td><td class="mono small">${esc(r.suggestedName)}</td></tr>`).join('');
+    return `<div class="alert info small">${esc(title || '')} 데이터 <b>${num(p.dataRows)}</b>행 × <b>${num(p.columns)}</b>열 → 파일당 <b>${num(p.rowsPerFile)}</b>행씩 <b>${num(p.files)}</b>개 (파일당 셀 ≈ ${num((p.rowsPerFile + 1) * p.columns)}, 권장 ${num(p.recommendedCells)})</div>
+      <table class="small"><tr><th>#</th><th>데이터 행</th><th>원본 위치 (헤더=1행)</th><th>제안 파일명</th></tr>${rows}</table>
+      ${p.files > (p.ranges || []).length ? '<div class="small muted">앞 ' + (p.ranges || []).length + '개만 표시</div>' : ''}
+      <div class="mt-4 small muted">파일마다 1행 헤더를 넣고, 두 번째 파일부터 NORMAL 실행 시 "기존 데이터가 있어도 적재"를 켭니다.</div>`;
+  }
+  $('#btnSplit').onclick = async () => {
+    const rows = Number(v('spRows')), cols = Number(v('spCols'));
+    if (!rows || !cols) { toast('데이터 행 수와 열 수를 넣으세요', 'err'); return; }
+    try { const p = await get(`/api/excel-load/split-plan?dataRows=${rows}&columns=${cols}&tableName=${encodeURIComponent(v('tableName'))}`); $('#splitResult').innerHTML = planHtml(p); }
+    catch (e) { $('#splitResult').innerHTML = `<div class="alert err small">${esc(e.message)}</div>`; }
+  };
+
+  /** 업로드 전 확인: 확장자·파일 크기. 셀 수는 서버가 업로드 직후 센다 */
+  function checkFile(f) {
+    if (!f) { $('#sizeAlert').innerHTML = ''; return true; }
+    const ext = (f.name.split('.').pop() || '').toLowerCase();
+    const allowed = LIMITS ? LIMITS.allowedExtensions : ['xlsx', 'csv'];
+    let msg = null;
+    if (!allowed.includes(ext)) msg = `.${esc(ext)} 은(는) 받지 않습니다 (${allowed.join(', ')}). xls 는 엑셀에서 xlsx 또는 CSV(UTF-8) 로 다시 저장하세요.`;
+    else if (LIMITS && f.size > LIMITS.maxUploadBytes) msg = `파일이 ${mb(f.size)} 로 상한 ${mb(LIMITS.maxUploadBytes)} 를 넘습니다. 같은 테이블에 행 범위로 나눠 여러 파일로 올리세요 (예: 1~1,000행 파일 1개, 1,001~2,000행 파일 1개). <a href="#" id="sizeSplit">나눠 올리기 계산</a>`;
+    if (msg) {
+      $('#sizeAlert').innerHTML = `<div class="alert err small">${msg}</div>`;
+      const ss = $('#sizeSplit'); if (ss) ss.onclick = (e) => { e.preventDefault(); openSplit(); };
+      return false;
+    }
+    const warnXlsx = ext === 'xlsx' && f.size > 10 * 1024 * 1024;
+    $('#sizeAlert').innerHTML = warnXlsx ? `<div class="alert warn small">xlsx ${mb(f.size)} 는 셀 수가 상한을 넘을 수 있습니다. 넘으면 업로드 직후 거부되고 나누는 방법을 안내합니다. 행이 많으면 CSV(UTF-8) 가 안전합니다.</div>` : '';
+    return true;
+  }
+
+  // ---------- 플러그인 → 테이블
+  $('#pluginName').onchange = () => {
+    const tables = CATALOG[v('pluginName')] || [];
+    $('#tableList').innerHTML = tables.map(t => `<option value="${esc(t)}">`).join('');
+    $('#tableCount').textContent = tables.length ? '(' + tables.length + ')' : '';
+    $('#tableName').placeholder = tables.length ? '테이블명 입력 또는 선택' : '이 플러그인에는 테이블이 없습니다';
+  };
+  function needTable() { if (!v('pluginName') || !v('tableName')) { toast('플러그인과 테이블을 선택하세요', 'err'); return false; } return true; }
+  $('#btnTemplate').onclick = () => { if (!needTable()) return; location.href = '/api/excel-load/template?pluginName=' + encodeURIComponent(v('pluginName')) + '&tableName=' + encodeURIComponent(v('tableName')); };
+  $('#btnBinding').onclick = async () => {
+    if (!needTable()) return;
+    UI.panel.title('binding', '컬럼 대응표 · ' + v('tableName'));
+    $('#bindingBox').innerHTML = '<div class="empty small loading">불러오는 중…</div>'; UI.panel.open('binding');
+    try { const b = await get('/api/excel-load/binding?pluginName=' + encodeURIComponent(v('pluginName')) + '&tableName=' + encodeURIComponent(v('tableName'))); $('#bindingBox').innerHTML = bindingTable(b, null); }
+    catch (e) { $('#bindingBox').innerHTML = `<div class="alert err small">${esc(e.message)}</div>`; }
+  };
+  function bindingTable(b, headers) {
+    const rows = (b.columns || []).map(c => {
+      const inH = headers ? (headers.includes(c.name) ? '✔' : '') : '';
+      return `<tr class="${c.accepted ? '' : 'muted'}"><td class="mono">${esc(c.name)}${c.primaryKey ? ' <span class="badge INFO">PK</span>' : ''}</td><td class="small">${esc(c.describe || '')}</td><td>${c.required ? '<b>필수</b>' : ''}${c.audit ? '<span class="small muted">감사</span>' : ''}${c.sequence ? '<span class="small muted">채번</span>' : ''}</td><td class="mono small">${esc(c.property || '')}${c.javaType ? ' <span class="muted">' + esc(c.javaType) + '</span>' : ''}</td>${headers ? `<td>${inH}</td>` : ''}<td class="small">${c.accepted ? '' : '무시 · '}${esc(c.note || '')}</td></tr>`;
+    }).join('');
+    const notes = (b.notes || []).map(n => `<div class="alert warn small">${esc(n)}</div>`).join('');
+    return `<details open><summary><b>${esc(b.tableName)}</b> → ${esc(b.targetTable)} · DTO <span class="mono small">${esc((b.dtoClass || '').split('.').pop())}</span> · 컬럼 ${num((b.columns || []).length)} · 채번 ${esc((b.sequenceColumns || []).join(',') || '없음')}${b.metaFound ? '' : ' · <span class="badge WARN">메타 없음</span>'}</summary>${notes}
+      <table class="small"><tr><th>컬럼</th><th>타입</th><th>구분</th><th>DTO</th>${headers ? '<th>헤더</th>' : ''}<th>비고</th></tr>${rows}</table></details>`;
+  }
+
+  // ---------- 업로드
+  const fileInput = $('#file'), drop = $('#drop');
+  drop.onclick = () => fileInput.click();
+  drop.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } };
+  fileInput.onchange = () => {
+    const f = fileInput.files[0];
+    $('#dropName').textContent = f ? f.name + ' (' + mb(f.size) + ')' : '';
+    $('#btnUpload').disabled = !checkFile(f);
+  };
+  ['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop', e => { if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; fileInput.onchange(); } });
+  $('#btnUpload').onclick = async () => {
+    if (!needTable()) return;
+    if (!fileInput.files[0]) { toast('파일을 선택하세요', 'err'); return; }
+    if (!checkFile(fileInput.files[0])) { toast('크기 제한을 넘는 파일입니다. 나눠서 올리세요', 'err'); return; }
+    const fd = new FormData(); fd.append('file', fileInput.files[0]); fd.append('pluginName', v('pluginName')); fd.append('tableName', v('tableName'));
+    $('#btnUpload').disabled = true; $('#upStatus').textContent = '업로드·검증 중…';
+    try {
+      const res = await fetch('/api/excel-load/files', { method: 'POST', body: fd, headers: UI_DEFAULT_HEADERS() });
+      let json; try { json = await res.json(); } catch (pe) { json = { success: false, message: 'HTTP ' + res.status + (res.status === 413 ? ' - 업로드 상한을 넘었습니다. 나눠서 올리세요' : '') }; }
+      if (!json.success) {
+        if (json.errorCode === 'EXCEL_TOO_LARGE' && json.data) {
+          $('#sizeAlert').innerHTML = `<div class="alert err small">${esc(json.message)}</div>`;
+          $('#splitResult').innerHTML = planHtml(json.data, '업로드한 파일 기준:');
+          $('#spRows').value = json.data.dataRows; $('#spCols').value = json.data.columns;
+          UI.panel.open('split');   // 크기 초과: 나눠 올리기를 바로 연다
+        } else if (json.errorCode === 'UPLOAD_TOO_LARGE' || res.status === 413) {
+          $('#sizeAlert').innerHTML = `<div class="alert err small">${esc(json.message)}</div>`;
+        }
+        throw new Error((json.errorCode ? '[' + json.errorCode + '] ' : '') + json.message);
+      }
+      toast(json.message || '업로드 완료', json.data && json.data.status === 'INVALID' ? 'err' : 'ok');
+      fileInput.value = ''; $('#dropName').textContent = '';
+      await loadList(); select(json.data.fileId);
+    } catch (e) { toast(e.message, 'err'); }
+    finally { $('#btnUpload').disabled = false; $('#upStatus').textContent = ''; }
+  };
+
+  // ---------- 목록
+  async function loadList() {
+    try {
+      const q = '/api/excel-load/files?limit=200' + (v('fStatus') ? '&status=' + encodeURIComponent(v('fStatus')) : '') + (v('fTable') ? '&tableName=' + encodeURIComponent(v('fTable')) : '');
+      const list = await get(q) || [];
+      const running = list.some(x => x.status === 'RUNNING');
+      $('#counts').textContent = '(' + list.length + (running ? ' · 실행 중' : '') + ')';
+      $('#list').innerHTML = list.length ? `<table class="small list"><tr><th>파일</th><th>테이블</th><th>상태</th><th>행</th><th>차단/경고</th><th>적재/건너뜀</th><th>업로더</th><th>업로드</th><th>폴더</th></tr>` +
+        list.map(x => `<tr class="clickable ${selected && selected.fileId === x.fileId ? 'sel' : ''}" data-id="${esc(x.fileId)}" title="누르면 파일 상세"><td><span class="mono">${esc(x.fileId)}</span><br><span class="small">${esc(x.originalName)}</span>${x.message ? `<span class="small cut1 xl-msg muted">${esc(x.message)}</span>` : ''}</td><td class="mono">${esc(x.tableName)}</td><td>${badge(x.status)}${x.lastTestMode && x.status !== 'RUNNING' ? '<br><span class="small muted">' + esc(x.lastTestMode) + '</span>' : ''}</td><td>${num(x.rowCount)}</td><td>${num(x.blockCount)} / ${num(x.warnCount)}</td><td>${num(x.writtenCount)} / ${num(x.skippedCount)}</td><td class="small">${esc(x.uploadedBy || '')}</td><td class="small">${fmtDate(x.uploadedAt)}</td><td class="small">${esc((x.folder || '').toLowerCase())}</td></tr>`).join('') + '</table>'
+        : '<div class="empty small">업로드한 파일이 없습니다.</div>';
+      document.querySelectorAll('#list tr[data-id]').forEach(tr => tr.onclick = () => select(tr.dataset.id));
+      if (running && !pollTimer) pollTimer = setInterval(() => { loadList(); if (selected) select(selected.fileId, true); }, 5000);
+      if (!running && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+    } catch (e) { $('#list').innerHTML = `<div class="alert err small">${esc(e.message)}</div>`; }
+  }
+  $('#btnReload').onclick = loadList; $('#fStatus').onchange = loadList; $('#fTable').onchange = loadList;
+
+  // ---------- 선택 파일 상세
+  /** 단계 표시: 고른 파일 상태 → 1 업로드 · 2 검증 · 3 적재 (지난 단계는 done) */
+  function steps(status) {
+    const st = String(status || '').toUpperCase();
+    const cur = !st ? 1 : ['RUNNING', 'COMPLETED', 'FAILED'].includes(st) ? 3 : 2;
+    document.querySelectorAll('#xlSteps .step').forEach(el => { const n = Number(el.dataset.step); el.classList.toggle('active', n === cur); el.classList.toggle('done', n < cur); });
+  }
+  async function select(fileId, quiet) {
+    try {
+      const r = await get('/api/excel-load/files/' + encodeURIComponent(fileId));
+      selected = r;
+      $('#pluginName').value = r.pluginName; $('#pluginName').onchange(); $('#tableName').value = r.tableName;
+      $('#runTarget').innerHTML = `<span class="mono">${esc(r.fileId)}</span> ${esc(r.originalName)} → <b>${esc(r.tableName)}</b> ${badge(r.status)}`;
+      const runnable = r.status !== 'RUNNING' && (r.folder || '').toUpperCase() !== 'COMPLETED';
+      $('#btnRun').disabled = !runnable; $('#btnCopyJson').disabled = !runnable;
+      if (!quiet) document.querySelectorAll('#list tr[data-id]').forEach(tr => tr.classList.toggle('sel', tr.dataset.id === fileId));
+      const doc = await get('/api/excel-load/files/' + encodeURIComponent(fileId) + '/report');
+      renderDetail(r, doc);
+      steps(r.status);
+      if (!quiet) UI.panel.open('file');   // 폴링(quiet)으로 다시 그릴 때는 열지 않는다
+      // 같은 테이블에 나눠 올린 파일: 앞 파일이 이미 적재됐으면 두 번째부터 기존 데이터 허용이 필요하다
+      try {
+        const same = (await get('/api/excel-load/files?limit=200&tableName=' + encodeURIComponent(r.tableName)) || []).filter(x => x.fileId !== r.fileId);
+        const loaded = same.filter(x => x.status === 'COMPLETED' || (x.writtenCount || 0) > 0);
+        $('#runResult').innerHTML = same.length ? `<div class="alert ${loaded.length ? 'warn' : 'info'} small">같은 테이블 <b>${esc(r.tableName)}</b> 에 다른 파일 ${same.length}개 (적재 완료 ${loaded.length}개: ${loaded.slice(0, 5).map(x => esc(x.originalName)).join(', ') || '-'}).`
+          + (loaded.length ? ' 이 파일을 NORMAL 로 적재하려면 <b>"기존 데이터가 있어도 적재"</b>를 켜세요. 파일끼리 행 범위(PK)가 겹치지 않는지 확인하세요.' : ' 나눠 올린 파일은 순서대로 실행하고, 두 번째부터 "기존 데이터가 있어도 적재"를 켭니다.') + '</div>' : '';
+      } catch (e2) { /* 안내만 생략 */ }
+    } catch (e) { toast(e.message, 'err'); }
+  }
+  function renderDetail(r, doc) {
+    const val = doc && doc.validation;
+    const issues = (val && val.issues) || [];
+    const run = (doc && doc.runIssues) || [];
+    const cls = r.status === 'RUNNING' ? 'info' : r.status === 'INVALID' || r.status === 'FAILED' ? 'err' : r.status === 'COMPLETED' ? 'ok' : (r.warnCount > 0 ? 'warn' : 'ok');
+    const ex = '/api/excel-load/files/' + encodeURIComponent(r.fileId);
+    let html = `<div class="alert ${cls}">${badge(r.status)} ${esc(r.message || '')}${r.migrationId ? ` · <a href="/ui/history?migrationId=${encodeURIComponent(r.migrationId)}">실행 이력</a> <span class="mono small">${esc(r.migrationId)}</span>` : ''}
+      <br><span class="small">업로드 ${fmtDate(r.uploadedAt)} · 검증 ${fmtDate(r.validatedAt)} · 실행 ${fmtDate(r.startedAt)} → ${fmtDate(r.finishedAt)} · SHA-256 <span class="mono">${esc((r.sha256 || '').slice(0, 12))}…</span></span></div>
+      <div class="inline" style="margin-bottom:8px">
+        <button class="btn sm" id="dPreview">미리보기</button><button class="btn sm" id="dValidate" data-write ${r.status === 'RUNNING' ? 'disabled' : ''}>재검증</button>
+        <a class="btn sm" href="${ex}/issues.xlsx">오류 목록 xlsx</a><a class="btn sm" href="${ex}/download">원본 내려받기</a>
+        <button class="btn sm danger" id="dDelete" data-write ${r.status === 'RUNNING' ? 'disabled' : ''}>삭제</button></div>`;
+    if (val) {
+      html += `<details ${val.blockCount > 0 ? 'open' : ''}><summary>검증 결과 · 행 ${num(val.rowCount)} · 차단 <b>${num(val.blockCount)}</b> · 경고 ${num(val.warnCount)} · 적재 컬럼 ${num((val.mappedHeaders || []).length)} / 무시 ${num((val.ignoredHeaders || []).length)}${val.truncated ? ' · 목록 일부만 표시' : ''}</summary>
+        ${(val.missingRequired || []).length ? `<div class="alert err small">필수 컬럼 없음: ${esc(val.missingRequired.join(', '))}</div>` : ''}
+        ${(val.ignoredHeaders || []).length ? `<div class="small muted">무시되는 헤더: ${esc(val.ignoredHeaders.join(', '))}</div>` : ''}
+        ${issues.length ? `<table class="small list"><tr><th>행</th><th>컬럼</th><th>심각도</th><th>메시지</th><th>값</th></tr>` + issues.slice(0, 300).map(i => `<tr><td>${i.row || '-'}</td><td class="mono">${esc(i.column || '')}</td><td>${badge(i.severity)}</td><td class="wrap">${esc(i.message)}</td><td class="mono small wrap">${esc(i.value || '')}</td></tr>`).join('') + '</table>' : '<div class="small muted">문제 없음</div>'}</details>`;
+    }
+    if (run.length || (doc && doc.runIssueCount)) {
+      html += `<details open class="mt-8"><summary>마지막 실행에서 건너뛴 행 <b>${num(doc.runIssueCount)}</b>${doc.runTruncated ? ' (일부만 표시)' : ''}</summary>
+        <table class="small list"><tr><th>행</th><th>컬럼</th><th>메시지</th><th>값</th></tr>${run.slice(0, 300).map(i => `<tr><td>${i.row || '-'}</td><td class="mono">${esc(i.column || '')}</td><td class="wrap">${esc(i.message)}</td><td class="mono small wrap">${esc(i.value || '')}</td></tr>`).join('')}</table></details>`;
+    }
+    $('#dTitle').innerHTML = `선택 파일 <span class="mono small">${esc(r.fileId)}</span> · ${esc(r.originalName || '')}`;
+    $('#detail').innerHTML = html;
+    $('#dPreview').onclick = async () => {
+      UI.panel.title('preview', '미리보기 · ' + r.fileId);
+      $('#previewBox').innerHTML = '<div class="empty small loading">불러오는 중…</div>'; UI.panel.open('preview');
+      try { const p = await get(ex + '/preview?rows=20'); const hs = p.headers || [];
+        $('#previewBox').innerHTML = `<h3 class="small">앞 ${num((p.rows || []).length)}행</h3><div class="scroll-x"><table class="small"><tr><th>#</th>${hs.map(h => '<th class="mono">' + esc(h) + '</th>').join('')}</tr>${(p.rows || []).map(row => '<tr><td>' + esc(row._row) + '</td>' + hs.map(h => '<td>' + esc(row[h] || '') + '</td>').join('') + '</tr>').join('')}</table></div>` + bindingTable(p.binding, hs); }
+      catch (e) { $('#previewBox').innerHTML = `<div class="alert err small">${esc(e.message)}</div>`; }
+    };
+    $('#dValidate').onclick = async () => { try { const rep = await post(ex + '/validate'); toast(rep.blockCount > 0 ? '검증 차단 ' + rep.blockCount + '건' : '검증 통과', rep.blockCount > 0 ? 'err' : 'ok'); await loadList(); select(r.fileId); } catch (e) { toast(e.message, 'err'); } };
+    $('#dDelete').onclick = async () => {
+      if (!await confirmModal('파일 삭제', `<span class="mono">${esc(r.fileId)}</span> ${esc(r.originalName)} 파일과 대장 기록을 지웁니다. 타겟 데이터는 지우지 않습니다.`, '삭제')) return;
+      try { await del(ex); toast('삭제했습니다', 'ok'); selected = null; steps(null); UI.panel.close(); $('#dTitle').textContent = '선택 파일'; $('#detail').innerHTML = '<div class="empty small">파일 목록에서 행을 누르면 여기에 검증 결과 · 건너뛴 행이 나옵니다.</div>'; $('#runTarget').textContent = '파일 목록에서 파일을 선택하세요'; $('#btnRun').disabled = true; loadList(); } catch (e) { toast(e.message, 'err'); }
+    };
+  }
+
+  // ---------- 실행
+  function buildRequest() {
+    const body = { pluginName: selected.pluginName, tableName: selected.tableName, source: 'EXCEL', excelFileId: selected.fileId,
+      onRowError: v('onRowError'), testMode: document.querySelector('input[name=testMode]:checked').value, chunkSize: Number(v('chunkSize') || 200),
+      tenantLevel1: v('t1'), tenantLevel2: v('t2'), tenantLevel3: v('t3'), tenantLevel4: v('t4'), tenantLevel5: v('t5') };
+    if (v('testMaxItems')) body.testMaxItems = Number(v('testMaxItems'));
+    if ($('#ignoreExistingData').checked) body.ignoreExistingData = true;
+    return body;
+  }
+  $('#btnCopyJson').onclick = () => { if (!selected) return; navigator.clipboard.writeText(JSON.stringify(buildRequest(), null, 2)).then(() => toast('요청 JSON 을 복사했습니다', 'ok')); };
+  $('#btnRun').onclick = async () => {
+    if (!selected) return;
+    const body = buildRequest();
+    if (body.testMode === 'NORMAL') {
+      const ok = await confirmModal('NORMAL 적재', `<b>${esc(body.tableName)}</b> 에 <span class="mono">${esc(body.excelFileId)}</span> (행 ${num(selected.rowCount)}) 를 실제 적재합니다. 오류 행 처리: <b>${esc(body.onRowError)}</b>. 끝나면 파일은 completed/failed 폴더로 옮겨집니다.`, '적재 실행', body.tableName);
+      if (!ok) return;
+    }
+    $('#btnRun').disabled = true;
+    try {
+      const r = await post('/api/migrate/table', body);
+      $('#runResult').innerHTML = `<div class="alert ok">${badge(r.status)} 실행 요청 완료 · <a href="/ui/history?migrationId=${encodeURIComponent(r.migrationId)}">이력</a> · <a href="/ui/running">실행 현황</a> <span class="mono small">${esc(r.migrationId)}</span></div>`;
+      toast('실행을 시작했습니다', 'ok'); setTimeout(() => { loadList(); select(selected.fileId, true); }, 1500);
+    } catch (e) {
+      const d = e.data && typeof e.data === 'object' ? e.data : null;
+      $('#runResult').innerHTML = `<div class="alert err">${esc(e.plainMessage || e.message)}${d && d.details ? '<br><span class="small">' + esc(JSON.stringify(d.details)) + '</span>' : ''}</div>`;
+      toast(e.plainMessage || e.message, 'err');
+    } finally { $('#btnRun').disabled = false; }
+  };
+
+  const qp = new URLSearchParams(location.search);
+  loadLimits();
+  loadList().then(() => { if (qp.get('fileId')) select(qp.get('fileId')); });
+})();
+</script>
+</body>
+</html>

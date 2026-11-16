@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('이력')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<div th:replace="~{ui/layout :: gate}"></div>
+<main>
+    <div class="page-head"><h1>이력</h1><p class="page-desc">끝난 실행의 건수 · 사유 · 보고서</p></div>
+    <div class="card">
+        <div class="card-head"><h2>실행 목록</h2>
+            <div class="inline small"><label class="check switch"><input type="checkbox" id="auto" data-refresh-ignore> 10초 자동 갱신</label> <details class="small"><summary>표시 열</summary><div class="mt-4 inline" id="colPick">
+                <label class="check"><input type="checkbox" data-col="tenant" checked> 테넌트</label><label class="check"><input type="checkbox" data-col="end" checked> 종료</label><label class="check"><input type="checkbox" data-col="skip" checked> skip</label><label class="check"><input type="checkbox" data-col="by" checked> 실행자</label><label class="check"><input type="checkbox" data-col="req" checked> 요청</label></div></details></div></div>
+        <div class="toolbar">
+            <input class="w-sm" type="date" id="fFrom"> ~ <input class="w-sm" type="date" id="fTo">
+            <select id="fPlugin"><option value="">전체 플러그인</option><option th:each="p : ${plugins}" th:value="${p}" th:text="${p}"></option></select>
+            <input class="w-sm ico-search" id="fTable" placeholder="테이블명">
+            <input class="w-md" id="fTenant" list="tenantList" placeholder="테넌트 (예: GRP.C01)" autocomplete="off" title="테넌트 계층을 점(.)으로 구분해 앞에서부터 입력. 앞 계층만 주면 그 아래 전체, 비우거나 * 인 계층은 전체 (예: GRP.C01 → 그룹 GRP·계열사 C01 아래 전체, GRP.*.*.D01 → 부서 D01)"><datalist id="tenantList"></datalist>
+            <select id="fStatus"><option value="">전체 상태</option><option>COMPLETED</option><option value="WARNING">완료(경고)</option><option>BLOCKED</option><option>FAILED</option><option>PROCESSING</option><option>PENDING</option><option>STOPPED</option><option>CANCELLED</option></select>
+            <button class="btn primary" id="search">조회</button>
+            <details class="small"><summary title="실행자·구분·모드">필터 더보기</summary><div class="mt-6 inline"><input class="w-sm" id="fBy" placeholder="실행자" title="실행자(X-Executed-By) 포함 검색"><select id="fKind" title="실행 구분"><option value="">전체 구분</option><option value="TABLE">테이블</option><option value="SCENARIO">시나리오</option><option value="DIVIDE">날짜 분할</option><option value="LIST">실행 목록</option><option value="SCHEDULE">스케줄</option></select><select id="fMode"><option value="">전체 모드</option><option>NORMAL</option><option>WRITER_TEST</option><option>PROCESSOR_TEST</option><option>READER_TEST</option></select></div></details>
+        </div>
+        <div id="list"><div class="empty loading">조회 중…</div></div>
+        <div class="pager"><button class="btn sm" id="prev">이전</button><span id="pageInfo" class="small muted"></span><button class="btn sm" id="next">다음</button><select id="pageSize" class="small"><option>20</option><option>50</option><option>100</option></select></div>
+    </div>
+    <!-- 보조 요소는 오른쪽 패널 (todo-task 32): 행을 누르면 상세, 오른쪽 탭 막대 → 보고서 · 실행 그룹 -->
+    <aside class="sp" data-panel="detail" data-title="상세" data-width="62%" data-dock-label="상세" data-dock-icon="file">
+        <div class="inline" id="dDownloads"></div>
+        <div id="dBody"><div class="empty small">목록에서 행을 누르면 여기에 실행 상세가 나옵니다.</div></div>
+    </aside>
+    <aside class="sp" data-panel="export" data-title="보고서 · 내보내기" data-width="640" data-more-desc="목록 조건으로 PDF · XLSX · CSV, zip(로그 · 청크 포함)" data-dock-label="보고서" data-dock-icon="download">
+        <div class="small muted">지금 목록의 조회 조건(기간 · 플러그인 · 테이블 · 테넌트 · 상태)을 그대로 씁니다. 요약은 기간을 비우면 최근 7일.</div>
+        <div class="inline">
+            <button class="btn sm" data-report="summary&format=pdf">기간 요약 PDF</button>
+            <button class="btn sm" data-report="summary&format=xlsx">기간 요약 XLSX</button>
+            <button class="btn sm" data-report="summary&format=csv">기간 요약 CSV</button>
+            <button class="btn sm" data-report="jobs&format=xlsx">Job 목록 XLSX</button>
+            <button class="btn sm" data-report="jobs&format=csv">Job 목록 CSV</button>
+        </div>
+        <div class="inline"><button class="btn sm primary" id="zipExport">zip 내보내기 (로그 · 청크 포함)</button><span class="small muted">백그라운드에서 만들고, 끝나면 아래에 다운로드가 나옵니다</span></div>
+        <div id="exports"><div class="small muted">zip 내보내기 기록이 없습니다</div></div>
+    </aside>
+    <aside class="sp" data-panel="groups" data-title="실행 그룹" data-width="65%" data-more-desc="날짜 분할(DIV-) · 시나리오(SCF-) 실행 단위 묶음의 판정" data-dock-label="실행 그룹" data-dock-icon="table">
+        <div class="small muted">날짜 분할(DIV-) · 시나리오(SCF-) 실행 단위 묶음 · 전체 성공 / 부분 성공 / 실패와 성공 · 실패 · 미실행 횟수. 행을 누르면 아래에 단위 표.</div>
+        <div class="toolbar"><select id="gType"><option value="">전체</option><option value="DIVIDE">날짜 분할</option><option value="SCENARIO">시나리오</option></select><button class="btn sm" id="gReload">조회</button></div>
+        <div id="groups"><div class="empty small loading">불러오는 중…</div></div>
+        <div id="groupDetail" class="mt-10"></div>
+    </aside>
+</main>
+<script>
+(function () {
+  const { get, post, del, fmtDate, fmtMs, num, badge, esc, confirmModal, toast, $ } = UI;
+  // 서버 페이징 (todo-task 39 단계 2-2): rows = 지금 쪽, total = 조건에 맞는 전체 건수. 모드 · 실행자 · 구분 · 경고도 서버가 거른다
+  let rows = [], total = 0, page = 0, timer = null, loadSeq = 0;
+  const pageSize = () => Number($('#pageSize').value);
+  function query() {
+    const q = new URLSearchParams();
+    if ($('#fFrom').value) q.set('from', $('#fFrom').value); if ($('#fTo').value) q.set('to', $('#fTo').value);
+    if ($('#fPlugin').value) q.set('pluginName', $('#fPlugin').value); if ($('#fTable').value.trim()) q.set('tableName', $('#fTable').value.trim());
+    if ($('#fStatus').value) q.set('status', $('#fStatus').value === 'WARNING' ? 'COMPLETED' : $('#fStatus').value);
+    // 테넌트: "GRP.C01" → tenantLevel1=GRP, tenantLevel2=C01 (서버가 준 계층만 비교)
+    $('#fTenant').value.trim().split('.').slice(0, 5).forEach((v, i) => { v = v.trim(); if (v && v !== '*') q.set('tenantLevel' + (i + 1), v); });
+    return q;
+  }
+  /** 목록 조회 조건 = query() + 화면 필터(모드 · 실행자 · 구분 · 경고) + 쪽. 보고서 · 내보내기는 query() 그대로 */
+  const pageCount = () => Math.max(1, Math.ceil(total / pageSize()));
+  function pageQuery() {
+    const q = query();
+    if ($('#fMode').value) q.set('mode', $('#fMode').value);
+    if ($('#fBy').value.trim()) q.set('executedBy', $('#fBy').value.trim());
+    if ($('#fKind').value) q.set('kind', $('#fKind').value);
+    if ($('#fStatus').value === 'WARNING') q.set('warningOnly', 'true');
+    q.set('page', page); q.set('size', pageSize());
+    return q;
+  }
+  function render() {
+    const pages = pageCount();
+    $('#list').innerHTML = rows.length ? `<table class="list"><tr><th>실행ID</th><th>구분</th><th>플러그인</th><th>테이블</th><th class="c-tenant">테넌트</th><th>모드</th><th>상태</th><th>시작</th><th class="c-end">종료</th><th class="num">소요</th><th class="num">읽기</th><th class="num">적재</th><th class="num">실패</th><th class="c-skip num">skip</th><th class="c-by">실행자</th><th class="c-req">요청</th></tr>` +
+      rows.map(j => `<tr class="clickable" data-mid="${esc(j.migrationId)}"><td>${esc(j.jobExecutionId ?? '-')}</td><td>${kindCell(j.batchId, j.executedBy)}</td><td><span class="cut s" title="${esc(j.pluginName)}">${esc(j.pluginName)}</span></td><td><b>${esc(j.tableName)}</b></td><td class="small c-tenant"><span class="cut s mono" title="${esc(j.tenantId || j.fullTenantId)}">${esc(j.tenantId || j.fullTenantId)}</span></td>
+        <td>${badge(j.tags || 'NORMAL')}${j.metadata ? ' <span class="small muted">' + esc(j.metadata) + '</span>' : ''}</td><td>${UI.statusBadge(j.status, j.warning)}${j.guardStatus === 'IGNORED' ? ' <span class="badge IGNORED" title="' + esc(j.blockedReason || '') + ' 무시하고 진행">무시</span>' : ''}</td><td class="small">${UI.fmtShort(j.startTime)}</td><td class="small c-end">${UI.fmtShort(j.endTime)}</td><td class="num">${fmtMs(j.executionTimeMs)}</td>
+        <td class="num">${num(j.sourceRecordCount)}</td><td class="num"><b>${num(j.targetRecordCount)}</b></td><td class="num">${num(j.failureCount)}</td><td class="c-skip num">${num(j.skippedCount)}</td><td class="small c-by"><span class="by-cell">${UI.avatar(j.executedBy)}<span class="cut s" title="${esc(j.executedBy)}">${esc(j.executedBy)}</span></span></td>
+        <td class="c-req"><button class="btn sm" data-req="${esc(j.migrationId)}" title="실행 당시 API 로 보낸 JSON (시나리오는 시나리오 전체 JSON 포함)">JSON</button></td></tr>`).join('') + '</table>'
+      : '<div class="empty">결과 없음</div>';
+    $('#pageInfo').textContent = `${page + 1} / ${pages} 페이지 · ${num(total)}건`;
+    $('#prev').disabled = page <= 0; $('#next').disabled = page >= pages - 1;
+    document.querySelectorAll('tr[data-mid]').forEach(tr => tr.onclick = () => showDetail(tr.dataset.mid));
+    markRow(); if (UI.panel.isOpen('detail')) setNav();
+    document.querySelectorAll('button[data-req]').forEach(b => b.onclick = async (e) => { e.stopPropagation(); showRequest(b.dataset.req); });
+  }
+  async function load() {
+    const seq = ++loadSeq;   // 늦게 온 이전 응답이 새 결과를 덮지 않게
+    try {
+      const d = await get('/api/report/jobs/page?' + pageQuery()) || {};
+      if (seq !== loadSeq) return;
+      rows = d.items || []; total = Number(d.total) || 0; page = Number(d.page) || 0;   // 넘친 쪽은 서버가 마지막 쪽으로
+      render(); tenantOptions(rows);
+    } catch (e) { if (seq === loadSeq) $('#list').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  /** 테넌트 입력 후보: 조회된 실행의 테넌트와 그 상위 계층 (조회할수록 쌓임) */
+  const tenantSeen = new Set();
+  function tenantOptions(list) {
+    const before = tenantSeen.size;
+    list.forEach(j => { const parts = String(j.tenantId || j.fullTenantId || '').split('.').filter(Boolean); for (let i = 1; i <= parts.length; i++) tenantSeen.add(parts.slice(0, i).join('.')); });
+    if (tenantSeen.size !== before) $('#tenantList').innerHTML = [...tenantSeen].sort().map(t => `<option value="${esc(t)}"></option>`).join('');
+  }
+  /** 구분 칸: 시나리오·날짜 분할은 그룹 ID 도 */
+  function kindCell(batchId, executedBy) {
+    const k = UI.runKind(batchId, executedBy);
+    const sub = k.key === 'SCENARIO' || k.key === 'DIVIDE' ? batchId : (k.key === 'SCHEDULE' ? String(executedBy).slice(9) : '');
+    return `<span class="badge kind-${k.key}">${esc(k.label)}</span>` + (sub ? `<div class="small muted mono">${esc(sub)}</div>` : '');
+  }
+  /**
+   * 요청 JSON 영역. 시나리오(SCF-)는 시나리오 전체 JSON(정의 + 실행 요청)과 이 단계 단위 요청을 함께,
+   * 날짜 분할(DIV-)은 이 구간 요청을 보여 준다. 버튼은 bindContext 로 연결
+   */
+  function contextHtml(requestJson, group) {
+    let html = '';
+    const scenario = group && group.groupType === 'SCENARIO';
+    if (scenario && group.definitionJson) {
+      let stepLabel = '';
+      try { const d = JSON.parse(group.definitionJson).definition; const st = d && d.steps && d.steps[(group.stepSeq || 0) - 1]; if (st) stepLabel = (st.label ? st.label + ' · ' : '') + st.plugin + '.' + st.table; } catch (e) { /* ignore */ }
+      const pos = group.stepSeq ? `${group.stepSeq}단계${stepLabel ? ' (' + stepLabel + ')' : ''}${group.unitCount > 1 ? ' · 구간 ' + group.unitSeq + '/' + group.unitCount + ' ' + (group.rangeStart || '') + '~' + (group.rangeEnd || '') : ''}` : '';
+      html += `<details open class="mt-8"><summary>시나리오 전체 JSON <span class="small muted">${esc(group.name || '')} · <span class="mono">${esc(group.groupId)}</span>${pos ? ' · 이 Job 은 ' + esc(pos) : ''}</span></summary>
+        <div class="inline" style="justify-content:space-between;margin:4px 0"><span class="api-line" style="margin:0"><span class="method">POST</span><span class="url">${esc(location.origin)}/api/scenarios/${esc(group.refId || '')}/run</span></span>
+        <span class="inline"><button class="btn sm" data-copy="scenario">복사</button><a class="btn sm" href="/ui/scenario">시나리오 이관 실행 화면</a></span></div>
+        <div class="small muted">definition = 실행 당시 시나리오 정의 전체 · request = 실행 요청 (API 로 보낼 본문은 request)</div><pre style="max-height:50vh">${esc(UI.prettyJson(group.definitionJson))}</pre></details>`;
+    } else if (group && group.groupType === 'DIVIDE') {
+      html += `<div class="mt-8 small muted">날짜 분할 실행 <span class="mono">${esc(group.groupId)}</span>${group.unitCount ? ' · 구간 ' + group.unitSeq + '/' + group.unitCount + ' ' + esc((group.rangeStart || '') + '~' + (group.rangeEnd || '')) : ''}</div>`;
+    }
+    if (requestJson) {
+      const title = scenario ? '이 단계 단위 요청 JSON' : (group && group.groupType === 'DIVIDE' ? '이 구간 요청 JSON' : '요청 JSON');
+      html += `<details ${scenario ? '' : 'open'} class="mt-8"><summary>${title} <span class="small muted">(테이블 이관 API 로 다시 보낼 수 있는 형태 · 읽기 전용)</span> <span class="small muted mono">${esc(UI.requestSummary(requestJson))}</span></summary>
+        <div class="inline" style="justify-content:space-between;margin:4px 0"><span class="api-line" style="margin:0"><span class="method">POST</span><span class="url">${esc(location.origin)}/api/migrate/table</span></span>
+        <span class="inline"><button class="btn sm" data-copy="request">복사</button><button class="btn sm" data-write data-reuse="1">이 조건으로 다시 실행</button></span></div><pre style="max-height:50vh">${esc(requestJson)}</pre></details>`;
+    } else if (scenario) {
+      html += `<div class="mt-4 small muted">이 단위의 테이블 요청 JSON 은 기록하기 전(2026-10-22 이전) 실행이라 없습니다. 위 시나리오 JSON 으로 다시 실행할 수 있습니다.</div>`;
+    }
+    return html;
+  }
+  function bindContext(root, requestJson, group) {
+    const copy = async (text) => { try { await navigator.clipboard.writeText(text); toast('JSON 복사됨', 'ok'); } catch (e) { toast('클립보드 복사 실패 (HTTPS/localhost 에서만 동작)', 'err'); } };
+    root.querySelectorAll('[data-copy="scenario"]').forEach(b => b.onclick = () => copy(UI.prettyJson(group.definitionJson)));
+    root.querySelectorAll('[data-copy="request"]').forEach(b => b.onclick = () => copy(requestJson));
+    root.querySelectorAll('[data-reuse]').forEach(b => b.onclick = () => UI.openInExecute(requestJson));
+  }
+  /** 목록의 JSON 버튼: 요청 JSON(시나리오는 시나리오 전체 JSON 포함)을 창으로 보여 주고 복사·다시 실행 */
+  async function showRequest(mid) {
+    const { requestJson: json, group } = await UI.runContext(mid);
+    if (!json && !group) { toast('이 실행은 요청 JSON 기록이 없습니다 (V2 이전 기록)', 'err'); return; }
+    const bg = document.createElement('div'); bg.className = 'modal-bg open';
+    bg.innerHTML = `<div class="modal" style="max-width:900px"><h2>요청 JSON <span class="small muted mono">${esc(mid)}</span></h2>${contextHtml(json, group)}
+      <div class="inline" style="justify-content:flex-end;margin-top:12px"><button class="btn primary" id="rqClose">닫기</button></div></div>`;
+    document.body.appendChild(bg);
+    bindContext(bg, json, group);
+    bg.querySelector('#rqClose').onclick = () => bg.remove();
+    bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+  }
+  let curMid = null;
+  /** 상세 패널의 이전 · 다음 = 목록의 앞뒤 행. 쪽 끝이면 앞 · 뒤 쪽을 불러와 그 끝 행으로 */
+  function setNav() {
+    const i = rows.findIndex(j => j.migrationId === curMid), pages = pageCount();
+    if (i < 0) { UI.panel.nav('detail', null, null); return; }
+    const goRow = (k) => () => showDetail(rows[k].migrationId);
+    const goPage = (pg, last) => async () => { page = pg; await load(); const j = last ? rows[rows.length - 1] : rows[0]; if (j) showDetail(j.migrationId); };
+    UI.panel.nav('detail', i > 0 ? goRow(i - 1) : (page > 0 ? goPage(page - 1, true) : null),
+      i < rows.length - 1 ? goRow(i + 1) : (page < pages - 1 ? goPage(page + 1, false) : null));
+  }
+  function markRow() { document.querySelectorAll('tr[data-mid]').forEach(tr => tr.classList.toggle('sel', tr.dataset.mid === curMid)); }
+  /** 실행 흐름 타임라인 (todo-task 33): 상세 API 가 주는 값으로만 - 시작 · 실행 전 확인 · 청크 · 완료 판정 · 종료.
+   *  API 에 없는 단계(게이트 획득 · 알림 전송 등)는 그리지 않는다. 시각이 없는 단계는 시각 칸을 비운다 */
+  function flowHtml(j, r) {
+    const hms = (t) => { const s = t ? fmtDate(t) : ''; return s ? `<time title="${esc(s)}">${esc(s.slice(-8))}</time>` : '<time></time>'; };
+    const item = (tone, time, title, meta) => `<li class="tl-item lv-${tone}">${time}<span class="tl-dot"></span><div class="tl-body"><div class="tl-title">${title}</div>${meta ? `<div class="tl-meta">${meta}</div>` : ''}</div></li>`;
+    const st = String(j.status || '').toUpperCase();
+    const out = [];
+    if (j.startTime) out.push(item('info', hms(j.startTime), '시작', `실행자 ${esc(j.executedBy || '-')}${j.executionEnvironment ? ' · 환경 ' + esc(j.executionEnvironment) : ''}`));
+    if (j.guardStatus) {
+      const g = String(j.guardStatus).toUpperCase();
+      out.push(item(/PASS|OK|ALLOW/.test(g) ? 'ok' : /BLOCK|FAIL|DENY/.test(g) ? 'err' : 'warn', '<time></time>', `실행 전 확인 ${badge(j.guardStatus)}`, esc(j.blockedReason || '')));
+    }
+    const chunks = r.chunks || [], failed = r.failedChunks || [];
+    if (chunks.length) {
+      const sum = (k) => chunks.reduce((a, c) => a + (Number(c[k]) || 0), 0);
+      out.push(item(failed.length ? 'err' : 'ok', '<time></time>', `청크 ${num(chunks.length - failed.length)} / ${num(chunks.length)} 완료${failed.length ? ` · 실패 ${num(failed.length)}` : ''}`,
+        `처리 ${num(sum('processedCount'))} · 성공 ${num(sum('successCount'))} · 오류 ${num(sum('errorCount'))} · skip ${num(sum('skipCount'))}`));
+    }
+    if (j.verdictSource != null) out.push(item(j.verdictDiff ? 'warn' : 'ok', '<time></time>', '완료 판정',
+      `소스 ${num(j.verdictSource)} / 필터 ${num(j.verdictFilter)} / 처리 ${num(j.verdictProcessed)}${j.countCheck === 'SKIP' ? ' · 건수 비교 제외' : ' · 차이 ' + num(j.verdictDiff)}`));
+    if (j.endTime) out.push(item(/COMPLET/.test(st) ? (j.warning ? 'warn' : 'ok') : /FAIL/.test(st) ? 'err' : /STOP/.test(st) ? 'warn' : 'info', hms(j.endTime), `종료 ${UI.statusBadge(j.status, j.warning)}`, `소요 ${fmtMs(j.executionTimeMs)}`));
+    return out.length ? `<h3 class="sp-h mt-12">실행 흐름</h3><ol class="timeline">${out.join('')}</ol>` : '';
+  }
+  async function showDetail(mid) {
+    curMid = mid; markRow(); setNav();
+    UI.panel.open('detail'); UI.panel.title('detail', '상세 조회 중…'); $('#dBody').innerHTML = '<div class="empty small loading">불러오는 중…</div>';
+    const rb = '/api/report/jobs/' + encodeURIComponent(mid);
+    $('#dDownloads').innerHTML = `<a class="btn sm" href="${rb}?format=pdf" target="_blank">결과 PDF</a><a class="btn sm" href="${rb}?format=xlsx">결과 XLSX</a><a class="btn sm" href="${rb}/logs?format=csv">로그 CSV</a><a class="btn sm" href="${rb}/chunks?format=csv">청크 CSV</a>`;
+    try {
+      const r = await get(rb + '?format=json'); const j = r.job || {};
+      if (curMid !== mid) return;   // 그사이 이전 · 다음으로 다른 행을 고름
+      UI.panel.title('detail', `실행ID ${j.jobExecutionId ?? '-'} · ${j.pluginName || ''} · ${j.tableName || ''}`);
+      let html = `<div class="small muted">migrationId <span class="mono">${esc(mid)}</span> · 실행자 ${UI.avatar(j.executedBy)} ${esc(j.executedBy || '-')} · 환경 ${esc(j.executionEnvironment || '-')}</div>
+        <table class="mt-8">
+          <tr><th>상태</th><td>${UI.statusBadge(j.status, j.warning)} ${badge(r.testMode || 'NORMAL')}${r.testMaxItems ? ' <span class="small muted">최대 ' + r.testMaxItems + '건</span>' : ''}</td><th>시작 / 종료</th><td class="small">${fmtDate(j.startTime)} → ${fmtDate(j.endTime)} (${fmtMs(j.executionTimeMs)})</td></tr>
+          <tr><th>읽기(소스) / 적재(타겟)</th><td>${num(j.sourceRecordCount)} / <b>${num(j.targetRecordCount)}</b></td><th>성공 / 실패 / skip</th><td>${num(j.successCount)} / ${num(j.failureCount)} / ${num(j.skippedCount)}</td></tr>
+          ${j.message ? `<tr><th>메시지</th><td colspan="3" class="small">${esc(j.message)}</td></tr>` : ''}
+          ${j.errorMessage ? `<tr><th>오류</th><td colspan="3" class="small mono" style="color:var(--danger);white-space:pre-wrap">${esc(String(j.errorMessage).slice(0, 800))}</td></tr>` : ''}
+          ${j.verdictSource != null ? `<tr><th>완료 판정</th><td colspan="3">소스 ${num(j.verdictSource)} / 필터 ${num(j.verdictFilter)} / 처리 <b>${num(j.verdictProcessed)}</b> · ${j.countCheck === 'SKIP' ? '<span class="muted">건수 비교 제외 테이블</span>' : '차이 <b' + (j.verdictDiff ? ' class="t-danger"' : '') + '>' + num(j.verdictDiff) + '</b>'}${j.targetBefore != null || j.targetAfter != null ? ' · 타겟 ' + num(j.targetBefore) + ' → ' + num(j.targetAfter) : ''}</td></tr>` : ''}
+          ${j.warning && j.warningReasons ? `<tr><th>경고 사유</th><td colspan="3" class="small kv-warn">${esc(j.warningReasons)}</td></tr>` : ''}
+          ${j.guardStatus ? `<tr><th>실행 전 확인</th><td colspan="3">${badge(j.guardStatus)} ${esc(j.blockedReason || '')} · ${(r.testMode || 'NORMAL') !== 'NORMAL' ? UI.autoPrecheckBadge('NA') : r.precheckRunId ? `${UI.autoPrecheckBadge('ON')} <a href="/ui/precheck?runId=${encodeURIComponent(r.precheckRunId)}">자동 점검 결과 보기</a>` : '<span class="badge NOT_RUN" title="이 실행은 자동 실행 전 점검 기록이 없습니다 (설정 꺼짐 · skipPrecheck · 엑셀 이관 · 점검 전 단계에서 차단)">자동 점검 안 함</span>'}</td></tr>` : ''}
+        </table>`;
+      html += flowHtml(j, r);
+      const ctx = await UI.runContext(mid);
+      const reqJson = r.requestJson || ctx.requestJson;
+      html = html.replace('<table class="mt-8">', `<div class="mt-4 small">구분 ${kindCell(j.batchId, j.executedBy)}</div><table class="mt-8">`);
+      if (reqJson || ctx.group) html += contextHtml(reqJson, ctx.group);
+      else html += `<div class="mt-8 small muted">요청 JSON 기록 없음 (${UI.runKind(j.batchId, j.executedBy).key === 'TABLE' ? 'V2 이전 기록 또는 2026-10-22 이전 스케줄 실행' : 'V2 이전 기록'})</div>`;
+      if ((r.testMode === 'WRITER_TEST') && (j.targetRecordCount || 0) > 0) html += `<div class="mt-4 small">샘플 실행 적재분(등록자 MIG-TEST)은 수작업으로 정리합니다 · <a href="/ui/guide?name=manual-cleanup">수작업 정리 안내서</a></div>`;
+      if (r.steps && r.steps.length) html += `<h2 class="mt-12">Step</h2><table class="list"><tr><th>Step</th><th>상태</th><th class="num">read</th><th class="num">write(큐)</th><th class="num">skip</th><th class="num">commit</th><th class="num">rollback</th><th>카운터</th></tr>` +
+        r.steps.map(s => `<tr><td>${esc(s.stepName)}</td><td>${badge(s.status)}</td><td class="num">${num(s.readCount)}</td><td class="num">${num(s.writeCount)}</td><td class="num">${num(s.skipCount)}</td><td class="num">${num(s.commitCount)}</td><td class="num">${num(s.rollbackCount)}</td><td class="small mono wrap">${esc(Object.entries(s.context || {}).map(([k, v]) => k + '=' + v).join(' '))}</td></tr>`).join('') +
+        `</table><div class="small muted">write 는 큐 적재 기준입니다. 실제 적재는 위 "적재(타겟)" 을 보세요.</div>`;
+      const chunks = r.chunks || [], failed = r.failedChunks || [];
+      const isFailed = ['FAILED', 'FAILURE'].includes(String(j.status || '').toUpperCase());
+      if (isFailed) html += `<div class="mt-12 alert warn">실패한 실행입니다. 타겟에 일부만 적재됐을 수 있습니다.
+        <button class="btn sm" id="fillMissing" style="margin-left:8px" data-write>빠진 행 채우기</button>
+        <div class="mt-4 small muted">같은 조건으로 소스를 다시 읽어 타겟에 이미 있는 키는 건너뛰고 없는 행만 적재합니다(새 실행으로 남음). 할 수 없는 테이블이면 사유를 보여 줍니다 · <a href="/ui/guide?name=rerun">재실행 안내서</a></div></div>`;
+      html += `<h2 class="mt-12">청크 (${chunks.length}, 실패 ${failed.length})</h2>`;
+      if (chunks.length) html += `<table class="list"><tr><th>#</th><th>Step</th><th class="num">offset</th><th>상태</th><th class="num">처리</th><th class="num">성공</th><th class="num">오류</th><th class="num">skip</th><th class="num">ms</th><th>재시도</th><th>오류</th></tr>` +
+        chunks.slice(0, 200).map(c => `<tr><td>${c.chunkNumber}</td><td class="small">${esc(c.stepName)}</td><td class="num">${num(c.chunkOffset)}</td><td>${badge(c.status)}</td><td class="num">${num(c.processedCount)}</td><td class="num">${num(c.successCount)}</td><td class="num">${num(c.errorCount)}</td><td class="num">${num(c.skipCount)}</td><td class="num">${num(c.executionTimeMs)}</td><td>${c.retryCount ?? 0}/${c.maxRetryCount ?? '-'}</td><td class="small mono" style="white-space:pre-wrap">${esc((c.errorMessage || '').slice(0, 300))}</td></tr>`).join('') +
+        (chunks.length > 200 ? `<tr><td colspan="11" class="muted small">이하 ${chunks.length - 200}건 생략 (청크 CSV 참고)</td></tr>` : '') + '</table>';
+      const logs = r.logs || [];
+      if (logs.length) html += `<details class="mt-12"><summary>작업 로그 (${logs.length})</summary><table class="small list"><tr><th>시각</th><th>레벨</th><th>단계</th><th>메시지</th></tr>` +
+        logs.map(l => `<tr><td class="nowrap mono">${fmtDate(l.logTime)}</td><td>${l.logLevel === 'ERROR' ? badge('FAILED') : esc(l.logLevel)}</td><td>${esc(l.step)}${l.subStep ? '/' + esc(l.subStep) : ''}</td><td style="white-space:pre-wrap;word-break:break-all">${esc(l.message)}${l.exceptionMessage ? '<br><span class="t-danger">' + esc(l.exceptionMessage) + '</span>' : ''}</td></tr>`).join('') + '</table></details>';
+      if (curMid !== mid) return;
+      $('#dBody').innerHTML = html;
+      bindContext($('#dBody'), reqJson, ctx.group);
+      const fbtn = $('#fillMissing');
+      if (fbtn) fbtn.onclick = async () => {
+        let c;
+        try { c = await get('/api/migrate/jobs/' + encodeURIComponent(mid) + '/fill-missing'); } catch (e) { toast(e.message, 'err'); return; }
+        const facts = `<table class="mt-6 small"><tr><th>타겟</th><td class="mono">${esc(c.targetTable || '-')} (PK ${esc((c.pkColumns || []).join(', ') || '-')})</td></tr>
+          <tr><th>소스 건수</th><td>원 실행 ${num(c.originalSourceCount)} → 지금 ${num(c.currentSourceCount)}</td></tr>
+          <tr><th>타겟 건수</th><td>원 실행 전 ${num(c.targetBefore)} → 후 ${num(c.targetAfter)}</td></tr></table>`;
+        if (!c.possible) {
+          await confirmModal('빠진 행 채우기를 할 수 없습니다', `<ul>${(c.reasons || []).map(r => '<li>' + esc(r) + '</li>').join('')}</ul>${facts}<div class="mt-6 small">타겟을 정리한 뒤 다시 실행하세요 · <a href="/ui/guide?name=rerun">재실행 안내서</a></div>`, '닫기');
+          return;
+        }
+        if (!await confirmModal('빠진 행 채우기', `원 실행과 같은 조건으로 소스를 다시 읽어, 타겟에 이미 있는 키는 건너뛰고 없는 행만 적재합니다. 원 실행은 실패로 남고 새 실행이 만들어집니다.${facts}`, '채우기')) return;
+        try {
+          const r2 = await post('/api/migrate/jobs/' + encodeURIComponent(mid) + '/fill-missing');
+          toast('빠진 행 채우기를 시작했습니다', 'ok');
+          if (r2 && r2.migrationId) setTimeout(() => showDetail(r2.migrationId), 1500);
+        } catch (e) { toast(e.message, 'err'); }
+      };
+    } catch (e) { if (curMid !== mid) return; UI.panel.title('detail', '상세'); $('#dBody').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  // ---- 보고서 / zip 내보내기
+  document.querySelectorAll('[data-report]').forEach(b => b.onclick = () => {
+    const [kind, fmt] = b.dataset.report.split('&format='); const q = query(); q.set('format', fmt);
+    window.open('/api/report/' + kind + '?' + q.toString(), '_blank');
+  });
+  let exportTimer = null, exportRunning = false;
+  async function loadExports() {
+    try {
+      const list = await get('/api/report/exports') || [];
+      if (!list.length) { $('#exports').innerHTML = '<div class="small muted">zip 내보내기 기록이 없습니다</div>'; if (exportTimer) { clearInterval(exportTimer); exportTimer = null; } return; }
+      const running = list.some(x => !x.done);
+      if (exportRunning && !running) { UI.panel.mark('export'); toast('zip 내보내기가 끝났습니다 (오른쪽 막대 › 보고서)', 'ok'); }
+      exportRunning = running;
+      // 파일 목록 (todo-task 33 T15): zip 아이콘 · 조건 · 상태 · 진행 · 크기 · 요청 시각 / 다운로드 · 삭제
+      const cond = (x) => [x.request?.from ? fmtDate(x.request.from) : '', x.request?.to ? '~' + fmtDate(x.request.to) : '', x.request?.pluginName, x.request?.tableName, (x.request?.tenantLevels || []).some(Boolean) ? '테넌트 ' + x.request.tenantLevels.map(v => v || '*').join('.').replace(/(\.\*)+$/, '') : '', x.request?.status].filter(Boolean).join(' ');
+      const meta = (x) => [`<span class="mono">${esc(x.exportId)}</span>`, badge(x.state) + (x.done ? '' : ' ' + Number(x.progressPercent || 0).toFixed(0) + '%'),
+        `Job ${x.processedJobs}/${x.totalJobs}`, x.fileSize ? (x.fileSize / 1024).toFixed(0) + ' KB' : '-', fmtDate(x.requestedAt)].join(' · ');
+      const acts = (x) => (x.state === 'COMPLETED' ? UI.iconBtn('', 'download', '다운로드', '', { href: '/api/report/exports/' + encodeURIComponent(x.exportId) + '/download' }) : '')
+        + UI.iconBtn(`data-write data-xdel="${esc(x.exportId)}"`, 'trash', '삭제', 'danger');
+      $('#exports').innerHTML = `<h3 class="small">zip 내보내기 (${list.length})</h3><div class="file-list">`
+        + list.slice(0, 10).map(x => `<div class="file-item"><span class="f-ico">${UI.ico('zip')}</span>`
+          + `<div class="f-txt"><b>${esc(cond(x) || '전체')}</b><span>${meta(x)}</span>${x.error ? `<div class="small t-danger">${esc(x.error)}</div>` : ''}</div>`
+          + `<div class="f-act">${acts(x)}</div></div>`).join('') + '</div>';
+      document.querySelectorAll('[data-xdel]').forEach(b => b.onclick = async () => { try { await del('/api/report/exports/' + encodeURIComponent(b.dataset.xdel)); loadExports(); } catch (e) { toast(e.message, 'err'); } });
+      if (running && !exportTimer) exportTimer = setInterval(loadExports, 3000);
+      if (!running && exportTimer) { clearInterval(exportTimer); exportTimer = null; }
+    } catch (e) { $('#exports').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  $('#zipExport').onclick = async () => {
+    const q = query(); const body = Object.fromEntries(q.entries());
+    const html = `<div>현재 조건의 Job 목록(jobs.csv), 요약(summary.csv / summary.pdf), Job 별 로그·청크 CSV 를 zip 으로 만듭니다. 백그라운드에서 생성되며 완료되면 목록에 다운로드가 나타납니다.</div>
+      <div class="mt-6 small muted">조건: ${esc(JSON.stringify(body))}</div>
+      <div class="mt-8"><label class="check"><input type="checkbox" id="xLogs" checked> 로그 포함</label> &nbsp; <label class="check"><input type="checkbox" id="xChunks" checked> 청크 포함</label> &nbsp; <label class="check"><input type="checkbox" id="xPdf" checked> 요약 PDF 포함</label></div>`;
+    let opts = { includeLogs: true, includeChunks: true, includePdf: true };
+    const read = () => { const g = (id) => { const el = document.getElementById(id); return el ? el.checked : true; }; opts = { includeLogs: g('xLogs'), includeChunks: g('xChunks'), includePdf: g('xPdf') }; };
+    document.addEventListener('change', read, { once: false });
+    const ok = await confirmModal('zip 내보내기', html, '시작'); document.removeEventListener('change', read);
+    if (!ok) return;
+    try { const st = await post('/api/report/exports', Object.assign(body, opts)); toast('내보내기 시작: ' + st.exportId, 'ok'); loadExports(); } catch (e) { toast(e.message, 'err'); }
+  };
+  // ---- 이벤트
+  $('#search').onclick = () => { page = 0; load(); };
+  ['fTable', 'fTenant'].forEach(id => $('#' + id).addEventListener('keydown', e => { if (e.key === 'Enter') { page = 0; load(); } }));
+  $('#fTenant').addEventListener('change', () => { page = 0; load(); });
+  // 표시 열 (브라우저에 저장)
+  (function () {
+    const KEY = 'ui.history.cols'; const DEF_HIDDEN = ['end', 'skip', 'req'];   // 처음에는 종료·skip·요청 열을 숨겨 한 화면에 맞춘다 (표시 열에서 켬)
+    let hidden = DEF_HIDDEN; try { const saved = localStorage.getItem(KEY); hidden = saved ? JSON.parse(saved) : DEF_HIDDEN; } catch (e) { hidden = DEF_HIDDEN; }
+    const apply = () => { $('#list').className = hidden.map(c => 'hide-c-' + c).join(' '); document.querySelectorAll('#colPick [data-col]').forEach(cb => { cb.checked = !hidden.includes(cb.dataset.col); }); };
+    document.querySelectorAll('#colPick [data-col]').forEach(cb => cb.addEventListener('change', () => { hidden = Array.from(document.querySelectorAll('#colPick [data-col]')).filter(x => !x.checked).map(x => x.dataset.col); try { localStorage.setItem(KEY, JSON.stringify(hidden)); } catch (e) { /* ignore */ } apply(); }));
+    apply();
+  })();
+  let byTimer = null;   // 실행자 입력은 멈춘 뒤 0.4초에 조회
+  ['fMode', 'fKind', 'fStatus'].forEach(id => $('#' + id).addEventListener('change', () => { page = 0; load(); }));
+  $('#fBy').addEventListener('input', () => { clearTimeout(byTimer); byTimer = setTimeout(() => { page = 0; load(); }, 400); });
+  $('#pageSize').onchange = () => { page = 0; load(); };
+  $('#prev').onclick = () => { if (page > 0) { page--; load(); } }; $('#next').onclick = () => { page++; load(); };
+  $('#auto').onchange = (e) => { if (e.target.checked) { timer = setInterval(load, 10000); } else { clearInterval(timer); timer = null; } };
+  (() => { const d = new Date(), to = d.toISOString().slice(0, 10); d.setDate(d.getDate() - 30); $('#fFrom').value = d.toISOString().slice(0, 10); $('#fTo').value = to; })();
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('migrationId')) { $('#fFrom').value = ''; }
+  if (qp.get('tenant')) $('#fTenant').value = qp.get('tenant');
+  load().then(async () => {
+    const mid = qp.get('migrationId'), eid = qp.get('jobExecutionId');
+    if (mid) return showDetail(mid);
+    if (!eid) return;
+    // 지금 쪽에 없으면 서버에서 실행ID 로 찾는다 (서버 페이징이라 목록에 다 있지 않다)
+    const j = rows.find(r => String(r.jobExecutionId) === eid)
+      || ((await get('/api/report/jobs/page?size=1&jobExecutionId=' + encodeURIComponent(eid)).catch(() => null)) || {}).items?.[0];
+    if (j) showDetail(j.migrationId); else UI.toast('실행ID ' + eid + ' 를 찾지 못했습니다');
+  });
+  loadExports();
+  // ---------- 실행 그룹 ----------
+  async function loadGroups() {
+    try {
+      const list = await get('/api/migrate/groups?limit=30' + ($('#gType').value ? '&type=' + $('#gType').value : '')) || [];
+      $('#groups').innerHTML = list.length ? '<table class="small list"><tr><th>그룹</th><th>종류</th><th>이름</th><th>모드</th><th>결과</th><th>성공/실패/차단/미실행</th><th>적재</th><th>시작</th></tr>' + list.map(g => `<tr data-g="${esc(g.groupId)}" style="cursor:pointer"><td class="mono">${esc(g.groupId)}</td><td>${g.groupType === 'SCENARIO' ? '시나리오' : '날짜 분할'}</td><td>${esc(g.name)}</td><td>${badge(g.testMode)}</td><td>${UI.groupBadge(g.status)}</td>`
+        + `<td>${num(g.unitSuccess)} / ${num(g.unitFailed)} / ${num(g.unitBlocked)} / ${num(g.unitNotRun)} <span class="muted">(전체 ${num(g.unitTotal)})</span></td><td>${num(g.processedCount)}</td><td>${esc(fmtDate(g.startedAt))}</td></tr>`).join('') + '</table>'
+        : '<div class="empty small">실행 그룹이 없습니다</div>';
+      document.querySelectorAll('#groups tr[data-g]').forEach(tr => tr.onclick = () => showGroup(tr.dataset.g));
+    } catch (e) { $('#groups').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  async function showGroup(id) {
+    try { $('#groupDetail').innerHTML = UI.groupView(await get('/api/migrate/groups/' + encodeURIComponent(id)), { stopButton: true }); UI.bindGroupStop($('#groupDetail')); }
+    catch (e) { $('#groupDetail').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  $('#gReload').onclick = loadGroups;
+  UI.panel.on('groups', loadGroups);
+  if (qp.get('groupId')) { UI.panel.open('groups'); showGroup(qp.get('groupId')); }
+})();
+</script>
+</body>
+</html>

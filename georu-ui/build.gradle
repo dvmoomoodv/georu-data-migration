@@ -1,0 +1,26 @@
+plugins {
+    id 'georu.java-library'
+}
+
+description = 'georu 운영 UI: Thymeleaf 화면, 정적 자원, 서버 진단(Spring Boot Admin)'
+
+dependencies {
+    api project(':georu-api')
+
+    implementation libs.spring.boot.starter.web
+    implementation libs.spring.boot.starter.thymeleaf
+    implementation libs.spring.boot.starter.security       // 운영 UI 로그인 (georu.security.enabled, 기본 켜짐)
+    implementation libs.spring.boot.admin.server         // 서버 진단 화면 /admin (georu.admin-console.enabled)
+    implementation libs.spring.boot.admin.client
+    implementation libs.swagger.annotations              // 컨트롤러 · 폼의 @Tag · @Operation · @Schema
+
+    testImplementation libs.spring.security.test
+    testImplementation 'com.h2database:h2'
+}
+
+tasks.named('processResources') {
+    inputs.property('version', project.version)
+    filesMatching('georu/ui/version.properties') {
+        expand(version: project.version)
+    }
+}

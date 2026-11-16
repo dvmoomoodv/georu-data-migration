@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_banner : 배너 ← ASIS(Oracle) NTC_BANNER
+     이관 상태: 대기 (ASIS 배너 이미지 경로 규칙 확인 중) - DemoNoticePlugin -->
+<mapper namespace="georu.demo.notice.TbBannerSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."NTC_BANNER" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbBannerSourceDto">
+        SELECT
+              A."BANNER_ID" AS "BANNER_ID"    <!-- 배너ID INT -->
+            , A."BANNER_NM" AS "BANNER_NM"    <!-- 배너명 VARCHAR(100) -->
+            , A."IMG_PATH" AS "IMAGE_PATH"    <!-- 이미지 경로 VARCHAR(300) -->
+            , A."LINK_URL" AS "LINK_URL"    <!-- 링크 VARCHAR(500) -->
+            , A."SORT_NO" AS "SORT_NO"    <!-- 정렬순서 INT -->
+            , DECODE(A."USE_YN", 'Y', '1', '0') AS "USE_YN"    <!-- 사용여부 1/0 CHAR(1) -->
+            , A."REG_ID" AS "INUSERID"    <!-- 등록자 -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 -->
+            , A."MOD_ID" AS "LUSERID"    <!-- 수정자 -->
+            , TO_CHAR(A."MOD_DATE", 'YYYYMMDDHH24MISS') AS "LDATE"    <!-- 수정일시 -->
+          FROM "DEMO"."NTC_BANNER" A
+        <include refid="where"/>
+         ORDER BY A."BANNER_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

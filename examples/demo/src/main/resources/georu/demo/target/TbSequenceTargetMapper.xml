@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_sequence : 공통시퀀스관리 (업무 05 시퀀스관리) / 자동 생성: 코드 생성기 -->
+<mapper namespace="georu.demo.sequence.TbSequenceTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbSequenceTargetDto">
+        INSERT INTO `demo_tobe`.`tb_sequence` (
+              `TABLES`    <!-- VARCHAR(50) 테이블명 -->
+            , `COL`    <!-- VARCHAR(50) 시퀀스컬럼 -->
+            , `SEQ`    <!-- DECIMAL(18,0) 시퀀스번호 -->
+        ) VALUES (
+              #{tables}
+            , #{col}
+            , #{seq}
+        )
+        <!-- PK 있음. 재실행은 제품 정책상 "기존 데이터 있으면 경고 후 중단" → 데모 리셋 SQL(21_demo_tobe_reset.sql) 후 재실행 -->
+    </insert>
+
+    <!-- 직접 만든 Writer(TbSequenceUpsertWriter)가 쓰는 문장. 런타임 채번이 먼저 만든 행을 작은 값으로 덮지 않는다 -->
+    <insert id="upsertData" parameterType="com.georu.examples.demo.target.dto.TbSequenceTargetDto">
+        INSERT INTO `demo_tobe`.`tb_sequence` (`TABLES`, `COL`, `SEQ`)
+        VALUES (#{tables}, #{col}, #{seq})
+        ON DUPLICATE KEY UPDATE `SEQ` = GREATEST(`SEQ`, VALUES(`SEQ`))
+    </insert>
+
+</mapper>

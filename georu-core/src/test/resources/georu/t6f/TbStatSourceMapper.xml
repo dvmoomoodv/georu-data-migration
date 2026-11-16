@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="georu.t6f.TbStatSourceMapper">
+  <select id="selectTotalCount" resultType="int">SELECT COUNT(*) FROM TB_STAT</select>
+  <select id="selectPageData" resultType="com.georu.core.internal.plugin.FanOutTest$StatSource">
+    SELECT STAT_ID AS statId, AMT AS amt FROM TB_STAT ORDER BY STAT_ID LIMIT #{_pagesize} OFFSET #{_skiprows}
+  </select>
+</mapper>

@@ -1,0 +1,85 @@
+# =============================================================================
+# prd 프로파일 - 운영
+#   접속정보·비밀은 환경변수 필수 (기본값 없음). 저장소에 호스트/계정/비밀번호를 적지 않는다.
+#     OPERATION_DB_URL / OPERATION_DB_USERNAME / OPERATION_DB_PASSWORD        (MySQL mig_ops, DDL 은 DBA 관리)
+#     SOURCE_DB_URL / SOURCE_DB_USERNAME / SOURCE_DB_PASSWORD           (소스 읽기 전용 계정)
+#     TARGET_DB_HOST / TARGET_DB_PORT / TARGET_DB_NAME / TARGET_DB_USERNAME / TARGET_DB_PASSWORD
+#     TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID (운영 채팅방)
+#     API_CORS_ALLOWED_ORIGINS (관리 UI 도메인)
+#   실행 시 SPRING_PROFILES_ACTIVE=prd 를 반드시 지정한다.
+# =============================================================================
+georu:
+  codegen:
+    enabled: false                     # 이관 설계 도구(코드 생성 등) 화면 · API 끔. 개발 · 업체 적용 전에만 쓴다
+  datasource:
+    operation:
+      hikari:
+        jdbc-url: ${OPERATION_DB_URL}
+        username: ${OPERATION_DB_USERNAME}
+        password: ${OPERATION_DB_PASSWORD}
+    source-m:
+      hikari:
+        jdbc-url: ${SOURCE_DB_URL}
+        username: ${SOURCE_DB_USERNAME}
+        password: ${SOURCE_DB_PASSWORD}
+        maximum-pool-size: 8                                   # J(1)×2+2 = 4 면 충분, 여유로 유지
+        minimum-idle: 2
+        connection-timeout: 60000
+    target-m:
+      hikari:
+        jdbc-url: jdbc:mysql://${TARGET_DB_HOST}:${TARGET_DB_PORT:3306}/${TARGET_DB_NAME}
+        username: ${TARGET_DB_USERNAME}
+        password: ${TARGET_DB_PASSWORD}
+        maximum-pool-size: 20                                  # J(1)×W(6)+2 = 8 이면 충분, 여유로 유지
+        minimum-idle: 4
+        connection-timeout: 60000
+        data-source-properties:
+          useSSL: true                                         # 운영은 SSL
+
+  plugins:
+    demo:
+      enabled: false                      # 데모 플러그인 (DEMO→demo_tobe). 운영에서는 끈다
+  log:
+    level: INFO
+    sql-level: WARN
+    root-level: WARN
+  operation:
+    schema-init: never
+  batch:
+    executor:
+      core-pool-size: 1                      # 단일 실행 규칙: 1 고정 (2 이상이면 기동 실패)
+      max-pool-size: 1
+    queue:
+      writer-thread-count: 6
+
+  run-window:
+    enabled: true
+    ranges:
+      - "08:00-21:00"
+  scheduler:
+    enabled: true
+
+  notification:
+    telegram:
+      enabled: true
+
+batch:
+  migration:
+    api:
+      cors:
+        allowedOrigins: ${API_CORS_ALLOWED_ORIGINS}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,logfile,threaddump   # 서버 진단 화면(/admin): 스레드 덤프·로그 파일 (읽기 전용). loggers·env 는 열지 않음
+  endpoint:
+    health:
+      show-details: never
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false

@@ -1,0 +1,11 @@
+plugins {
+    id 'georu.java-library'
+}
+
+description = 'georu 플러그인 작성자용 테스트 도구: 의존 경계 규칙(ArchUnit), 여러 DataSource H2 픽스처'
+
+dependencies {
+    api project(':georu-core')
+    api libs.archunit.junit5
+    api libs.h2                 // GeoruTestDataSources
+}

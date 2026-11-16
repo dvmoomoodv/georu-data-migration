@@ -1,0 +1,8 @@
+﻿코드그룹,코드,코드명,순서,사용여부
+GENDER,M,남자,1,Y
+GENDER,F,여자,2,Y
+MEM_STATUS,A,정상,1,Y
+MEM_STATUS,I,탈퇴,2,Y
+MEM_STATUS,D,휴면,3,N
+DEVICE,P,PC,1,Y
+DEVICE,M,모바일,2,Y

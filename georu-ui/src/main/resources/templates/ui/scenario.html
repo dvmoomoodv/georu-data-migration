@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('시나리오 이관 실행')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<div th:replace="~{ui/layout :: gate}"></div>
+<main>
+    <div class="page-head"><h1>시나리오 이관 실행</h1><p class="page-desc">정의된 순서로 단계(테이블) → 날짜 구간 → Job 을 서버가 하나씩 실행 · 한 번에 한 이관만</p></div>
+    <div id="envStrip"></div>
+    <div id="runningWarn"></div>
+    <div class="card">
+        <div class="card-head"><h2>시나리오 <span class="small muted">배포 파일(읽기 전용) + 사용자 정의(운영 저장소)</span></h2>
+            <div class="inline"><a class="btn primary sm" href="/ui/scenario-design?mode=new" data-write>+ 새 시나리오 (설계)</a><button class="btn sm" id="uploadScn" type="button" data-write title="JSON 파일을 올려 설계기에서 편집">파일 올리기</button><input type="file" id="scnFile" accept=".json,application/json" style="display:none"><button class="btn sm" id="reload" type="button">새로고침</button></div></div>
+        <div id="list" class="mt-8"><div class="empty small loading">불러오는 중…</div></div>
+    </div>
+    <div class="split r54">
+        <div class="stack">
+        <div class="card" id="detailHint"><div class="empty">위 목록에서 시나리오를 고르면 단계 흐름과 실행 설정이 여기에 표시됩니다.</div></div>
+        <div class="card" id="detailCard" style="display:none">
+            <div class="card-head"><h2 id="scnTitle"></h2><span class="small muted mono" id="scnSource"></span></div>
+            <div class="small muted" id="scnDesc" style="margin:4px 0 8px"></div>
+            <div class="scn-flow" id="flow"></div>
+            <form class="mt-12 f" id="form" onsubmit="return false">
+                <div class="field full"><label>실행 모드 <span class="muted">(NORMAL 은 실제 이관)</span></label>
+                    <div class="choice">
+                        <label><input type="radio" name="testMode" value="READER_TEST" checked> READER_TEST <span class="muted small">읽기만</span></label>
+                        <label><input type="radio" name="testMode" value="WRITER_TEST"> WRITER_TEST <span class="muted small">단위마다 적재 ≤100건</span></label>
+                        <label class="danger"><input type="radio" name="testMode" value="NORMAL"> NORMAL <span class="muted small">실제 이관</span></label>
+                    </div></div>
+                <div class="field"><label>테스트 최대 건수 <span class="muted">(단위마다, 비우면 모드 기본값)</span></label><input id="testMaxItems" type="number" min="1" max="100"></div>
+                <div class="field"><label>분할 단계 시작일 <span class="muted">(비우면 정의 값)</span></label><input id="startDate" placeholder="YYYYMMDD"></div>
+                <div class="field"><label>분할 단계 종료일 <span class="muted">(포함)</span></label><input id="endDate" placeholder="YYYYMMDD"></div>
+                <div class="field"><label>구간이 실패하면 <span class="muted">(시나리오 기본)</span></label><select id="onUnitFailure"><option value="">정의 값</option><option value="STOP">남은 구간 멈춤</option><option value="CONTINUE">남은 구간 계속</option></select></div>
+                <div class="field"><label>단계가 끝까지 성공하지 못하면</label><select id="onStepStop"><option value="">정의 값</option><option value="STOP_ALL">시나리오 전체 멈춤</option><option value="NEXT_STEP">다음 단계 계속</option></select></div>
+                <div class="field full"><div id="scnAutoPc"></div>
+                    <details class="mt-4"><summary class="small">단계마다 실행 직전에 확인하는 순서</summary><div id="scnGuardFlow" class="mt-6"></div></details></div>
+                <div class="mt-6 full inline">
+                    <button class="btn" id="check" type="button">사전 확인</button>
+                    <button class="btn primary" id="run" type="button" data-write>시나리오 실행</button>
+                    <span class="small muted">제품은 타겟을 지우지 않습니다 - 다시 돌리려면 <a href="/ui/guide?name=manual-cleanup" target="_blank">수작업 정리</a> 후 실행</span>
+                </div>
+            </form>
+            <div id="checkBox" class="mt-12"></div>
+        </div>
+        </div>
+        <div class="sticky-col stack">
+        <div class="card">
+            <div class="card-head"><h2>진행 현황</h2><span class="inline"><span class="small muted mono" id="trackMeta"></span><button class="btn sm" id="btnRecent" type="button" title="최근 시나리오 실행 (고르면 진행 현황에 표시)">최근 실행 ▾</button></span></div>
+            <div id="track"><div class="empty">시나리오를 실행하거나 최근 실행을 고르면 단계·구간별 진행과 결과가 표시됩니다.</div></div>
+        </div>
+        </div>
+    </div>
+    <!-- 정의 오류 (todo-task 33 9-2): 목록의 실행 열에는 첫 건 한 줄 + 건수, 누르면 여기에 전체 -->
+    <aside class="sp" data-panel="err" data-title="정의 오류" data-width="560" data-dock-label="정의 오류" data-dock-icon="block">
+        <div id="errBox"><div class="empty small">목록의 실행 열에서 "불가" 아래 사유를 누르면 여기에 전체가 나옵니다.</div></div>
+    </aside>
+</main>
+<style>/* Hallmark · checked: 2026-10-29 · genre: modern-minimal (inferred) · built: the project · redesign: polish · v2.0.0 */
+.scn-flow{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px}
+.scn-step{border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:120px;background:var(--card)}
+.scn-step .t{font-weight:600}.scn-step .p{font-size:11px;color:var(--muted)}
+.scn-step.ok{border-color:var(--c-16a34a)}.scn-step.bad{border-color:var(--c-dc2626)}.scn-step.run{border-color:var(--c-2563eb)}.scn-step.skip{opacity:.55}.scn-step.warn{border-color:var(--c-d97706)}
+.scn-arrow{align-self:center;color:var(--muted)}
+.scn-units{display:flex;gap:2px;margin-top:4px;flex-wrap:wrap}.scn-units i{width:8px;height:8px;border-radius:2px;background:var(--line)}
+.scn-units i.COMPLETED{background:var(--c-16a34a)}.scn-units i.FAILED,.scn-units i.BLOCKED{background:var(--c-dc2626)}.scn-units i.RUNNING{background:var(--c-2563eb)}.scn-units i.NOT_RUN,.scn-units i.INTERRUPTED{background:var(--c-94a3b8)}
+tr.sel td{background:var(--hover, var(--c-a-37-99-235-08))}
+</style>
+<script th:inline="javascript">
+(function () {
+  const IS_PRD = /*[[${isProduction}]]*/ false;
+  const PRECHECK_AUTO = /*[[${precheckAuto}]]*/ true;
+  /** 모드에 따른 자동 점검 안내 (단계별 건너뜀은 사전 확인에서) */
+  function renderAutoPc() {
+    const m = document.querySelector('input[name=testMode]:checked').value;
+    const st = UI.autoPrecheckState({ auto: PRECHECK_AUTO, mode: m });
+    $('#scnAutoPc').innerHTML = UI.autoPrecheckLine(st) + (st === 'ON' ? ' <span class="small">· <b>단계마다</b> 1회 (날짜 분할은 구간마다가 아니라 단계당 1회). 차단이면 그 단계에서 멈춤</span>' : '');
+    $('#scnGuardFlow').innerHTML = UI.guardFlow({ auto: PRECHECK_AUTO, mode: m });
+  }
+  document.querySelectorAll('input[name=testMode]').forEach(r => r.addEventListener('change', renderAutoPc));
+  setTimeout(renderAutoPc, 0);
+  const { get, post, esc, badge, confirmModal, toast, num, $ } = UI;
+  let scenarios = [], current = null, trackSeq = 0;
+  const v = (id) => $('#' + id).value.trim();
+  const mode = () => document.querySelector('input[name=testMode]:checked').value;
+  const policyText = (u, s) => [u ? '구간 실패 시 ' + (u === 'CONTINUE' ? '계속' : '멈춤') : '', s ? '단계 멈춤 시 ' + (s === 'NEXT_STEP' ? '다음 단계' : '전체 멈춤') : ''].filter(Boolean).join(' · ');
+
+  function request() {
+    const r = { testMode: mode(), executedBy: UI.executedBy.get() || undefined };
+    if (r.testMode !== 'NORMAL' && v('testMaxItems')) r.testMaxItems = Number(v('testMaxItems'));
+    if (v('startDate')) r.startDate = v('startDate');
+    if (v('endDate')) r.endDate = v('endDate');
+    if (v('onUnitFailure')) r.onUnitFailure = v('onUnitFailure');
+    if (v('onStepStop')) r.onStepStop = v('onStepStop');
+    return r;
+  }
+
+  // 실행 불가 사유 (todo-task 33 9-2): 목록에는 첫 건 한 줄 + 건수, 누르면 오른쪽 정의 오류 패널에 전체
+  /** refusal 을 항목으로: "정의 오류: 1단계: … / 2단계: …" → ['1단계: …', '2단계: …'] */
+  function refusalItems(text) {
+    const t = String(text || '').trim(), m = /^정의 오류:\s*/.exec(t);
+    return { def: !!m, items: (m ? t.slice(m[0].length) : t).split(' / ').map(x => x.trim()).filter(Boolean) };
+  }
+  function refusalLink(s) {
+    const { items } = refusalItems(s.refusal); if (!items.length) return '';
+    return `<button type="button" class="err-link" data-err="${esc(s.id)}" title="실행할 수 없는 이유 전체 보기"><span class="cut1">${esc(items[0])}</span>${items.length > 1 ? `<b>${items.length}건</b>` : ''}</button>`;
+  }
+  function showRefusal(id) {
+    const s = scenarios.find(x => x.id === id); if (!s) return;
+    const { def, items } = refusalItems(s.refusal);
+    const li = items.map((x, i) => { const k = x.indexOf(':'); return k > 0 && k <= 10 ? `<li><span class="no">${esc(x.slice(0, k))}</span><span>${esc(x.slice(k + 1).trim())}</span></li>` : `<li><span class="no">${i + 1}</span><span>${esc(x)}</span></li>`; }).join('');
+    const fix = s.editable ? `<a class="btn sm primary" href="/ui/scenario-design?mode=edit&id=${encodeURIComponent(s.id)}" data-write>설계에서 고치기</a>`
+      : `<a class="btn sm primary" href="/ui/scenario-design?mode=copy&id=${encodeURIComponent(s.id)}" data-write title="배포 파일은 고칠 수 없어 복제해서 고칩니다">복제해서 고치기</a>`;
+    $('#errBox').innerHTML = `<div class="sp-sum"><div><b>${esc(s.name)}</b> <span class="mono small muted">${esc(s.id)}</span></div><div class="inline"><span class="badge BLOCKED">불가</span></div></div>`
+      + `<p class="small muted">${def ? `이 정의는 지금 실행할 수 없습니다. 아래 ${items.length}건을 고치면 "가능"으로 바뀝니다.` : '이 시나리오는 지금 실행할 수 없습니다.'}</p>`
+      + `<ol class="err-list">${li}</ol>`
+      + `<div class="inline mt-10">${fix}<a class="btn sm" href="/ui/system" title="플러그인이 없거나 꺼져 있으면 시스템 화면의 플러그인 목록에서 확인">플러그인 상태</a></div>`;
+    UI.panel.open('err');   // 조회만 권한이면 data-write 버튼은 CSS(html.ro)로 숨는다
+  }
+
+  async function loadList() {
+    try { scenarios = await get('/api/scenarios') || []; } catch (e) { $('#list').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; return; }
+    if (!scenarios.length) { $('#list').innerHTML = '<div class="empty small">정의된 시나리오가 없습니다 (src/main/resources/scenarios/*.json)</div>'; return; }
+    $('#list').innerHTML = '<table class="list"><tr><th>시나리오</th><th>종류</th><th>단계</th><th>플러그인</th><th>기본 정책</th><th>실행</th><th></th></tr>' + scenarios.map(s => {
+      const plugins = [...new Set(s.steps.map(x => x.plugin))].join(' · ');
+      const kind = s.editable ? `사용자 정의 <span class="muted">v${esc(s.version)}</span>${s.enabled ? '' : ' <span class="badge STOPPED">사용 안 함</span>'}` : `<span class="muted" title="${esc(s.source)}">배포 파일</span>`;
+      const btns = (s.editable ? `<a class="btn sm" href="/ui/scenario-design?mode=edit&id=${encodeURIComponent(s.id)}" data-write>설계·편집</a> <button class="btn sm" data-write data-enable="${esc(s.id)}" data-on="${s.enabled ? '0' : '1'}">${s.enabled ? '사용 안 함' : '사용'}</button>` : '')
+        + ` <a class="btn sm" href="/ui/scenario-design?mode=copy&id=${encodeURIComponent(s.id)}" data-write title="이 정의를 바탕으로 새 시나리오">복제</a> <a class="btn sm" href="/api/scenarios/${encodeURIComponent(s.id)}/export">JSON</a>`;
+      return `<tr data-id="${esc(s.id)}" class="${current && current.id === s.id ? 'sel' : ''}" style="cursor:pointer"><td><b>${esc(s.name)}</b> <span class="mono small muted">${esc(s.id)}</span></td><td class="small">${kind}</td><td>${s.steps.length}</td><td class="small">${esc(plugins)}</td>`
+        + `<td class="small wrap">${esc(policyText(s.onUnitFailure, s.onStepStop))}</td><td class="wrap">${s.runnable ? '<span class="badge COMPLETED">가능</span>' : `<span class="badge BLOCKED">불가</span>${refusalLink(s)}`}</td><td class="nowrap">${btns}</td></tr>`;
+    }).join('') + '</table>';
+    document.querySelectorAll('#list [data-err]').forEach(b => b.onclick = () => showRefusal(b.dataset.err));
+    document.querySelectorAll('#list tr[data-id]').forEach(tr => tr.onclick = (ev) => { if (ev.target.closest('button,a')) return; select(tr.dataset.id); });
+    document.querySelectorAll('#list [data-enable]').forEach(b => b.onclick = async () => {
+      const on = b.dataset.on === '1';
+      if (!await confirmModal(on ? '사용으로 변경' : '사용 안 함으로 변경', `<span class="mono">${esc(b.dataset.enable)}</span> 을(를) ${on ? '실행할 수 있게 합니다' : '목록에 남기되 실행하지 못하게 합니다 (삭제 아님)'}.`, '변경')) return;
+      try { await UI.api('PUT', '/api/scenarios/' + encodeURIComponent(b.dataset.enable) + '/enabled', { enabled: on }); toast('변경했습니다', 'ok'); loadList(); } catch (e) { toast(e.message, 'err'); }
+    });
+    if (!current) { const q = UI.qs('id'); select(q && scenarios.find(s => s.id === q) ? q : scenarios[0].id); }
+  }
+
+  function select(id) {
+    current = scenarios.find(s => s.id === id);
+    if (!current) return;
+    document.querySelectorAll('#list tr[data-id]').forEach(tr => tr.classList.toggle('sel', tr.dataset.id === id));
+    $('#detailCard').style.display = ''; $('#detailHint').style.display = 'none';
+    $('#scnTitle').textContent = current.name;
+    $('#scnSource').textContent = current.source;
+    $('#scnDesc').textContent = (current.description || '') + (current.profiles && current.profiles.length ? ' · 프로파일 ' + current.profiles.join(',') : '');
+    $('#checkBox').innerHTML = current.runnable ? '' : `<div class="alert err">${esc(current.refusal)}</div>`;
+    $('#run').disabled = !current.runnable;
+    drawFlow(current.steps.map((s, i) => ({ seq: i + 1, plugin: s.plugin, table: s.table, label: s.label, divide: s.divide, u: s.onUnitFailure, st: s.onStepStop })));
+  }
+
+  /** 단계 카드 (state: ok/bad/run/skip/warn, units: 단위 상태 목록) */
+  function drawFlow(steps) {
+    $('#flow').innerHTML = steps.map((s, i) => `${i ? '<span class="scn-arrow">▶</span>' : ''}<div class="scn-step ${s.state || ''}" title="${esc(s.plugin)}.${esc(s.table)}">`
+      + `<div class="p">${s.seq}. ${esc(s.plugin)}</div><div class="t">${esc(s.table)}</div>`
+      + (s.label ? `<div class="p">${esc(s.label)}</div>` : '')
+      + (s.divide ? `<div class="p">분할 ${esc(s.divide.unit || '1m')} · ${esc(s.divide.startDate || '')}~${esc(s.divide.endDate || '')}</div>` : '')
+      + ((s.u || s.st) ? `<div class="t-warn p">${esc(policyText(s.u, s.st))}</div>` : '')
+      + (s.extra || '')
+      + (s.units ? `<div class="scn-units">${s.units.map(u => `<i class="${esc(u)}" title="${esc(u)}"></i>`).join('')}</div>` : '')
+      + '</div>').join('');
+  }
+
+  async function doCheck() {
+    if (!current) return null;
+    $('#checkBox').innerHTML = '<div class="empty small">확인 중…</div>';
+    try {
+      const c = await post('/api/scenarios/' + encodeURIComponent(current.id) + '/check', request());
+      const steps = c.steps || [];
+      drawFlow(steps.map(s => ({ seq: s.seq, plugin: s.plugin, table: s.table, label: s.label, u: s.onUnitFailure === 'CONTINUE' ? 'CONTINUE' : null, st: s.onStepStop === 'NEXT_STEP' ? 'NEXT_STEP' : null,
+        divide: s.divideUnit ? { unit: s.divideUnit, startDate: (s.ranges[0] || '').split('~')[0], endDate: (s.ranges[s.ranges.length - 1] || '').split('~')[1] } : null,
+        state: s.blockers.length ? 'bad' : (s.warnings.length ? 'warn' : 'ok'),
+        extra: `<div class="p">구간 ${s.units} · 기존 ${s.existingCount == null ? '?' : esc(s.existingCount)}${(s.sequenceColumns || []).length ? ' · 채번 ' + esc(s.sequenceColumns.join(',')) : ''}</div><div class="p">${UI.autoPrecheckBadge(s.autoPrecheck || 'NA')}</div>` })));
+      let html = c.runnable ? `<div class="alert ok">✔ ${steps.length} 단계 · 단위 ${num(c.unitTotal)}개 실행 가능 (${esc(c.testMode)})</div>`
+        : `<div class="alert err">실행할 수 없습니다${c.refusal ? ': ' + esc(c.refusal) : ''}${c.blockedSteps ? ` · 막힌 단계 ${c.blockedSteps}개` : ''}${c.gateBusy ? ' · 다른 이관 실행 중' : ''}</div>`;
+      const rows = steps.filter(s => s.blockers.length || s.warnings.length);
+      if (rows.length) html += '<table class="small"><tr><th>단계</th><th>테이블</th><th>막는 것</th><th>주의</th></tr>' + rows.map(s => `<tr><td>${s.seq}</td><td>${esc(s.table)}</td>`
+        + `<td class="t-danger">${s.blockers.map(esc).join('<br>')}</td><td>${s.warnings.map(esc).join('<br>')}</td></tr>`).join('') + '</table>';
+      if (rows.some(s => s.blockers.some(b => b.indexOf('기존 데이터') >= 0))) html += '<div class="mt-6 small">제품은 데이터를 지우지 않습니다. <a href="/ui/guide?name=manual-cleanup" target="_blank">수작업 정리 안내서</a>대로 비운 뒤 다시 확인하세요.</div>';
+      $('#checkBox').innerHTML = html;
+      return c;
+    } catch (e) { $('#checkBox').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; return null; }
+  }
+
+  /** 사전 확인 결과의 단계별 자동 점검 요약 */
+  function autoPcSummary(c) {
+    const steps = c.steps || [], cnt = (k) => steps.filter(s => s.autoPrecheck === k).length;
+    if (!steps.length) return '-';
+    if (cnt('NA') === steps.length) return UI.autoPrecheckLine('NA');
+    if (cnt('OFF') === steps.length) return UI.autoPrecheckLine('OFF');
+    return `${UI.autoPrecheckBadge('ON')} ${cnt('ON')}단계 실행 직전 점검` + (cnt('SKIP') ? ` · ${UI.autoPrecheckBadge('SKIP')} ${cnt('SKIP')}단계 (${steps.filter(s => s.autoPrecheck === 'SKIP').map(s => s.seq + '.' + esc(s.table)).join(', ')})` : '');
+  }
+
+  async function doRun() {
+    if (!current) return;
+    const req = request();
+    const c = await doCheck();
+    if (!c) return;
+    let html = `<table><tr><th>시나리오</th><td><b>${esc(current.name)}</b></td></tr><tr><th>단계 · 단위</th><td>${(c.steps || []).length} 단계 · ${num(c.unitTotal)} 단위(Job)</td></tr><tr><th>모드</th><td>${badge(req.testMode)}${req.testMaxItems ? ' 최대 ' + req.testMaxItems + '건' : ''}</td></tr>`
+      + `<tr><th>정책</th><td>${esc(policyText(req.onUnitFailure || current.onUnitFailure, req.onStepStop || current.onStepStop))}</td></tr>`
+      + `<tr><th>자동 점검</th><td>${autoPcSummary(c)}</td></tr></table>`;
+    const cont = (c.steps || []).filter(s => s.onUnitFailure === 'CONTINUE' || s.onStepStop === 'NEXT_STEP');
+    if (cont.length) html += `<div class="mt-8 alert warn">실패해도 계속하도록 설정된 단계: ${cont.map(s => s.seq + '.' + esc(s.table)).join(', ')}</div>`;
+    if (!c.runnable) html += `<div class="mt-8 alert err">사전 확인에서 막힌 단계가 있습니다. 실행하면 그 단계에서 차단됩니다.</div>`;
+    if (req.testMode === 'NORMAL') html += `<div class="mt-8 alert err">NORMAL 은 모든 단계의 데이터를 실제로 이관합니다.</div>`;
+    if (!await confirmModal('시나리오 실행 확인', html, '실행', (req.testMode === 'NORMAL' && IS_PRD) ? current.id : null)) return;
+    $('#run').disabled = true;
+    try {
+      const r = await post('/api/scenarios/' + encodeURIComponent(current.id) + '/run', req);
+      toast('시나리오를 시작했습니다 ' + r.groupId, 'ok');
+      showGroup(r.groupId);
+    } catch (e) { toast(e.plainMessage || e.message, 'err'); }
+    finally { $('#run').disabled = !(current && current.runnable); }
+  }
+
+  /** 그룹 진행 표시: 단계 카드 색과 구간 칸, 아래에 단위 표 */
+  function showGroup(groupId) {
+    const seq = ++trackSeq;
+    $('#trackMeta').textContent = groupId;
+    UI.trackGroup(groupId, (d) => {
+      if (seq !== trackSeq) return false;
+      if (!d) return;
+      const units = d.units || [];
+      const steps = [];
+      units.forEach(u => { let s = steps.find(x => x.seq === u.stepSeq); if (!s) { s = { seq: u.stepSeq, plugin: u.pluginName, table: u.tableName, units: [] }; steps.push(s); } s.units.push(u.status); });
+      steps.forEach(s => {
+        const st = s.units;
+        s.state = st.some(x => x === 'RUNNING') ? 'run' : st.every(x => x === 'COMPLETED') ? 'ok' : st.every(x => x === 'NOT_RUN') ? 'skip' : st.some(x => x === 'FAILED' || x === 'BLOCKED') ? 'bad' : '';
+        s.extra = `<div class="p">${st.filter(x => x === 'COMPLETED').length}/${st.length}</div>`;
+      });
+      if (steps.length) drawFlow(steps);
+      $('#track').innerHTML = UI.groupView(d, { stopButton: true });
+      UI.bindGroupStop($('#track'));
+    });
+  }
+
+  /** 최근 시나리오 실행 15건: 고르면 진행 현황에 그 그룹을 보여 준다 */
+  UI.popover($('#btnRecent'), { label: '최근 시나리오 실행', empty: '아직 실행한 시나리오가 없습니다',
+    load: async () => (await get('/api/migrate/groups?type=SCENARIO&limit=15') || []).map(g => ({
+      html: `<div class="inline" style="justify-content:space-between"><b class="small">${esc(g.name)}</b><span>${badge(g.testMode)} ${UI.groupBadge(g.status)}</span></div>
+        <div class="small muted"><span class="mono">${esc(g.groupId)}</span> · ${esc(UI.fmtDate(g.startedAt))} · 성공 ${num(g.unitSuccess)} / 실패 ${num(g.unitFailed)} / 차단 ${num(g.unitBlocked)} / 미실행 ${num(g.unitNotRun)}</div>`,
+      pick: () => showGroup(g.groupId)
+    })) });
+
+  async function refreshWarn() {
+    const g = await UI.gate();
+    $('#runningWarn').innerHTML = g.busy ? '<div class="alert err">단일 실행 규칙: 다른 이관이 끝날 때까지 새 실행은 거절(409)됩니다.</div>' : '';
+  }
+
+  // ---------- 파일 올리기 → 설계기
+  $('#uploadScn').onclick = () => $('#scnFile').click();
+  $('#scnFile').onchange = () => { const f = $('#scnFile').files[0]; if (!f) return; const rd = new FileReader(); rd.onload = () => { let d; try { d = JSON.parse(rd.result); } catch (e) { toast('JSON 파일을 읽지 못했습니다', 'err'); return; } const exists = scenarios.find(x => x.id === d.id && x.editable); try { sessionStorage.setItem('ui.scenario.design', JSON.stringify(d)); } catch (e) { /* ignore */ } location.href = '/ui/scenario-design?mode=' + (exists ? 'edit' : 'new'); }; rd.readAsText(f); $('#scnFile').value = ''; };
+
+  $('#reload').onclick = loadList;
+  $('#check').onclick = doCheck;
+  $('#run').onclick = doRun;
+  loadList(); refreshWarn(); setInterval(refreshWarn, 10000);
+  if (UI.qs('groupId')) showGroup(UI.qs('groupId'));
+  if (UI.qs('check') === '1') { const t = setInterval(() => { if (current) { clearInterval(t); doCheck(); } }, 300); }
+})();
+</script>
+</body>
+</html>

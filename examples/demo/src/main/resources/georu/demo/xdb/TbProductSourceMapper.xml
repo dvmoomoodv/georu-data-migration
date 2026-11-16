@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Source] source-3 SQL Server demo_ms.dbo.WMS_PRODUCT. 삭제(DEL_YN Y) 제외. tb_product(→ target-2) 와 tb_product_dw(→ target-1) 가 같이 쓴다
+     SQL Server: 페이징 OFFSET … ROWS FETCH NEXT … ROWS ONLY (2012 이상, ORDER BY 필수), 날짜 → 문자 14 는 CONVERT(…, 120) 에서 구분자를 뺀다 (FORMAT 은 느리다) -->
+<mapper namespace="georu.demo.xdb.TbProductSourceMapper">
+    <sql id="where">
+        WHERE A.DEL_YN = 'N'
+    </sql>
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*) FROM dbo.WMS_PRODUCT A <include refid="where"/>
+    </select>
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto" resultType="com.georu.examples.demo.xdb.dto.TbProductDto">
+        SELECT A.PRODUCT_CD
+             , A.PRODUCT_NM
+             , A.PRICE
+             , REPLACE(REPLACE(REPLACE(CONVERT(varchar(19), A.REG_DT, 120), '-', ''), ' ', ''), ':', '') AS REG_DATE
+          FROM dbo.WMS_PRODUCT A
+        <include refid="where"/>
+         ORDER BY A.PRODUCT_CD
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+</mapper>

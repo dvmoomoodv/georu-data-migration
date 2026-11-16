@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Target] target-1 MySQL demo_dw.tb_order (완료 주문) -->
+<mapper namespace="georu.demo.xdb.TbOrderDwTargetMapper">
+    <insert id="insertData" parameterType="com.georu.examples.demo.xdb.dto.TbOrderDto">
+        INSERT INTO `tb_order` (`ORDER_ID`, `CUSTOMER_ID`, `ORDER_AMT`, `ORDER_DATE`, `STATUS`)
+        VALUES (#{orderId}, #{customerId}, #{orderAmt}, #{orderDate}, #{status})
+    </insert>
+</mapper>

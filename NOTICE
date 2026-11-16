@@ -1,0 +1,36 @@
+georu
+Copyright 2026 The georu Authors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+-------------------------------------------------------------------------------
+Bundled third-party resources
+-------------------------------------------------------------------------------
+
+NanumGothic font (src/main/resources/fonts/NanumGothic-*.ttf)
+  Copyright (c) 2010, NHN Corporation, with Reserved Font Name Nanum, NanumGothic, etc.
+  Licensed under the SIL Open Font License, Version 1.1
+  (src/main/resources/fonts/OFL.txt). Used to render Korean text in PDF reports.
+
+Wanted Sans font (georu-ui/src/main/resources/static/ui-assets/fonts/WantedSans-SemiBold.subset.woff2)
+  Copyright 2024 The Wanted Sans Project Authors (https://github.com/wanteddev/wanted-sans)
+  Licensed under the SIL Open Font License, Version 1.1
+  (georu-ui/src/main/resources/static/ui-assets/fonts/OFL.txt). Subset of v1.0.3 SemiBold
+  (KS X 1001 Hangul + Latin), used for headings in the operations UI.
+
+-------------------------------------------------------------------------------
+Runtime dependencies
+-------------------------------------------------------------------------------
+
+The built application and Docker image include third-party libraries resolved by
+Gradle (see build.gradle), each under its own license. Notable ones:
+
+  - Spring Boot, Spring Batch, Spring Framework .......... Apache License 2.0
+  - MyBatis / mybatis-spring ............................. Apache License 2.0
+  - Apache POI ........................................... Apache License 2.0
+  - openhtmltopdf ........................................ LGPL 2.1 / MIT (pdfbox: Apache 2.0)
+  - Spring Boot Admin .................................... Apache License 2.0
+  - H2 Database .......................................... MPL 2.0 / EPL 1.0
+  - Oracle JDBC (ojdbc11, orai18n) ....................... Oracle Free Use Terms and Conditions (FUTC)
+  - MySQL Connector/J .................................... GPL 2.0 with Universal FOSS Exception
+  - Microsoft JDBC Driver for SQL Server ................. MIT

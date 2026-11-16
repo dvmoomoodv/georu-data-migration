@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_notice : 공지사항 ← ASIS(Oracle) NTC_NOTICE
+     이관 상태: 수행 - DemoNoticePlugin -->
+<mapper namespace="georu.demo.notice.TbNoticeSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."NTC_NOTICE" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbNoticeSourceDto">
+        SELECT
+              A."NOTICE_ID" AS "NOTICE_ID"    <!-- 공지ID INT -->
+            , A."TITLE" AS "TITLE"    <!-- 제목 VARCHAR(200) -->
+            , A."CONTENT" AS "CONTENT"    <!-- 내용 VARCHAR(2000) -->
+            , DECODE(A."NOTICE_TYPE_CD", 'G', 'GENERAL', 'U', 'URGENT', 'E', 'EVENT', 'GENERAL') AS "NOTICE_TYPE"    <!-- 공지유형 GENERAL/URGENT/EVENT VARCHAR(10) -->
+            , DECODE(A."TOP_YN", 'Y', '1', '0') AS "TOP_YN"    <!-- 상단고정 1/0 CHAR(1) -->
+            , NVL(A."VIEW_CNT", 0) AS "VIEW_CNT"    <!-- 조회수 INT -->
+            , TO_CHAR(A."POST_START_DT", 'YYYYMMDD') AS "POST_START_YMD"    <!-- 게시시작일 VARCHAR(8) -->
+            , A."REG_ID" AS "INUSERID"    <!-- 등록자 -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 -->
+            , A."MOD_ID" AS "LUSERID"    <!-- 수정자 -->
+            , TO_CHAR(A."MOD_DATE", 'YYYYMMDDHH24MISS') AS "LDATE"    <!-- 수정일시 -->
+          FROM "DEMO"."NTC_NOTICE" A
+        <include refid="where"/>
+         ORDER BY A."NOTICE_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

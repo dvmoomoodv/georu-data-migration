@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_popup : 팝업 ← ASIS(Oracle) NTC_POPUP
+     이관 상태: 대기 (TOBE 팝업 화면 설계 확정 전 (링크 규칙 미정)) - DemoNoticePlugin -->
+<mapper namespace="georu.demo.notice.TbPopupSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."NTC_POPUP" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbPopupSourceDto">
+        SELECT
+              A."POPUP_ID" AS "POPUP_ID"    <!-- 팝업ID INT -->
+            , A."POPUP_NM" AS "POPUP_NM"    <!-- 팝업명 VARCHAR(100) -->
+            , TO_CHAR(A."START_DT", 'YYYYMMDD') AS "START_YMD"    <!-- 시작일 VARCHAR(8) -->
+            , TO_CHAR(A."END_DT", 'YYYYMMDD') AS "END_YMD"    <!-- 종료일 VARCHAR(8) -->
+            , A."WIDTH" AS "WIDTH"    <!-- 가로(px) INT -->
+            , A."HEIGHT" AS "HEIGHT"    <!-- 세로(px) INT -->
+            , NULL AS "LINK_URL"    <!-- 링크 VARCHAR(500) TODO ← 원천 미정 (ASIS LINK_URL 은 내부 경로 · 외부 URL 이 섞여 있음) -->
+            , DECODE(A."USE_YN", 'Y', '1', '0') AS "USE_YN"    <!-- 사용여부 1/0 CHAR(1) -->
+            , A."REG_ID" AS "INUSERID"    <!-- 등록자 -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 -->
+            , A."MOD_ID" AS "LUSERID"    <!-- 수정자 -->
+            , TO_CHAR(A."MOD_DATE", 'YYYYMMDDHH24MISS') AS "LDATE"    <!-- 수정일시 -->
+          FROM "DEMO"."NTC_POPUP" A
+        <include refid="where"/>
+         ORDER BY A."POPUP_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

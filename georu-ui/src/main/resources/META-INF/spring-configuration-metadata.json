@@ -1,0 +1,16 @@
+{
+  "properties": [
+    {
+      "name": "georu.customer.name",
+      "type": "java.lang.String",
+      "description": "고객사 이름. UI 좌상단과 브라우저 탭 제목에 \"Georu for <이름>\" 으로 표시한다.",
+      "defaultValue": "dvmoomoodv"
+    },
+    {
+      "name": "georu.ui.enabled",
+      "type": "java.lang.Boolean",
+      "description": "운영 화면(georu-ui)을 켤지. false 면 화면 Bean 을 등록하지 않는다.",
+      "defaultValue": true
+    }
+  ]
+}

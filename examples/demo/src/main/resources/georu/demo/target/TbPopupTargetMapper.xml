@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Target] TOBE(MySQL) tb_popup : 팝업 (업무 04 공지) / 이관 상태: 대기 -->
+<mapper namespace="georu.demo.notice.TbPopupTargetMapper">
+
+    <select id="testSelect" resultType="int">
+        SELECT 1
+    </select>
+
+    <insert id="insertData" parameterType="com.georu.examples.demo.target.dto.TbPopupTargetDto">
+        INSERT INTO `demo_tobe`.`tb_popup` (
+              `POPUP_ID`    <!-- INT 팝업ID -->
+            , `POPUP_NM`    <!-- VARCHAR(100) 팝업명 -->
+            , `START_YMD`    <!-- VARCHAR(8) 시작일 -->
+            , `END_YMD`    <!-- VARCHAR(8) 종료일 -->
+            , `WIDTH`    <!-- INT 가로(px) -->
+            , `HEIGHT`    <!-- INT 세로(px) -->
+            , `LINK_URL`    <!-- VARCHAR(500) 링크 -->
+            , `USE_YN`    <!-- CHAR(1) 사용여부 1/0 -->
+            , `INUSERID`    <!-- VARCHAR(40) 등록자 -->
+            , `INDATE`    <!-- VARCHAR(14) 등록일시 -->
+            , `LUSERID`    <!-- VARCHAR(40) 수정자 -->
+            , `LDATE`    <!-- VARCHAR(14) 수정일시 -->
+        ) VALUES (
+              #{popupId}
+            , #{popupNm}
+            , #{startYmd}
+            , #{endYmd}
+            , #{width}
+            , #{height}
+            , #{linkUrl}
+            , #{useYn}
+            , #{inuserid}
+            , #{indate}
+            , #{luserid}
+            , #{ldate}
+        )
+    </insert>
+
+</mapper>

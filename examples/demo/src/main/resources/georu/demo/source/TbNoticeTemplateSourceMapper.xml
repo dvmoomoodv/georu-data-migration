@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE tb_notice_template : 공지 템플릿 ← ASIS(Oracle) NTC_TEMPLATE
+     이관 상태: 이관 제외 (ASIS 전용 기능 폐기 (TOBE 는 에디터 기본 서식 사용)) - DemoNoticePlugin -->
+<mapper namespace="georu.demo.notice.TbNoticeTemplateSourceMapper">
+
+    <sql id="where">
+        WHERE 1 = 1
+    </sql>
+
+    <select id="testSelect" resultType="int">
+        SELECT 1 FROM DUAL
+    </select>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM "DEMO"."NTC_TEMPLATE" A
+        <include refid="where"/>
+    </select>
+
+    <!-- ASIS → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="com.georu.examples.demo.source.dto.TbNoticeTemplateSourceDto">
+        SELECT
+              A."TEMPLATE_ID" AS "TEMPLATE_ID"    <!-- 템플릿ID INT -->
+            , A."TEMPLATE_NM" AS "TEMPLATE_NM"    <!-- 템플릿명 VARCHAR(100) -->
+            , NULL AS "BODY"    <!-- 본문 서식 VARCHAR(2000) TODO ← BODY_HTML (HTML 정리 규칙 없음) -->
+            , DECODE(A."USE_YN", 'Y', '1', '0') AS "USE_YN"    <!-- 사용여부 1/0 CHAR(1) -->
+            , A."REG_ID" AS "INUSERID"    <!-- 등록자 -->
+            , TO_CHAR(A."REG_DATE", 'YYYYMMDDHH24MISS') AS "INDATE"    <!-- 등록일시 -->
+            , A."MOD_ID" AS "LUSERID"    <!-- 수정자 -->
+            , TO_CHAR(A."MOD_DATE", 'YYYYMMDDHH24MISS') AS "LDATE"    <!-- 수정일시 -->
+          FROM "DEMO"."NTC_TEMPLATE" A
+        <include refid="where"/>
+         ORDER BY A."TEMPLATE_ID"
+        OFFSET #{_skiprows} ROWS FETCH NEXT #{_pagesize} ROWS ONLY
+    </select>
+
+</mapper>

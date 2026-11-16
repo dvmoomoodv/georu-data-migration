@@ -1,0 +1,25 @@
+// 데모 앱은 별도 Gradle 빌드다. 라이브러리는 업체 프로젝트와 똑같이 com.georu:* 좌표로 의존한다.
+// includeBuild('../..') 가 그 좌표를 저장소 안의 라이브러리 소스로 바꿔 끼운다 (개발 중).
+// 배포된 jar 만으로 돌아가는지 확인하려면 includeBuild 줄을 지우고 repositories 에 배포 저장소를 추가한다.
+pluginManagement {
+    includeBuild '../../build-logic'
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
+    versionCatalogs {
+        libs {
+            from(files('../../gradle/libs.versions.toml'))
+        }
+    }
+}
+
+rootProject.name = 'georu-demo'
+
+includeBuild '../..'

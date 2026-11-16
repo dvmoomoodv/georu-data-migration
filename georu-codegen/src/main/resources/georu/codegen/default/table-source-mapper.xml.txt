@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- [Source] TOBE [(${t.physical})][(${t.xmlComment})] ← [(${t.mapped} ? ${t.source} : '원천 미지정')] ([(${s.sourceDataSource})], [(${s.sourceDialect})])
+     [(${t.mappingSummary})]
+     자동 생성: georu 코드 생성기 [(${gen.version})] -->
+<mapper namespace="georu.[(${w.plugin})].[(${t.pascal})]SourceMapper">
+
+    <sql id="where">
+[# th:if="${t.mapped}"]        <!-- 이관 조건은 여기에 (예: AND A."STATUS" <> 'D'). 뺀 건수는 READER_TEST 의 COUNT 와 소스 건수로 확인한다 -->
+        WHERE 1 = 1
+[/][# th:unless="${t.mapped}"]        WHERE 1 = 0    <!-- TODO 원천 미지정: FROM · SELECT 를 채운 뒤 이 줄을 WHERE 1 = 1 로 바꾼다 -->
+[/]    </sql>
+
+    <select id="selectTotalCount" parameterType="com.georu.common.dto.CommonSourceDto" resultType="int">
+        SELECT COUNT(*)
+          FROM [(${t.fromClause})] A[(${t.fromComment})]
+        <include refid="where"/>
+    </select>
+
+    <!-- 원천 → TOBE 컬럼 변환. 별칭 = TOBE 컬럼명 -->
+    <select id="selectPageData" parameterType="com.georu.common.dto.CommonSourceDto"
+            resultType="[(${w.pkg})].dto.[(${t.pascal})]SourceDto">
+        SELECT
+[# th:each="c, st : ${t.columns}"]            [(${st.first} ? '  ' : ', ')][(${c.selectExpr})] AS [(${c.alias})][(${c.selectComment})]
+[/]          FROM [(${t.fromClause})] A[(${t.fromComment})]
+        <include refid="where"/>
+         ORDER BY [(${t.orderBy})][(${t.orderByComment})]
+        [(${t.paging})]
+    </select>
+
+</mapper>

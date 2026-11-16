@@ -1,0 +1,27 @@
+pluginManagement {
+    includeBuild 'build-logic'
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+    }
+}
+
+rootProject.name = 'georu'
+
+// 라이브러리 (com.georu:*)
+include 'georu-core'
+include 'georu-api'
+include 'georu-codegen'
+include 'georu-ui'
+include 'georu-spring-boot-autoconfigure'
+include 'georu-spring-boot-starter'
+include 'georu-test'
+
+// 예제 앱(examples/demo)은 별도 빌드다. 라이브러리 좌표(com.georu:*)만 의존하고 includeBuild('../..') 로 이 빌드를 끼워 쓴다.
+//   ./gradlew -p examples/demo test | bootRunDocker | bootJar

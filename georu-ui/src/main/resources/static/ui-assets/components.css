@@ -1,0 +1,746 @@
+/* =====================================================================
+ * Georu UI 컴포넌트 v0.1
+ * 읽는 순서: ui.css → theme-georu.css (색 · 크기) → components.css (이 파일)
+ * Bootstrap 은 쓰지 않는다 (.btn .card .badge .alert .tabs .progress .modal 이 georu 클래스와 겹치고,
+ * 화면 스크립트가 만드는 마크업이 georu 클래스를 쓴다).
+ * 정의 · 판정 · 이식 방법: design-template/version0.1/COMPONENTS.md (todo-task 33), 모양: design-template/version0.1/screens/components.html
+ * ===================================================================== */
+
+/* ---------- 아이콘 (인라인 SVG 공통) ---------- */
+.ico{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ico.sm{width:16px;height:16px}.ico.lg{width:26px;height:26px}
+
+/* ---------- 상단 바 [header-area: 검색 · 아이콘 버튼 · 알림 · 사용자 메뉴] ---------- */
+.topbar{gap:12px}
+.tb-search{position:relative;flex:0 1 300px;min-width:180px}
+.tb-search .ico{position:absolute;right:14px;top:50%;transform:translateY(-50%);color:var(--gr-primary);pointer-events:none}
+.tb-search input{width:100%;height:44px;padding:0 44px 0 18px!important;border:1px solid #F6F7F9!important;border-radius:7px;background:#F6F7F9!important;font-size:14px;color:var(--gr-heading)}
+.tb-search input:focus{background:#fff!important;border-color:var(--gr-primary)!important;box-shadow:0 0 0 3px rgba(96,93,255,.12)}
+.topbar .sysbar{flex:1 1 auto;justify-content:flex-start;padding-left:6px}
+.tb-ico{position:relative;width:40px;height:40px;flex:none;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:8px;background:transparent;color:var(--gr-heading);cursor:pointer;text-decoration:none!important}
+.tb-ico:hover{background:#F6F7F9;color:var(--gr-primary)}
+.tb-ico .dot-count{position:absolute;top:3px;right:1px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:var(--gr-danger);color:#fff;font-size:10.5px;font-weight:700;line-height:18px;text-align:center;box-shadow:0 0 0 2px #fff}
+.tb-chip{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:16px;font-size:12.5px;font-weight:600;white-space:nowrap;background:var(--gr-gray-10);color:var(--gr-body)}
+.tb-chip.busy{background:var(--gr-warning-10);color:var(--gr-warning-text)}
+.tb-chip.idle{background:var(--gr-success-10);color:var(--gr-success-text)}
+.tb-chip .gate-dot{margin:0;box-shadow:none}
+.topbar .who{gap:6px}
+
+/* 드롭다운 [dropdowns] - details/summary 로 만들어 스크립트 없이 열린다 */
+.dd{position:relative}
+.dd>summary{list-style:none;cursor:pointer;color:inherit}
+.dd>summary::-webkit-details-marker{display:none}
+.dd-menu{position:absolute;right:0;top:calc(100% + 8px);z-index:30;min-width:200px;padding:8px;background:#fff;border-radius:10px;box-shadow:0 10px 30px rgba(58,66,82,.14),0 0 0 1px var(--gr-line)}
+.dd-menu a,.dd-menu button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 12px;border:0;border-radius:6px;background:transparent;color:var(--gr-heading);font:inherit;font-size:14px;text-align:left;text-decoration:none!important;cursor:pointer}
+.dd-menu a:hover,.dd-menu button:hover{background:var(--gr-primary-soft);color:var(--gr-primary)}
+.dd-menu .dd-head{padding:8px 12px 10px;margin-bottom:6px;border-bottom:1px solid var(--gr-line)}
+.dd-menu .dd-head b{display:block;color:var(--gr-heading)}
+.dd-menu .dd-head span{font-size:12.5px;color:var(--gr-body)}
+.dd-menu hr{border:0;border-top:1px solid var(--gr-line);margin:6px 0}
+.dd-menu .danger{color:var(--gr-danger-text)}
+
+/* 사용자 메뉴 [header: 아바타 + 이름 + ▾] */
+.tb-user>summary{display:flex;align-items:center;gap:10px;height:44px;padding:0 6px 0 4px;border-radius:22px}
+.tb-user>summary:hover{background:#F6F7F9}
+.tb-user .u-name{display:flex;flex-direction:column;line-height:1.2;font-size:14px;font-weight:600;color:var(--gr-heading)}
+.tb-user .u-name small{font-size:11.5px;font-weight:400;color:var(--gr-body)}
+.tb-user .chev{color:var(--gr-body)}
+
+/* ---------- 아바타 [avatar] - 사진 대신 이름 첫 글자 ---------- */
+.avatar{width:36px;height:36px;flex:none;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;background:var(--gr-primary);color:#fff;font-weight:700;font-size:14px}
+.avatar.sm{width:32px;height:32px;font-size:13px}.avatar.xs{width:28px;height:28px;font-size:12px}.avatar.xxs{width:22px;height:22px;font-size:11px}
+.avatar.c2{background:#2DB6F5}.avatar.c3{background:#25B003}.avatar.c4{background:#FE7A36}.avatar.c5{background:#AD63F6}.avatar.off{background:#C9D0DB}
+.avatar-group{display:inline-flex}.avatar-group .avatar{box-shadow:0 0 0 2px #fff}.avatar-group .avatar+.avatar{margin-left:-8px}
+.who-cell{display:inline-flex;align-items:center;gap:10px}
+.who-cell b{display:block;color:var(--gr-heading);font-weight:600}
+.who-cell span{font-size:12.5px;color:var(--gr-body)}
+/* 표 칸의 아바타 + 이름 (사용자 이름 · 이력 실행자 C5). 이름이 길면 말줄임 */
+.by-cell{display:inline-flex;align-items:center;gap:8px;max-width:100%;min-width:0;vertical-align:middle}   /* .who-cell 은 두 줄(이름 + 부제)용, 이것은 한 줄 말줄임용 */
+.by-cell>.cut{min-width:0}
+
+/* ---------- 페이지 머리 + 경로 [breadcrumb] ---------- */
+.crumbs{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:13.5px;color:var(--gr-body);white-space:nowrap}
+.crumbs a{display:inline-flex;align-items:center;gap:5px;color:var(--gr-heading)}
+.crumbs a .ico{color:var(--gr-primary)}
+.crumbs .sep{color:#A3AEC0}
+.crumbs .cur{color:#8A97AB}
+.page-head.ph-plain{grid-template-columns:minmax(0,1fr) auto}
+.page-head.ph-plain .crumbs{grid-column:2;grid-row:1/span 2;align-self:center}
+.page-head:not(.ph-plain) .crumbs{grid-column:1/-1;grid-row:1;margin-bottom:6px}
+
+/* ---------- 요약 숫자 카드 [widgets: stats-box - 아이콘 타일] ---------- */
+.grid.kpi>.card{padding-right:84px;min-height:104px}
+.stat-ico{position:absolute;right:22px;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--gr-primary-10);color:var(--gr-primary)}
+.stat-ico.ok{background:var(--gr-success-10);color:var(--gr-success-text)}
+.stat-ico.bad{background:var(--gr-danger-10);color:var(--gr-danger-text)}
+.stat-ico.warn{background:var(--gr-warning-10);color:var(--gr-warning-text)}
+.stat-ico.info{background:var(--gr-info-10);color:var(--gr-info-text)}
+.stat-ico.gray{background:var(--gr-gray-10);color:var(--gr-body)}
+
+/* ---------- 환영 띠 [dashboard: Welcome banner] ---------- */
+.banner{position:relative;overflow:hidden;display:flex;align-items:center;gap:24px;padding:26px 30px;border-radius:8px;color:#fff;
+  background:linear-gradient(110deg,#605DFF 0%,#7B5CFA 60%,#9C5FF5 100%)}
+.banner h3{margin:0 0 6px;font-size:20px;font-weight:700;color:#fff}
+.banner p{margin:0;opacity:.9;font-size:14px;line-height:1.6}
+.banner .banner-act{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.banner .btn{border-color:rgba(255,255,255,.55);background:transparent;color:#fff}
+.banner .btn:hover{background:rgba(255,255,255,.14);color:#fff;border-color:#fff}
+.banner .btn.white{background:#fff;color:var(--gr-primary);border-color:#fff}
+.banner .btn.white:hover{background:#F3F2FF;color:var(--gr-primary-dark)}
+.banner-txt{flex:1;min-width:0;position:relative;z-index:1}
+.banner-art{flex:none;width:150px;height:110px;opacity:.95}
+.banner-close{position:absolute;top:12px;right:12px;width:30px;height:30px;border:0;border-radius:50%;background:rgba(255,255,255,.16);color:#fff;font-size:18px;line-height:30px;cursor:pointer}
+.banner-close:hover{background:rgba(255,255,255,.3)}
+@media (max-width:900px){.banner-art{display:none}}
+
+/* ---------- 알림 띠 + 아이콘 [alerts: Alerts with Icon] - 마크업 그대로, 앞에 아이콘만 ---------- */
+.alert{position:relative;padding-left:46px}
+.alert::before{content:"";position:absolute;left:16px;top:14px;width:20px;height:20px;background:currentColor;
+  -webkit-mask:var(--al-ico) center/contain no-repeat;mask:var(--al-ico) center/contain no-repeat}
+.alert.info{--al-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 11v6M12 7.5v.5'/%3E%3C/svg%3E")}
+.alert.ok{--al-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M8 12.5l2.7 2.7L16 9.5'/%3E%3C/svg%3E")}
+.alert.warn{--al-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3.5L2.5 20h19z'/%3E%3Cpath d='M12 10v4.5M12 17.5v.3'/%3E%3C/svg%3E")}
+.alert.err{--al-ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M9 9l6 6M15 9l-6 6'/%3E%3C/svg%3E")}
+#gateBanner .alert{font-size:13.5px;padding-left:18px}
+#gateBanner .alert::before{display:none}   /* 게이트 문구가 🔒 로 시작해서 아이콘을 겹쳐 그리지 않는다 */
+
+/* ---------- 탭 [tabs] - 쪽 이동 탭은 알약(pills), 카드 안 전환 탭은 상자형 ---------- */
+.tabs.tab-links{gap:6px;border:0;padding:5px;background:#fff;border-radius:8px;display:inline-flex}
+.tabs.tab-links a{border:0;border-radius:6px;padding:8px 16px}
+.tabs.tab-links a.active{background:var(--gr-primary);color:#fff}
+.tabs.tab-links a:not(.active):hover{background:var(--gr-primary-soft);color:var(--gr-primary)}
+.tabs[role=tablist]{gap:2px}
+.tabs[role=tablist] button{border:1px solid transparent;border-bottom:0;border-radius:7px 7px 0 0;margin-bottom:-1px;padding:10px 16px}
+.tabs[role=tablist] button.active{background:#fff;border-color:var(--gr-line);color:var(--gr-heading)}
+.tabs[role=tablist] button:not(.active):hover{color:var(--gr-primary)}
+
+/* ---------- 단계 표시 [wizard: 번호 원 + 제목 + 설명, 사이 선] ---------- */
+.stepper{display:flex;align-items:center;gap:14px;padding:18px 25px;background:#fff;border-radius:8px}
+.stepper .step{display:flex;align-items:center;gap:12px;border:0;background:transparent;padding:0;cursor:pointer;text-align:left;font:inherit;min-width:0}
+.stepper .step .no{width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--gr-primary-soft);color:var(--gr-primary);font-size:17px;font-weight:700}
+.stepper .step b{display:block;font-size:15px;color:var(--gr-heading);font-weight:600}
+.stepper .step small{display:block;font-size:12.5px;color:var(--gr-primary)}
+.stepper .step.active .no{background:var(--gr-primary);color:#fff;box-shadow:0 4px 12px rgba(96,93,255,.35)}
+.stepper .step.done .no{background:var(--gr-success-10);color:var(--gr-success-text)}
+.stepper .line{flex:1;height:2px;min-width:24px;background:var(--gr-line);border-radius:1px}
+.stepper .line.done{background:var(--gr-primary)}
+.stepper .cnt{display:inline-block;margin-left:4px;padding:0 6px;border-radius:4px;background:var(--gr-primary-10);color:var(--gr-primary);font-size:11.5px;font-weight:600;line-height:18px}
+
+/* ---------- 펼침 묶음 [accordions] - 폼 안 details ---------- */
+form details,.field details,details.acc{border:1px solid var(--gr-line);border-radius:8px;background:#fff}
+form details>summary,.field details>summary,details.acc>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:12px 16px;color:var(--gr-heading);font-weight:500;cursor:pointer}
+form details>summary::-webkit-details-marker,.field details>summary::-webkit-details-marker,details.acc>summary::-webkit-details-marker{display:none}
+form details>summary::after,.field details>summary::after,details.acc>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--gr-body);border-bottom:2px solid var(--gr-body);transform:rotate(45deg) translateY(-2px);transition:transform .15s}
+form details[open]>summary::after,.field details[open]>summary::after,details.acc[open]>summary::after{transform:rotate(-135deg) translateY(-2px)}
+form details[open]>summary,.field details[open]>summary,details.acc[open]>summary{border-bottom:1px solid var(--gr-line);color:var(--gr-primary)}
+form details>:not(summary),.field details>:not(summary),details.acc>:not(summary){padding:14px 16px}
+form details+details{margin-top:8px}
+
+/* ---------- 파일 올리기 [file-upload: Drop files here] ---------- */
+.dropzone,.gen-drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;min-height:150px;padding:24px;
+  border:1.5px dashed #C9D0DB;border-radius:10px;background:#FAFBFF;color:var(--gr-body);text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.dropzone:hover,.gen-drop:hover,.dropzone:focus-visible,.gen-drop:focus-visible,.dropzone.over,.gen-drop.over{border-color:var(--gr-primary);background:var(--gr-primary-soft)}
+.dropzone .dz-ico{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:var(--gr-primary-10);color:var(--gr-primary)}
+.dropzone .dz-main{font-size:15px;font-weight:600;color:var(--gr-heading)}
+.dropzone .dz-main u{color:var(--gr-primary)}
+.dropzone .dz-sub{font-size:12.5px}
+.gen-drop{min-height:96px}
+.gen-drop b{color:var(--gr-heading)}
+
+/* ---------- 파일 목록 [ticket-details: Attachments] ---------- */
+.file-list{display:flex;flex-direction:column;gap:10px}
+.file-item{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:8px;background:#F6F7F9}
+.file-item .f-ico{width:40px;height:40px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#fff;color:var(--gr-primary)}
+.file-item .f-txt{flex:1;min-width:0}
+.file-item .f-txt b{display:block;color:var(--gr-heading);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-item .f-txt>span{display:block;font-size:12.5px;color:var(--gr-body)}   /* 직속만 - 안의 배지 색을 덮지 않게 */
+button.file-item{width:100%;border:1px solid transparent;text-align:left;font:inherit;color:inherit;cursor:pointer}
+button.file-item:hover,button.file-item:focus-visible{border-color:var(--gr-primary)}
+.file-item[aria-current]{background:var(--gr-primary-soft);border-color:var(--gr-primary)}
+.file-item .f-act{display:flex;gap:6px;align-items:center}
+
+/* ---------- 타임라인 [timeline: Basic Timeline] ---------- */
+.timeline{list-style:none;margin:0;padding:0}
+.tl-item{display:grid;grid-template-columns:150px 22px minmax(0,1fr);column-gap:14px;position:relative;padding-bottom:22px;cursor:pointer}
+.tl-item:last-child{padding-bottom:4px}
+.tl-item time{font-size:12.5px;color:var(--gr-body);padding-top:2px;font-variant-numeric:tabular-nums}
+.tl-item .tl-dot{position:relative;display:flex;justify-content:center}
+.tl-item .tl-dot::before{content:"";width:11px;height:11px;margin-top:5px;border-radius:50%;background:var(--tl,var(--gr-primary));box-shadow:0 0 0 4px color-mix(in srgb,var(--tl,var(--gr-primary)) 18%,transparent);position:relative;z-index:1}
+.tl-item .tl-dot::after{content:"";position:absolute;top:18px;bottom:-22px;left:50%;border-left:1px dashed #C9D0DB}
+.tl-item:last-child .tl-dot::after{display:none}
+.tl-item .tl-title{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:600;color:var(--gr-heading)}
+.tl-item .tl-meta{margin-top:3px;font-size:13px;color:var(--gr-body)}
+.tl-item.unread .tl-title::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--gr-danger)}
+.tl-item:hover .tl-title{color:var(--gr-primary)}
+.tl-item.lv-ok{--tl:var(--gr-success)}.tl-item.lv-warn{--tl:var(--gr-warning)}.tl-item.lv-err{--tl:var(--gr-danger)}.tl-item.lv-info{--tl:var(--gr-primary)}
+
+/* ---------- 쪽 넘김 [data-tables 바닥줄: "1-10 of 12  ‹ ›"] - 마크업 그대로 ---------- */
+.pager{display:flex;align-items:center;gap:8px;margin:0;padding:14px 4px 0;border-top:1px solid var(--gr-line)}
+.pager>[id=pageInfo],.pager>span:first-of-type{order:-1;margin-right:auto;font-size:13px;color:var(--gr-body)}
+.pager .btn.sm{height:34px;min-width:34px;padding:0 12px}
+.pager select{height:34px}
+
+/* ---------- 켜기/끄기 [check-radio: form-switch] - 자동 갱신 등 ---------- */
+.check.switch input{appearance:none;-webkit-appearance:none;position:relative;width:36px;height:20px;margin:0;border:0;border-radius:10px;background:#D5D9E2;cursor:pointer;transition:background .15s;flex:none}
+.check.switch input::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.2);transition:transform .15s}
+.check.switch input:checked{background:var(--gr-primary)}
+.check.switch input:checked::after{transform:translateX(16px)}
+.check.switch input:focus-visible{outline:2px solid var(--gr-primary);outline-offset:2px}
+
+/* ---------- 검색 입력칸 [input with icon] ---------- */
+input.ico-search{padding-left:40px!important;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") 13px center/17px no-repeat}
+
+/* ---------- 아이콘 버튼 [table Action: 보기 · 고치기 · 삭제] ---------- */
+.btn.icon{width:34px;height:34px;padding:0;border-color:transparent;background:transparent;color:var(--gr-body)}
+.btn.icon:hover{background:var(--gr-primary-soft);color:var(--gr-primary);border-color:transparent}
+.btn.icon.danger{color:var(--gr-danger-text)}
+.btn.icon.danger:hover{background:var(--gr-danger-10);color:var(--gr-danger-text)}
+.row-acts{display:inline-flex;gap:2px;align-items:center}
+
+/* ---------- 요약 칩 (todo-task 33 G3: 시스템 플러그인 요약) ---------- */
+.sum-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.sum-chip{display:inline-flex;align-items:baseline;gap:6px;padding:5px 12px;border-radius:14px;background:var(--gr-gray-10);color:var(--gr-body);font-size:12.5px}
+.sum-chip b{font-size:14px;color:var(--gr-heading);font-variant-numeric:tabular-nums}
+.sum-chip.primary{background:var(--gr-primary-soft);color:var(--gr-primary)}
+.sum-chip.ok{background:var(--gr-success-10);color:var(--gr-success-text)}
+.sum-chip.bad{background:var(--gr-danger-10);color:var(--gr-danger-text)}
+.sum-chip:is(.ok,.bad,.primary) b{color:inherit}
+
+/* ---------- 진행 막대 [progress] - 전체 건수를 모를 때는 흐르는 막대 ---------- */
+.progress.indet{position:relative;overflow:hidden}
+.progress.indet>i{position:absolute;left:0;width:35%!important;animation:tzIndet 1.4s ease-in-out infinite}
+@keyframes tzIndet{0%{left:-35%}100%{left:100%}}
+.progress-row{display:flex;align-items:center;gap:12px;margin:12px 0 4px}
+.progress-row .progress{flex:1}
+.progress-row b{font-size:13px;color:var(--gr-heading);min-width:44px;text-align:right}
+@media (prefers-reduced-motion:reduce){.progress.indet>i{animation:none;width:100%!important;opacity:.35}}
+
+/* ---------- 로딩 [spinners] ---------- */
+/* 불러오는 중 (T16): 글자를 담은 칸에 class="loading" 만 붙이면 앞에 스피너. .empty 는 빈 상태 그림 대신 큰 스피너 */
+.loading::before{content:"";display:inline-block;flex:none;width:16px;height:16px;margin-right:8px;vertical-align:-3px;border:2px solid var(--gr-primary-soft);border-top-color:var(--gr-primary);border-radius:50%;animation:tzSpin .8s linear infinite}
+.empty.loading::before{display:block;width:28px;height:28px;margin:0 0 4px;border-width:3px;background:none}
+.empty.small.loading{flex-direction:row;justify-content:center}
+.empty.small.loading::before{display:inline-block;width:14px;height:14px;margin:0 6px 0 0;border-width:2px}
+@media (prefers-reduced-motion:reduce){.loading::before{animation-duration:2.4s}}
+@keyframes tzSpin{to{transform:rotate(360deg)}}
+
+/* ---------- 빈 상태 [search · 404: 아이콘 + 문구 + 버튼] ---------- */
+.empty{display:flex;flex-direction:column;align-items:center;gap:6px;padding:28px 16px}
+.empty::before{content:"";width:44px;height:44px;margin-bottom:4px;border-radius:50%;background:var(--gr-gray-10) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238695AA' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 13l2.5-7h11L20 13v5H4z'/%3E%3Cpath d='M4 13h5l1 2h4l1-2h5'/%3E%3C/svg%3E") center/22px no-repeat}
+.empty .btn{margin:6px 0 0}
+.empty.small::before{display:none}
+
+/* ---------- 오류 · 권한 없음 쪽 [404-error-page] ---------- */
+.error-page{display:flex;flex-direction:column;align-items:center;text-align:center;padding:56px 24px}
+.error-page .err-ico{width:96px;height:96px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--gr-primary-soft);color:var(--gr-primary);margin-bottom:22px}
+.error-page .err-code{font-family:var(--title);font-size:44px;font-weight:700;color:var(--gr-heading);line-height:1}
+.error-page h2{margin:12px 0 8px;font-size:22px}
+.error-page p{margin:0 0 4px;color:var(--gr-body);max-width:460px}
+.error-page .inline{margin-top:20px;justify-content:center}
+
+/* ---------- 색 타일 [Projects Overview: 옅은 색 상자 4칸] ---------- */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.tile{display:flex;flex-direction:column;gap:14px;padding:20px 22px;border-radius:8px;border:1px solid transparent}
+.tile .t-top{display:flex;gap:14px;align-items:center}
+.tile .t-top .ico{width:32px;height:32px}
+.tile .t-top span{display:block;font-size:13.5px}
+.tile .t-top b{display:block;font-family:var(--title);font-size:24px;color:var(--gr-heading)}
+.tile .t-foot{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--gr-body)}
+.tile.primary{background:#F3F4FF;border-color:#DDE1FF;color:var(--gr-primary)}
+.tile.ok{background:#F1FFEB;border-color:#D3F7C4;color:var(--gr-success-text)}
+.tile.bad{background:#FFF4EE;border-color:#FFDCCB;color:var(--gr-danger-text)}
+.tile.warn{background:#FFF9EA;border-color:#FFE8B3;color:var(--gr-warning-text)}
+
+/* ---------- 창 [modals] · 토스트 [toasts] ---------- */
+.modal{padding:0;overflow:auto}   /* auto: 90vh 를 넘는 긴 창(요청 JSON · 주기 기록)도 스크롤 (todo-task 39) */
+.modal>h2:first-child,.modal .modal-head{margin:0;padding:18px 25px;border-bottom:1px solid var(--gr-line);font-size:17px}
+.modal>:not(h2):not(.modal-head):not(.modal-foot){padding-left:25px;padding-right:25px}
+.modal .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 25px;border-top:1px solid var(--gr-line);background:#FAFBFC}
+/* 위아래 여백: 머리 다음 첫 줄과 마지막 줄(.modal-foot 이 아닌 버튼 줄)이 창 끝에 붙지 않게. 창 6개 공통 (todo-task 39) */
+.modal>h2:first-child+:not(.modal-foot),.modal>.modal-head+:not(.modal-foot){padding-top:16px}
+.modal>:last-child:not(h2):not(.modal-head):not(.modal-foot){padding-bottom:20px}
+#toast div{display:flex;align-items:center;gap:10px;min-width:280px;background:#fff;color:var(--gr-heading);border-left:4px solid var(--gr-primary);box-shadow:0 10px 30px rgba(58,66,82,.16),0 0 0 1px var(--gr-line)}
+#toast div.ok{background:#fff;border-left-color:var(--gr-success)}
+#toast div.err{background:#fff;border-left-color:var(--gr-danger)}
+
+/* ---------- 입력 검증 [validation: invalid-feedback] ---------- */
+input.invalid,select.invalid,textarea.invalid{border-color:var(--gr-danger)!important;box-shadow:0 0 0 3px rgba(253,88,18,.12)}
+.field .err-msg{font-size:12.5px;color:var(--gr-danger-text)}
+input.valid{border-color:var(--gr-success)!important}
+
+/* ---------- 목록 묶음 [list] - 안내서 목차 · 파일 고르기 ---------- */
+.list-group{display:flex;flex-direction:column;border:1px solid var(--gr-line);border-radius:8px;overflow:hidden}
+.list-group>a,.list-group>button{display:flex;align-items:center;gap:10px;padding:11px 16px;border:0;border-bottom:1px solid var(--gr-line);background:#fff;color:var(--gr-heading);text-align:left;font:inherit;text-decoration:none!important;cursor:pointer}
+.list-group>:last-child{border-bottom:0}
+.list-group>a:hover,.list-group>button:hover{background:#FAFBFF;color:var(--gr-primary)}
+.list-group>.active{background:var(--gr-primary-soft);color:var(--gr-primary);font-weight:600}
+
+
+/* =====================================================================
+ * v0.1.1 - 전체 폭 배치 (full layout)
+ * 본문은 메뉴 오른쪽 전체 폭을 쓴다. 카드 · 묶음에 걸려 있던 px 상한을 푼다.
+ * 글을 읽는 폭이 필요한 곳(문단 · 안내서 본문)은 카드가 아니라 글줄에 상한을 둔다.
+ * ===================================================================== */
+.focus-col{max-width:none}                                   /* 코드 생성 · 관계 분석 · 매핑 초안 · 내 계정 (1280px) */
+.ds-grid2{max-width:none!important}                          /* 시나리오 설계 ① 두 칸 (1200px) */
+.arch-svg{max-width:none!important;width:100%;height:auto}   /* 구조 설명 그림 (1180px) - viewBox 로 늘어난다 */
+/* 접는 카드 머리(.cc-head): 제목은 왼쪽, 보조 정보(프로파일 · 최근 ▾ 등)는 오른쪽 끝 - space-between 이면 제목이 가운데로 간다 */
+.card-head.cc-head,h2.cc-head{justify-content:flex-start}
+.card-head.cc-head>:last-child:not(h2):not(.cc-tog):not(.cc-sum){margin-left:auto}
+.grid.c2:not(.align-top)>.card,.grid.c3:not(.align-top)>.card{height:100%}   /* 한 줄 카드 높이 맞춤 */
+
+/* =====================================================================
+ * v0.1.1 - 후보 컴포넌트 적용
+ * ===================================================================== */
+/* [색 타일] 이관 진행 단계 줄 - 마크업 그대로, 상태 배지로 색을 정한다 (화면 <style> 보다 우선하도록 main 을 붙임) */
+main .phase-strip{grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+main .phase-strip button{padding:16px 18px;gap:8px;border-radius:8px;border:1px solid #E3E7EF;background:#FAFBFC}
+main .phase-strip button .nm{font-size:14.5px;color:var(--gr-heading)}
+main .phase-strip button:has(.badge.DONE),main .phase-strip button:has(.badge.COMPLETED){background:#F1FFEB;border-color:#D3F7C4}
+main .phase-strip button:has(.badge.RUNNING),main .phase-strip button:has(.badge.STARTED){background:#FFF9EA;border-color:#FFE8B3}
+main .phase-strip button.current{background:#F3F4FF;border-color:var(--gr-primary);box-shadow:0 0 0 1px var(--gr-primary)}
+main .phase-strip button:hover{border-color:var(--gr-primary)}
+
+/* [색 타일] 실행 전 점검 결과 요약 */
+.tiles+.tiles-cap,.tiles-cap{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 14px;font-size:13px;color:var(--gr-body)}
+.tiles-cap b{color:var(--gr-heading)}
+.tile.gray{background:#F6F7F9;border-color:#E3E7EF;color:var(--gr-body)}
+
+/* [목록 묶음] 안내서 목차 */
+.guide-toc #tocList .grp{margin:14px 2px 6px;font-size:12px;font-weight:500;color:var(--gr-menu-title)}
+.guide-toc #tocList .item{display:block;padding:10px 14px;margin:0 0 -1px;border:1px solid var(--gr-line);background:#fff;color:var(--gr-heading);font-weight:500;text-decoration:none}
+.guide-toc #tocList .grp+.item{border-radius:8px 8px 0 0}
+.guide-toc #tocList .item:has(+ .grp),.guide-toc #tocList .item:last-child,.guide-toc #tocList .item:has(+ .sub){border-radius:0 0 8px 8px}
+.guide-toc #tocList .grp+.item:has(+ .grp),.guide-toc #tocList .grp+.item:has(+ .sub){border-radius:8px}
+.guide-toc #tocList .item:hover{background:#FAFBFF;color:var(--gr-primary)}
+.guide-toc #tocList .item.active{position:relative;z-index:1;background:var(--gr-primary-soft);border-color:#C9CCFF;color:var(--gr-primary)}
+.guide-toc #tocList .item .d{display:block;margin-top:2px;font-size:12px;font-weight:400;color:var(--gr-body)}
+.guide-toc #tocList .sub{margin:8px 0 6px 10px;padding-left:10px;border-left:2px solid var(--gr-primary-soft)}
+.guide-toc #tocList .sub a{display:block;padding:3px 8px;font-size:12.5px;color:var(--gr-body);border-radius:4px}
+.guide-toc #tocList .sub a:hover{background:var(--gr-primary-soft);color:var(--gr-primary);text-decoration:none}
+/* [목록 묶음] 로그 파일 고르기 */
+.list-group .lg-main{flex:1;min-width:0;font-family:var(--mono);font-size:13px}
+.list-group .lg-side{font-size:12px;color:var(--gr-body);text-align:right;white-space:nowrap}
+
+/* [카드 머리 ··· 메뉴] */
+.card-menu{margin-left:auto}
+.card-menu>summary{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:6px;color:var(--gr-body)}
+.card-menu>summary:hover,.card-menu[open]>summary{background:#F6F7F9;color:var(--gr-primary)}
+.card-menu .dd-menu{min-width:220px}
+h2 .card-menu,.card-head .card-menu{font-size:14px;font-weight:400}
+.card>h2:has(.card-menu){display:flex;align-items:center;gap:8px}
+
+/* =====================================================================
+ * v0.1.2 - 디자인 점검 (1440 · 1920px 전 화면 확인 후 고친 것)
+ * ===================================================================== */
+/* D1 상단 바: 좁은 폭에서 시스템 요약이 글자 중간에서 잘리던 것 → 끝을 흐리게, 덜 중요한 항목(.opt)은 1700px 아래에서 숨김 */
+.topbar .sysbar{-webkit-mask-image:linear-gradient(to right,#000 88%,transparent);mask-image:linear-gradient(to right,#000 88%,transparent)}
+@media (max-width:1700px){.topbar .sysbar .opt{display:none}}
+
+/* D2 요약 숫자 카드: 6칸(테이블 현황)에서 아이콘이 자리를 차지해 이름이 세 줄로 꺾이던 것 → 아이콘을 오른쪽 위 작은 원으로 */
+.grid.kpi>.card{padding-right:25px;min-height:0}
+.grid.kpi>.card .k{padding-right:46px;min-height:36px;line-height:1.35}
+.stat-ico{top:20px;right:20px;transform:none;width:38px;height:38px}
+.stat-ico .ico{width:18px;height:18px}
+
+/* D3 세로 키 · 값 표(헬스 · 요약 · 실행 게이트): 왼쪽 머리 칸 전체가 보라 띠로 칠해지던 것 → 머리 칸은 글자만 */
+th:has(+ td){background:transparent;color:var(--gr-body);font-weight:500;border-bottom:1px solid var(--gr-line);width:1%;white-space:nowrap;padding-right:28px}
+tr:first-child>th:has(+ td){border-radius:0}
+
+/* D4 목록 표: 열이 많은 표(이력 17열)가 카드 밖으로 잘리던 것 → 칸 여백을 줄이고, 표를 감싼 칸에서 가로 스크롤 */
+th,td,table.list th,table.list td{padding:10px 12px}
+table{font-size:13px}
+.card>div:has(>table.list),.card>div:has(>table),.card .scroll-y{overflow-x:auto}
+
+/* D5 고정폭 글꼴의 한글: 로그 메시지 등에서 한글이 굴림체(전각)로 넓게 벌어지던 것 → 한글은 맑은 고딕으로 */
+:root{--mono:ui-monospace,SFMono-Regular,"D2Coding",Consolas,"Malgun Gothic","Apple SD Gothic Neo",monospace}
+
+/* D6 카드형 선택(모드 · 테스트 모드): 이름이 길면 라디오만 윗줄에 남던 것 → 라디오 | 이름 · 설명 두 칸 */
+.choice label{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:8px;row-gap:2px;align-items:baseline}
+.choice label>input{grid-row:1/span 3;align-self:start;margin-top:3px}
+.choice label .small,.choice label .muted{padding-left:0}
+.choice label .badge{justify-self:start}
+.choice:not(.col){grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}   /* 좁은 카드에서는 2칸, 넓으면 4칸 - 모드 이름(PROCESSOR_TEST)이 잘리지 않게 */
+.choice label{overflow-wrap:anywhere}
+/* 테이블 이관 실행 모드 카드: 화면 <style> 이 1280px 기준으로 4칸이라, 메뉴 250px + 여백을 빼면 1440px 에서도 카드가 좁다 → 1700px 이상에서만 4칸 */
+main .choice.modes{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:1700px){main .choice.modes{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* D7 폼 안 체크박스 설명: 설명 조각이 칸마다 따로 꺾이던 것(시나리오 설계 시간 윈도우, DDL 자바 모델 Lombok) → 한 문장으로 흐르게 */
+form .check,.field .check{display:block;padding-left:24px;text-indent:-24px}
+form .check>input,.field .check>input{vertical-align:-2px;margin:0 6px 0 0}
+form .check.switch,.field .check.switch{display:inline-flex;padding-left:0;text-indent:0}
+
+/* D8 실행 막대(테이블 이관 실행 아래): 버튼이 두 줄로 갈리며 '지금 실행' 만 왼쪽 아래로 떨어지던 것 → 요약 한 줄, 버튼은 오른쪽 한 묶음 */
+.runbar{border:0;border-radius:8px;box-shadow:0 -6px 20px rgba(58,66,82,.08);padding:12px 16px;justify-content:flex-end}
+main .runbar .runbar-sum{flex:1 1 100%}   /* 화면 <style> 의 flex:1 보다 우선 */
+.runbar.normal{box-shadow:0 -6px 20px rgba(58,66,82,.08),inset 3px 0 0 var(--gr-danger)}
+
+/* D9 긴 사유 글: 시나리오 목록 '실행' 칸 정의 오류가 열 줄 넘게 늘어지던 것 → 두 줄 + 말줄임 (전체는 title) */
+.clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+/* D10 머리글만 있는 빈 표(관계 분석 명명 규칙 등) → 표 아래 안내 줄과 붙어 보이게 */
+table.list:not(:has(td)){margin-bottom:6px}
+
+/* D11 화면 목록(index) · 카탈로그 쪽도 전체 폭 */
+body:not(:has(.sidebar)):not(.login) main{max-width:none!important}
+
+/* =====================================================================
+ * v0.1.3 - 글자에 맞춰 늘어나는 상자 · 오른쪽 패널
+ * ===================================================================== */
+/* E1 글자 넘침 방지 (전체): 격자 · 두 칸 배치의 칸은 내용보다 좁아질 수 있게, 긴 영문 · 경로는 칸 안에서 줄바꿈 */
+.grid>*,.split>*,.stack>*,.tiles>*,.af-row>*,.af-grid>*{min-width:0}
+.card,.tile,.file-item,.tl-item,.alert,.choice label,.af-box{overflow-wrap:anywhere}
+.card h2,.card-head h2{min-width:0}
+
+/* E2 구조도 (구조 설명) - 좌표 고정 SVG 대신 HTML. 상자는 글자 길이만큼 높이가 늘고, 칸은 화면 폭에 맞춰 줄어든다 */
+.arch-svg{display:none!important}
+.arch-list:not(.toc){display:none!important}
+.arch-flow{display:flex;flex-direction:column;gap:18px}
+.af-top{display:grid;grid-template-columns:minmax(170px,.8fr) 46px minmax(240px,1.2fr) 46px minmax(380px,2.4fr);align-items:stretch}
+.af-right{display:flex;flex-direction:column;gap:18px;min-width:0}
+.af-grp{border:1px dashed #CBD2DC;border-radius:10px;padding:14px;background:#FCFCFD;min-width:0}
+.af-grp>h4{margin:0 0 12px;font-size:12.5px;font-weight:600;color:var(--gr-body)}
+.af-grp>h4 small{font-weight:400}
+.af-stack{display:flex;flex-direction:column;gap:22px}
+.af-stack.plain{gap:10px}
+.af-stack:not(.plain)>.af-box+.af-box::before{content:"";position:absolute;left:50%;top:-18px;width:0;height:14px;border-left:1.5px solid #8A97AB}
+.af-stack:not(.plain)>.af-box+.af-box::after{content:"";position:absolute;left:calc(50% - 4px);top:-7px;border:4px solid transparent;border-top:5px solid #8A97AB;border-bottom:0}
+.af-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:12px}
+.af-row:last-child{margin-bottom:0}
+.af-row.flow{column-gap:28px}
+.af-row.flow>.af-box+.af-box::before{content:"";position:absolute;left:-22px;top:50%;width:16px;border-top:1.5px solid #8A97AB}
+.af-row.flow>.af-box+.af-box::after{content:"";position:absolute;left:-8px;top:calc(50% - 4px);border:4px solid transparent;border-left:5px solid #8A97AB;border-right:0}
+.af-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:12px}
+.af-box{position:relative;display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:8px;border:1px solid #D5D9E2;background:#fff;color:var(--gr-heading);text-decoration:none!important;line-height:1.4;transition:box-shadow .15s,border-color .15s}
+.af-box:hover{border-color:var(--gr-primary);box-shadow:0 4px 14px rgba(96,93,255,.14)}
+.af-box b{font-size:13.5px;font-weight:600}
+.af-box span{font-size:12px;color:var(--gr-body)}
+.af-box em{font-style:normal;font-size:11.5px;font-weight:600;color:var(--gr-success-text);margin-top:2px}
+.af-box.wide{grid-column:1/-1}
+.af-box.ops{background:#FFF9F2;border-color:#F5D3AE}
+.af-box.core{background:#fff}
+.af-box.dev{background:#F3F4FF;border-color:#C9CCFF}
+.af-box.db{background:#F1FFEB;border-color:#BFEAB0}
+.af-link{display:flex;align-items:flex-start;justify-content:center;padding-top:58px;position:relative}
+.af-link::before{content:"";position:absolute;top:66px;left:6px;right:10px;border-top:1.5px solid #8A97AB}
+.af-link::after{content:"";position:absolute;top:62px;right:4px;border:4px solid transparent;border-left:6px solid #8A97AB;border-right:0}
+.af-link span{position:relative;top:-14px;font-size:11px;color:var(--gr-body);background:var(--card);padding:0 3px}
+@media (max-width:1280px){
+  .af-top{grid-template-columns:1fr;gap:12px}
+  .af-link{padding:0;height:22px}.af-link::before{top:0;bottom:0;left:50%;right:auto;border-top:0;border-left:1.5px solid #8A97AB}
+  .af-link::after{top:auto;bottom:-2px;right:auto;left:calc(50% - 4px);border:4px solid transparent;border-top:6px solid #8A97AB;border-bottom:0}
+  .af-link span{top:0;left:14px}
+}
+@media (max-width:760px){.af-row,.af-row.flow{grid-template-columns:1fr}.af-row.flow>.af-box+.af-box::before,.af-row.flow>.af-box+.af-box::after{display:none}}
+
+/* E3 오른쪽 패널 (aside.sp): 화면 전체 높이, 왼쪽 그림자, 머리 굵게 */
+.sp-dim{left:0!important;top:0!important;background:rgba(30,34,53,.32);z-index:40}
+aside.sp{top:0;z-index:41;background:#fff;border-left:0;box-shadow:-12px 0 40px rgba(30,34,53,.16);border-radius:14px 0 0 14px;max-width:calc(100vw - 80px)}
+aside.sp .sp-head{padding:18px 20px 16px 24px;border-bottom:1px solid var(--gr-line);gap:10px}
+aside.sp .sp-title{font-size:18px;font-weight:700;color:var(--gr-heading)}
+aside.sp .sp-x{width:36px;height:36px;border-radius:50%;background:#F6F7F9;color:var(--gr-body)}
+aside.sp .sp-x:hover{background:var(--gr-danger-10);color:var(--gr-danger-text)}
+aside.sp .sp-body{padding:20px 24px 28px}
+aside.sp .sp-body>*+*{margin-top:16px}
+aside.sp .sp-grip::after{border-radius:2px}
+aside.sp .sp-nav .btn.sm{height:30px}
+.sp-sum{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 16px;border-radius:8px;background:#F6F7F9}
+.sp-sum b{font-size:16px;color:var(--gr-heading)}
+.sp-kpi{gap:10px}
+.sp-kpi>.card{padding:14px 16px;border:1px solid var(--gr-line);min-height:0}
+.sp-kpi>.card .k{min-height:0;padding-right:0}
+.sp-kpi>.card .v{font-size:22px}
+.sp-h{margin:22px 0 10px;font-size:14.5px;color:var(--gr-heading)}
+/* 도움말 패널 본문 */
+.sp-help .help-md p{margin:0 0 10px;line-height:1.7;color:var(--gr-heading)}
+.sp-help .help-md ul{margin:0 0 10px;padding-left:18px;line-height:1.7}
+.sp-help .help-md code{font-family:var(--mono);font-size:12px;padding:1px 5px;border-radius:4px;background:#F1F3F7}
+.sp-help .help-foot{border-top:1px solid var(--gr-line);padding-top:12px}
+
+/* 패널 안 숫자 칸: 4칸 한 줄, 낮게 */
+.grid.kpi.sp-kpi{grid-template-columns:repeat(4,minmax(0,1fr))}
+.grid.kpi.sp-kpi>.card{padding:12px 14px;min-height:0}
+.grid.kpi.sp-kpi>.card .k{min-height:0;padding-right:0;font-size:12.5px}
+.grid.kpi.sp-kpi>.card .v{font-size:22px;margin-top:2px}
+.grid.kpi.sp-kpi>.card.tone-warn::before{left:14px}
+aside.sp .tl-item{grid-template-columns:96px 22px minmax(0,1fr)}
+/* 패널 안 표: 패널 폭을 넘지 않게 칸 안에서 줄바꿈 */
+aside.sp table th{white-space:nowrap}
+aside.sp table td{white-space:normal;word-break:keep-all}
+aside.sp table td.mono,aside.sp table td.small:has(>span[title]){white-space:nowrap}
+aside.sp .sp-body{overflow-x:hidden}
+
+/* =====================================================================
+ * v0.1.4 - 화면 단위 디자인 검증 (30개 화면 · 1440 / 1920px · 열린 패널) 결과
+ * ===================================================================== */
+/* F1 한글이 낱말 중간에서 끊기지 않게 (권한/을, 필/수 …). 넘칠 때만 칸 안에서 끊는다 */
+body{word-break:keep-all}
+/* F2 표가 카드보다 넓을 때: 오른쪽 끝을 흐리게 해 더 있다는 걸 보이고, 마지막 열(동작 · 실행자)은 오른쪽에 붙여 둔다 */
+.card>div:has(>table.list){background:
+  linear-gradient(to right,#fff 30%,rgba(255,255,255,0)) left/36px 100% no-repeat local,
+  linear-gradient(to left,#fff 30%,rgba(255,255,255,0)) right/36px 100% no-repeat local,
+  radial-gradient(farthest-side at 0 50%,rgba(30,34,53,.14),transparent) left/12px 100% no-repeat scroll,
+  radial-gradient(farthest-side at 100% 50%,rgba(30,34,53,.14),transparent) right/12px 100% no-repeat scroll;
+  scrollbar-width:thin;scrollbar-color:#C9D0DB transparent}
+.card>div>table.list tr>:last-child{position:sticky;right:0;z-index:1}
+.card>div>table.list tr>td:last-child{background:#fff}
+.card>div>table.list tr:hover>td:last-child{background:#FAFBFF}
+table.list td{vertical-align:middle}
+/* F3 상단 바: 1700px 아래에서는 DB 이름을 빼고 점만 (이름은 마우스를 올리면) */
+@media (max-width:1700px){.sysbar .it[title^="DB"] .v{display:none}.sysbar .it[title^="DB"] .dot{margin-right:2px}}
+/* F4 페이지 머리: 경로는 모든 화면에서 제목 위 한 줄 (화면마다 오른쪽 · 위로 달랐던 것) */
+.page-head.ph-plain .crumbs{grid-column:1/-1;grid-row:1;align-self:auto;margin-bottom:6px}
+/* F5 메뉴가 바닥 시계에 가려질 때: 아래를 흐리게 */
+.sidebar nav{-webkit-mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(to bottom,#000 calc(100% - 28px),transparent)}
+/* F6 요약 숫자 카드 바닥의 짧은 색 막대: 일부 카드에만 있고 잘려 보여서 없앤다 (색은 아이콘 · 숫자로 이미 구분) */
+.tone-bad::before,.tone-warn::before,.tone-ok::before{display:none}
+/* F7 6칸 요약(테이블 현황): 1600px 아래는 3칸 두 줄 */
+@media (max-width:1600px){.grid.c6.kpi{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* F8 폼: 설명이 붙은 라벨이 두 줄이 되어도 같은 줄 입력칸 높이가 맞게 아래 정렬. 폼 밖 세로로 쌓인 칸은 간격 */
+form.f{align-items:end}
+:not(form.f)>.field+.field{margin-top:12px}
+.field>.badge,.field>.check{align-self:flex-start}
+/* F9 카드형 선택: 4개면 2칸(넓은 화면 4칸), 3개는 한 줄에 꽉 차게 */
+.choice:not(.col){grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.choice:not(.col):has(>label:nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (min-width:1700px){.choice:not(.col):has(>label:nth-child(4):last-child){grid-template-columns:repeat(4,minmax(0,1fr))}}
+/* F10 카드 머리 · 제목 줄의 보조 설명은 가늘게 (제목과 겨루지 않게) */
+h2 .small,h2 .muted,.card-head h2 .small{font-weight:400;color:var(--gr-body)}
+/* F11 검색칸 안내 글이 잘리지 않게 */
+input.w-lg.ico-search{min-width:300px}
+/* F12 타임라인 세로선이 잘 보이게 */
+.tl-item .tl-dot::after{border-left-color:#A3AEC0}
+/* F13 펼침 묶음 머리: 설명이 길면 다음 줄로 (좁은 칸에 끼어 꺾이지 않게) */
+form details>summary,.field details>summary,details.acc>summary{flex-wrap:wrap;position:relative;padding-right:40px}
+form details>summary::after,.field details>summary::after,details.acc>summary::after{position:absolute;right:16px;top:18px;margin:0}
+form details>summary>.muted,.field details>summary>.muted{flex-basis:100%;font-weight:400}
+/* F14 시스템 그래프: 칸 폭을 다 쓰게 (높이 고정 때문에 가운데 60% 만 쓰던 것) */
+.chart svg{height:auto}
+/* F15 로그 표: 시각 · 레벨 · 로거는 내용 폭만, 메시지가 나머지 */
+#logs table th:nth-child(-n+3),#logs table td:nth-child(-n+3){width:1%;white-space:nowrap}
+/* F16 자동 갱신 켜기/끄기: 화면마다 테두리 있고 없던 것 → 없음으로 통일 */
+.check.switch{border:0!important;padding:0!important;background:none!important}
+/* F17 아바타 첫 글자는 흰색 (이름 칸 회색 글자 규칙에 덮이던 것) */
+.who-cell .avatar,.avatar{color:#fff!important}
+.who-cell .avatar.xxs{font-size:11px}.who-cell .avatar.xs{font-size:12px}
+/* F18 내 계정: 아이디 · 권한은 읽기 전용 값으로, 입력은 두 칸까지 */
+#pwForm{grid-template-columns:repeat(2,minmax(0,1fr))}
+#pwForm .field:has(>#who)>label,#pwForm .field:has(>#role)>label{font-size:12.5px;color:var(--gr-body);font-weight:400}
+#pwForm #who,#pwForm #role{font-weight:600;color:var(--gr-heading);padding-top:0!important}
+/* F19 패널 안 상세 숫자: 요약 띠와 같은 회색 바탕, 테두리 없음 */
+.grid.kpi.sp-kpi>.card{background:#F6F7F9;border:0}
+.file-item .f-txt b{white-space:normal}
+/* F20 DDL 도구 결과 머리의 테이블 고르기 · 작은 선택칸 */
+#tableSel,#tobeTable,select#tobeSel{min-width:140px}
+/* F21 구조도 클래스 이름: 낱말 경계(<wbr>)에서만 줄바꿈 */
+.af-box{overflow-wrap:break-word}
+/* F22 카탈로그 · 기타 */
+.modal .modal-head,.modal>h2:first-child{font-weight:700}
+.pager{border-top:0}
+.sp-help .help-foot{font-size:13px}
+.gen-drop:not(:has(.dz-ico))::before{content:"";width:48px;height:48px;border-radius:12px;background:var(--gr-primary-10) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23605DFF' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 16V4M7 9l5-5 5 5'/%3E%3Cpath d='M4 16v4h16v-4'/%3E%3C/svg%3E") center/22px no-repeat}
+.scn-arrow:last-child{display:none}
+.plug-sum{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+/* F2 보강: 붙여 둔 마지막 열은 선택된 행 색을 따르고, 왼쪽에 옅은 그림자로 경계 */
+.card>div>table.list tr>td:last-child{box-shadow:-10px 0 10px -10px rgba(30,34,53,.18)}
+.card>div>table.list tr.active>td:last-child,.card>div>table.list tr.sel>td:last-child,.card>div>table.list tr.selected>td:last-child{background:var(--gr-primary-soft)}
+/* 동작 칸의 긴 안내 글(사용자 목록 총관리자)은 줄바꿈 */
+table.list td.nowrap:last-child:has(>.small){white-space:normal;min-width:160px}
+
+/* =====================================================================
+ * v0.1.5 - 남은 것 마저 · 카드 접기 (data-collapse) 모양
+ * ===================================================================== */
+/* H1 두 칸 격자에서 둘 다 펼쳐져 있으면 높이를 맞춘다 (시스템 헬스 · 요약). 하나라도 접히면 위 정렬 그대로 */
+.grid.align-top:not(:has(>.cc-closed))>.card{align-self:stretch}
+/* H2 알림 타임라인: 넓은 화면에서 제목 줄 오른쪽에 종류 · 테이블 (왼쪽 절반만 쓰던 것) */
+@media (min-width:1500px){
+  .timeline .tl-body{display:flex;align-items:baseline;gap:16px}
+  .timeline .tl-title{flex:1;min-width:0}
+  .timeline .tl-meta{margin-top:0;flex:none;max-width:45%;text-align:right}
+}
+/* H3 실행 전 점검: 테이블 글상자가 옆 선택칸과 높이가 크게 다르던 것 → 한 줄 높이에서 시작, 필요하면 늘림 */
+#tables{height:var(--ctl-h);min-height:var(--ctl-h);resize:vertical;padding-top:8px}
+
+/* ---------- 카드 접기 (data-collapse) - 카드 머리 오른쪽 둥근 꺾쇠 버튼 ---------- */
+.cc-head{display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;user-select:none}
+.cc-head::after{content:"";order:97;flex:1 1 0}
+.cc-head>.cc-tog{order:99}
+.card-head.cc-head>:not(h2):not(.cc-tog):not(.cc-sum){order:98}
+.cc-head>h2{margin:0}
+.cc-tog{flex:none;width:32px;height:32px;margin:0;border:0;border-radius:50%;background:#F6F7F9;color:var(--gr-body);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background .15s,color .15s}
+.cc-tog::before{content:"";width:16px;height:16px;background:currentColor;transition:transform .2s ease;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 15l6-6 6 6'/%3E%3C/svg%3E") center/contain no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 15l6-6 6 6'/%3E%3C/svg%3E") center/contain no-repeat}
+.card.cc-closed>.cc-head .cc-tog::before{content:"";transform:rotate(180deg)}
+.cc-head:hover .cc-tog,.cc-tog:focus-visible{background:var(--gr-primary-soft);color:var(--gr-primary)}
+/* 접힌 카드: 머리 한 줄만, 요약은 회색 알약 */
+.card.cc-closed{padding:0!important}
+.card.cc-closed>.cc-head{margin:0!important;padding:16px 20px 16px 25px!important;border:0!important}
+.card.cc-closed>.cc-head:hover{background:#FAFBFC;border-radius:8px}
+.cc-sum{order:1;font-size:12.5px;font-weight:500;color:var(--gr-body);max-width:50%}
+.card.cc-closed .cc-sum:not(:empty){padding:3px 10px;border-radius:12px;background:#F1F3F7}
+.card.cc-closed>.cc-head>:not(h2):not(.cc-tog):not(.cc-sum){display:none}   /* 접히면 머리 오른쪽 버튼 · 보조 정보는 감춤 */
+@media (prefers-reduced-motion:reduce){.cc-tog::before{transition:none}}
+/* 머리의 보조 설명(span)은 제목 옆 왼쪽에 둔다 - 버튼 · 선택칸 · 링크 묶음만 오른쪽 */
+.card-head.cc-head>span:not(.cc-sum){order:2}
+/* 좁은 카드 표의 긴 테넌트 값은 말줄임 (마지막 열이 다른 열을 덮지 않게) */
+.card table.list td.small.mono{max-width:190px;overflow:hidden;text-overflow:ellipsis}
+/* 반 폭 카드(두 칸 격자)의 표는 마지막 열 고정을 쓰지 않는다 - 조금만 넘쳐도 앞 열을 덮어서. 흐림 표시만 */
+.grid.c2>.card:not(.span-all) table.list tr>:last-child{position:static;box-shadow:none}
+.grid.c2>.card:not(.span-all) table.list td.small.mono{max-width:130px}
+
+/* =====================================================================
+ * v0.1.6 - 글자가 많아질 때 대비 (모든 화면 글자를 2~3배로 늘린 점검 결과)
+ * 원칙: 한 줄 자리(메뉴 · 칩 · 배지 · 표 칸 · 버튼)는 말줄임(…) + 마우스를 올리면 전체(title),
+ *       글 자리(설명 · 값 · 패널)는 칸 안에서 줄바꿈. 어떤 경우에도 옆 요소를 밀어내지 않는다
+ * ===================================================================== */
+/* L1 페이지 머리: 오른쪽 버튼 묶음이 커져도 제목은 최소 22글자 폭 유지, 버튼은 여러 줄로 */
+.page-head{grid-template-columns:minmax(min(100%,22ch),1fr) minmax(0,auto)}
+.page-head>h1,.page-head>.page-desc{min-width:0}
+.page-acts{min-width:0;max-width:min(62vw,760px)}
+/* L2 좌측 메뉴: 이름 · 묶음 이름은 말줄임, 알림 수는 줄지 않게 */
+.sidebar nav a{min-width:0}
+.sidebar nav a .sb-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar .sb-group{overflow:hidden;text-overflow:ellipsis}
+.noti-count{flex:none;max-width:4.5em;overflow:hidden;text-overflow:ellipsis}
+/* L3 상단 바 칩 · 사용자 이름 · 프로파일 */
+.tb-chip{max-width:200px;overflow:hidden;text-overflow:ellipsis}
+.tb-user .u-name{max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .profile{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;line-height:26px}
+.tb-search input{text-overflow:ellipsis}
+/* L4 배지: 칸보다 길면 말줄임 (글자가 잘려 '대7' 처럼 보이던 것) */
+.badge{max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;min-width:0}
+td .badge{max-width:18ch}
+/* L5 표 칸: 한 줄 칸은 40글자에서 말줄임, 띄어쓰기 없는 코드 · ID 는 28글자에서 */
+table.list td:not(.wrap){max-width:40ch;overflow:hidden;text-overflow:ellipsis}
+table.list td.mono,table.list td .mono:not(.badge){max-width:28ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.list td div.mono,table.list td div.small.mono{display:block}
+/* 로그: 시각 · 로거는 말줄임, 메시지는 넓게 남기고 줄바꿈 */
+#logs table td:nth-child(-n+3){max-width:24ch;overflow:hidden;text-overflow:ellipsis}
+#logs table td:nth-child(4){min-width:320px;white-space:normal!important;overflow-wrap:anywhere}
+/* L6 세로 키 · 값 표(시스템 요약 · 패널 상세): 키는 8~16글자, 값은 줄바꿈 */
+th:has(+ td){white-space:normal;min-width:8em;max-width:16em}
+th+td{white-space:normal!important;overflow-wrap:anywhere;max-width:none!important}
+/* L7 오른쪽 패널: 표를 감싼 칸은 가로 스크롤, 목록 표 칸은 말줄임 */
+aside.sp .sp-body :is(div,section):has(>table){overflow-x:auto}
+aside.sp table.list td:not(.wrap){max-width:24ch;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+aside.sp table.list th+td{white-space:normal;max-width:none}
+/* L8 파일 목록 · 색 타일: 배지 · 버튼이 커져도 이름 칸이 사라지지 않게 */
+.file-item{flex-wrap:wrap}
+.file-item .f-txt{flex:1 1 220px}
+.file-item .f-act{flex-wrap:wrap;justify-content:flex-end}
+.tile .t-foot{flex-wrap:wrap;gap:6px 10px}
+.tile .t-foot>span:not(.badge){flex:1 1 8em;min-width:0}
+/* L9 코드 조각: 좁은 칸(로그인 · 초기 설정 안내 등)에서 칸 밖으로 넘치지 않게 */
+code,kbd{overflow-wrap:anywhere}
+.mono{overflow-wrap:anywhere}
+/* L10 두 칸 폼(DDL 자바 모델 · Writer): 라벨 길이가 달라도 입력칸 높이 맞춤 */
+.f.split{align-items:end}
+.f.split>.field{justify-content:flex-end}
+/* L11 접는 카드 머리: 설명이 길어도 꺾쇠는 오른쪽 끝 같은 줄 */
+.cc-head{flex-wrap:nowrap}
+.cc-head>*:not(.cc-tog){min-width:0}
+.cc-head>.cc-tog{align-self:flex-start;margin-top:-2px}
+/* L12 카드 제목 옆 건수 · 보조 설명 앞 간격 */
+h2>.small,h2>.muted,h2>span.small{margin-left:6px}
+/* L13 툴바 · 카드 머리의 검색칸 · 선택칸 */
+:is(.toolbar,.card-head,.inline) input.ico-search{min-width:12em;flex:1 1 12em}
+:is(.toolbar,.card-head,.inline) select{max-width:min(320px,50%);text-overflow:ellipsis}
+/* L14 그래프 제목 줄(시스템): 제목은 말줄임, '지금 값' 은 줄지 않게 */
+.chart-block>h2{display:flex;align-items:baseline;gap:10px;min-width:0}
+.chart-block>h2>.now{flex:none;margin-left:auto;white-space:nowrap}
+/* L15 구조도 연결선 글자 */
+.af-link span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* L1 보강: 경로가 첫 줄 전체를 쓰므로 버튼 묶음은 둘째 줄부터 (경로와 겹치던 것 - 시나리오 설계 · 시스템) */
+.page-head:has(>.crumbs) .page-acts{grid-row:2/span 2;align-self:start}
+.page-acts>.small,.page-acts>.muted{flex:1 1 100%;text-align:right}
+/* L6 보강: 키 칸이 1% 폭으로 눌려 세로로 길어지던 것 → 표 폭의 최대 35% */
+th:has(+ td){width:auto;max-width:35%}
+table:has(th+td) th:has(+ td){width:30%}
+/* 시간 칸(패널 타임라인)은 줄바꿈 대신 말줄임 */
+.tl-item time{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* L13 보강: 선택칸은 최소 7글자 폭 (기간 '24시간' 이 '2…' 로 줄던 것) */
+:is(.toolbar,.card-head,.inline,.cc-head) select{min-width:7.5em;flex:none}
+
+/* =====================================================================
+ * v0.1.7 - 오른쪽 패널 탭 막대 (sp-dock)
+ * 화면 오른쪽 가장자리 세로 가운데에 고정. 이 화면에서 열 수 있는 패널마다 버튼 하나 (아이콘 + 짧은 이름).
+ * 누르면 그 패널이 바로 열린다. 패널이 열리면 막대는 패널 왼쪽 가장자리로 붙어 다른 패널로 바로 바꿀 수 있다.
+ * (⋯ 더보기 메뉴를 대신한다)
+ * ===================================================================== */
+.sp-dock{position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:43;display:flex;flex-direction:column;gap:4px;
+  padding:8px 6px;background:#fff;border-radius:14px 0 0 14px;box-shadow:-6px 0 24px rgba(30,34,53,.12),0 0 0 1px var(--gr-line);
+  transition:right .2s ease}
+.sp-dock button{position:relative;width:64px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 4px 8px;border:0;border-radius:10px;
+  background:transparent;color:var(--gr-body);font:inherit;font-size:11.5px;font-weight:500;line-height:1.25;cursor:pointer;text-align:center}
+.sp-dock button .ico{width:20px;height:20px}
+.sp-dock button span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;max-width:100%}
+.sp-dock button:hover{background:var(--gr-primary-soft);color:var(--gr-primary)}
+.sp-dock button[aria-pressed="true"]{background:var(--gr-primary);color:#fff}
+.sp-dock button:focus-visible{outline:2px solid var(--gr-primary);outline-offset:1px}
+.sp-dock button.sp-marked::after{content:"";position:absolute;top:7px;right:12px;width:8px;height:8px;border-radius:50%;background:var(--gr-danger);box-shadow:0 0 0 2px #fff}
+.sp-dock .sp-dock-sep{height:1px;margin:2px 8px;background:var(--gr-line)}
+/* 패널이 열리면 막대를 패널 왼쪽에 붙인다 (--sp-open-w 는 열린 패널 폭) */
+html.sp-on .sp-dock{right:min(var(--sp-open-w,520px),calc(100vw - 80px));border-radius:14px 0 0 14px}
+/* 본문이 막대에 가리지 않게 오른쪽 여백 */
+body:has(.sp-dock){padding-right:calc(var(--gr-gutter) + 76px)}
+body:has(.sp-dock) .topbar{right:calc(var(--gr-gutter) + 76px)}
+@media (max-width:900px){
+  .sp-dock{top:auto;bottom:12px;transform:none;flex-direction:row;border-radius:14px 0 0 14px}
+  .sp-dock button{width:56px}
+  body:has(.sp-dock){padding-right:var(--gr-gutter);padding-bottom:84px}
+  body:has(.sp-dock) .topbar{right:var(--gr-gutter)}
+  .sp-dock .sp-dock-sep{width:1px;height:auto;margin:8px 2px}
+  html.sp-on .sp-dock{right:0}   /* 좁은 화면은 패널이 전체 폭 - 막대는 패널 위 오른쪽 아래에 그대로 */
+}
+@media (prefers-reduced-motion:reduce){.sp-dock{transition:none}}
+
+/* =====================================================================
+ * v0.1.8 - 알림: 긴 메시지는 한 줄 말줄임, 누르면 오른쪽 '알림 내용' 패널에 전체
+ * ===================================================================== */
+.timeline .tl-item[role="button"]{cursor:pointer;border-radius:10px}
+.timeline .tl-item[role="button"]:focus-visible{outline:2px solid var(--gr-primary);outline-offset:2px}
+.tl-item .tl-msg{margin-top:4px;font-size:13px;color:var(--gr-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.tl-item.sel .tl-title{color:var(--gr-primary)}
+.tl-item.sel .tl-body{background:var(--gr-primary-soft);border-radius:8px;box-shadow:0 0 0 8px var(--gr-primary-soft)}
+@media (min-width:1500px){
+  .timeline .tl-body{flex-wrap:wrap}
+  .timeline .tl-msg{flex-basis:100%;order:3;min-width:0}
+}
+.msg-pre{margin:0;padding:12px 14px;border-radius:8px;background:#F6F7F9;color:var(--gr-heading);font:13px/1.65 var(--mono,monospace);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;max-height:none}
+
+/* =====================================================================
+ * v0.1.9 - 로그 · 시나리오 · 엑셀: 긴 내용은 한 줄 말줄임, 누르면 오른쪽 패널에 전체 (알림 화면과 같은 방식)
+ * ===================================================================== */
+.cut1{display:block;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 로그: 메시지 칸은 남은 폭을 다 쓰고 한 줄. 여러 줄이면 +N줄 */
+#logs table td.log-msg{width:100%;max-width:0;min-width:240px;white-space:nowrap!important}
+#logs .lm{display:flex;align-items:center;gap:8px;min-width:0}
+#logs .lm .cut1{flex:1}
+#logs .lm .badge{flex:none}
+#logs tr[data-panel-open]{cursor:pointer}
+#logs tr.sel td{background:var(--gr-primary-soft)}
+/* 시나리오: 정의 오류 링크 (한 줄 + 건수) */
+.err-link{display:flex;align-items:center;gap:6px;width:100%;max-width:340px;min-width:0;margin-top:4px;padding:0;border:0;background:none;
+  color:var(--gr-danger-text);font:inherit;font-size:12.5px;line-height:1.4;cursor:pointer;text-align:left}
+.err-link .cut1{flex:1}
+.err-link b{flex:none;padding:1px 7px;border-radius:10px;background:var(--gr-danger-10);font-weight:600}
+.err-link:hover .cut1,.err-link:focus-visible .cut1{text-decoration:underline}
+.err-link:focus-visible{outline:2px solid var(--gr-primary);outline-offset:2px;border-radius:4px}
+.err-list{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:8px}
+.err-list li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px;padding:10px 12px;border-radius:8px;background:var(--gr-danger-10);color:var(--gr-heading);overflow-wrap:anywhere}
+.err-list .no{font-weight:600;color:var(--gr-danger-text);white-space:nowrap}
+/* 엑셀: 파일 칸의 결과 메시지 한 줄, 고른 행 */
+#list .xl-msg{max-width:260px;margin-top:2px}
+#list tr.sel td{background:var(--gr-primary-soft)}
+/* v0.1.9 점검: 로그 메시지(스택)도 칸 안에서 여러 줄 · 정의 오류가 있는 열은 최소 폭 · 파일 목록 머리 글자는 자르지 않음(표가 가로 스크롤) */
+.msg-pre.log{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;tab-size:4}   /* 로그 메시지(스택 포함)도 칸 안에서 여러 줄로 - 가로 스크롤 없이 */
+td:has(>.err-link) .err-link{max-width:100%}
+#list table th{max-width:none!important;overflow:visible!important;text-overflow:clip!important;white-space:nowrap}
+/* 시나리오 목록: 표가 카드보다 넓어 고정된 마지막 열(복제 · JSON)이 실행 열을 덮던 것 → 정책 · 실행 열 최소 폭과 플러그인 열을 줄여 한 화면에 */
+#list tr[data-id]>td.wrap{min-width:150px}
+#list tr[data-id]>td.wrap:has(>.badge){min-width:120px;max-width:170px}
+#list tr[data-id]>td:nth-child(4):not(.wrap){max-width:22ch}
+/* 두 칸 배치(.split) 안 표: 마지막 열 고정을 끈다 (엑셀 파일 목록의 '폴더' 열이 차단/경고 열을 덮던 것 - 반 폭 카드 규칙과 같음) */
+.split .card>div>table.list tr>:last-child{position:static;box-shadow:none}

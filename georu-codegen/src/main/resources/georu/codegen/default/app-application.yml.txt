@@ -1,0 +1,61 @@
+# =============================================================================
+# [(${s.company})] 이관 앱 공통 설정. 환경마다 다른 값(접속 정보)은 application-{프로파일}.yml 에 둔다.
+#   프로파일은 실행하는 쪽이 정한다 (SPRING_PROFILES_ACTIVE). 정하지 않으면 dev.
+#   DataSource 이름: 소스 [(${s.sourceDataSource})] ([(${s.sourceDialect})]) · 타겟 [(${s.targetDataSource})] ([(${s.targetDialect})]) · 운영 저장소 operation
+# 자동 생성: georu 코드 생성기 [(${gen.version})]
+# =============================================================================
+server:
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+
+spring:
+  application:
+    name: georu-[(${s.company})]
+  profiles:
+    default: dev
+  servlet:
+    multipart:                           # 엑셀 이관 · 코드 생성 업로드
+      max-file-size: 50MB
+      max-request-size: 55MB
+  aop:
+    proxy-target-class: true             # Reader · Writer 의 Step 리스너 등록
+  batch:
+    job:
+      enabled: false                     # 기동 시 Job 자동 실행 안 함 (운영 UI · API 로 실행)
+    jdbc:
+      initialize-schema: never           # BATCH_* 는 georu.operation.schema-init 가 만든다
+
+georu:
+  customer:
+    name: [(${s.company})]               # 운영 UI 이름
+  datasource:
+    operation:                           # 운영 저장소 (실행 이력 · 로그). 기본: 내장 H2 파일
+      hikari:
+        jdbc-url: ${OPERATION_DB_URL:jdbc:h2:file:./data/operation/migops;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;DB_CLOSE_ON_EXIT=FALSE}
+        username: ${OPERATION_DB_USERNAME:sa}
+        password: ${OPERATION_DB_PASSWORD:}
+    [(${s.sourceDataSource})]:                            # 소스 (접속 정보는 프로파일 yml)
+      hikari:
+        driver-class-name: [(${s.sourceDriver})]
+        read-only: true
+        auto-commit: false
+    [(${s.targetDataSource})]:                            # 타겟 (접속 정보는 프로파일 yml)
+      hikari:
+        driver-class-name: [(${s.targetDriver})]
+        auto-commit: false
+  plugins:
+    [(${s.company})]:
+      enabled: true                      # 업무 하나만 끄기: georu.plugins.[(${s.company})].<업무>.enabled: false
+  sequence:                              # 채번 (TableOptions.sequenceColumns 를 쓰는 테이블). TOBE 앱의 채번 관리 테이블에 맞춘다
+    enabled: true
+    # table: mig_sequence                # 관리 테이블 (기본 mig_sequence, 타겟 DB). 예: tobe_schema.tb_sequence
+    # table-name-column: TABLES          # 테이블명 열
+    # column-name-column: COL            # 컬럼명 열
+    # value-column: SEQ                  # 마지막 번호 열
+    # key-case: UPPER                    # 관리 테이블 키 대소문자 UPPER | LOWER | AS_IS
+  operation:
+    schema-init: auto                    # 운영 저장소 테이블을 기동 때 만든다
+  batch:
+    executor:                            # 단일 실행 규칙: 엔진 기본값이 1/1 이다 (2 이상이면 기동 실패). 바꿀 일이 없으면 지워도 된다
+      core-pool-size: 1
+      max-pool-size: 1

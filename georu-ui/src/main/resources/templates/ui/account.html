@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('내 계정')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>내 계정</h1><p class="page-desc">비밀번호 바꾸기 · 권한</p></div>
+    <div class="alert warn" id="mustChange" style="display:none">
+        <b>비밀번호를 먼저 바꿔야 합니다.</b> 이 계정은 비밀번호 변경이 필요한 상태입니다. 바꾸기 전에는 다른 화면을 쓸 수 없습니다.
+    </div>
+    <div class="split r11 align-top">
+            <div class="card">
+                <h2>비밀번호 바꾸기</h2>
+                <form class="f" id="pwForm" onsubmit="return false" autocomplete="off">
+                    <div class="field full"><label>아이디</label><div class="mono" id="who" style="padding-top:6px">-</div></div>
+                    <div class="field full"><label>권한</label><div id="role" style="padding-top:6px">-</div></div>
+                    <div class="field full"><label for="curPw">현재 비밀번호</label><input id="curPw" type="password" autocomplete="current-password" required></div>
+                    <div class="field"><label for="newPw">새 비밀번호 <span class="muted">(8자 이상, 현재와 다르게)</span></label><input id="newPw" type="password" autocomplete="new-password" minlength="8" required></div>
+                    <div class="field"><label for="newPw2">새 비밀번호 확인</label><input id="newPw2" type="password" autocomplete="new-password" minlength="8" required></div>
+                    <div class="full inline"><button class="btn primary" id="btnPw" type="button">바꾸기</button><span class="small muted" id="pwStatus"></span></div>
+                </form>
+            </div>
+            <div class="card" data-collapse="idle" data-collapse-sum="#idleText">
+                <h2>유휴 잠금</h2>
+                <p class="small" id="idleText">-</p>
+                <p class="small muted">마우스 · 키보드 입력이 이 시간만큼 없으면 자동으로 로그아웃합니다 (화면만 잠기고, 실행 중인 이관은 서버에서 계속 돕니다). 시간은 <b>권한마다</b> 관리자가 정합니다 (사용자 · 권한 › 권한).</p>
+            </div>
+    </div>
+</main>
+<script>
+(function () {
+  const { $, toast, get } = UI;
+  async function load() {
+    try {
+      const me = await get('/api/account/me');
+      $('#who').textContent = (me.name || '') + (me.username ? ' (' + me.username + ')' : '');
+      $('#role').textContent = me.roleName || (me.admin ? '관리자' : '-');
+      $('#idleText').innerHTML = me.idleLockMinutes ? '지금 권한의 유휴 잠금: <b>' + me.idleLockMinutes + '분</b>' : '지금 권한은 유휴 잠금을 쓰지 않습니다 (0분)';
+      $('#mustChange').style.display = me.mustChangePassword ? '' : 'none';
+      if (me.mustChangePassword) $('#curPw').focus();
+    } catch (e) { toast(e.message, 'err'); }
+  }
+  $('#btnPw').onclick = async () => {
+    const cur = $('#curPw').value, nw = $('#newPw').value, nw2 = $('#newPw2').value;
+    if (nw.length < 8) { toast('새 비밀번호는 8자 이상', 'err'); return; }
+    if (nw !== nw2) { toast('새 비밀번호 확인이 다릅니다', 'err'); return; }
+    $('#btnPw').disabled = true; $('#pwStatus').textContent = '바꾸는 중…';
+    try {
+      await UI.post('/api/account/password', { currentPassword: cur, newPassword: nw });
+      toast('비밀번호를 바꿨습니다', 'ok'); $('#pwStatus').textContent = '바꿨습니다';
+      $('#curPw').value = ''; $('#newPw').value = ''; $('#newPw2').value = '';
+      const was = $('#mustChange').style.display !== 'none';
+      $('#mustChange').style.display = 'none';
+      if (was) setTimeout(() => { location.href = '/ui'; }, 800);   // 권한의 첫 화면으로
+    } catch (e) { toast(e.plainMessage || e.message, 'err'); $('#pwStatus').textContent = ''; }
+    finally { $('#btnPw').disabled = false; }
+  };
+  load();
+})();
+</script>
+</body>
+</html>

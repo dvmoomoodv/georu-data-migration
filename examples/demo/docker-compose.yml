@@ -1,0 +1,257 @@
+# =============================================================================
+# 로컬 도커 환경 (데모 이관: Oracle DEMO → MySQL demo_tobe, 운영저장소 = 내장 H2)
+#
+#   cp docker/.env.example docker/.env      # 비밀번호 등 편집
+#   docker compose --env-file docker/.env up -d oracle mysql   # DB 먼저 (Oracle 최초 기동 2~3분, init 스크립트 포함 5분 내외)
+#   docker compose --env-file docker/.env up -d --build app
+#   docker compose logs -f app
+#
+#   데모를 처음 상태로 돌려 다시 돌릴 때: ./run-scripts/run-docker.sh demo (docker-compose.demo.yml)
+# =============================================================================
+name: georu
+
+services:
+  # ---------------------------------------------------------------------------
+  # 애플리케이션
+  # ---------------------------------------------------------------------------
+  app:
+    build:
+      context: ../..
+      dockerfile: examples/demo/Dockerfile
+    image: georu:local
+    container_name: georu
+    ports:
+      - "${APP_PORT:-8083}:8081"
+      - "127.0.0.1:${H2_TCP_PORT:-9093}:9092" # 운영저장소 H2 TCP (DBeaver 용, 로컬에서만 접속). georu.operation.h2-tcp
+    environment:
+      # 프로파일 docker (application-docker.yml). 아래 환경변수는 호스트 기본값(localhost)을 컨테이너 네트워크 서비스명으로 바꾸는 것만
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-docker}
+      SERVER_PORT: "8081"
+      GEORU_ADMIN_RESET_PASSWORD: ${GEORU_ADMIN_RESET_PASSWORD:-false} # 관리자 비밀번호를 잊었을 때만 true 로 한 번 기동 → 계정 삭제 → 초기 설정 화면(/setup). 끝나면 되돌린다
+      JAVA_OPTS: ${JAVA_OPTS:--XX:MaxRAMPercentage=70.0 -XX:+UseZGC -Dfile.encoding=UTF-8 -Duser.timezone=Asia/Seoul -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/app/logs/heapdump.hprof -XX:+ExitOnOutOfMemoryError -Xlog:gc*:file=/app/logs/gc.log:time,uptime,level,tags:filecount=5,filesize=10m}
+
+      # 운영저장소: 내장 H2 파일 (application-docker.yml 기본값 → /app/data/operation/migops.mv.db, 볼륨 보존). OPERATION_DB_URL 미지정.
+      OPERATION_H2_TCP_ALLOW_OTHERS: "true" # 포트 매핑 접속은 컨테이너 입장에서 외부 IP. 호스트 노출은 127.0.0.1 로 제한
+      #   DBeaver(H2 Server 드라이버): jdbc:h2:tcp://localhost:9093//app/data/operation/migops;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE  (sa / 빈 비밀번호)
+
+      # 소스 (Oracle 컨테이너)
+      SOURCE_DB_URL: jdbc:oracle:thin:@//oracle:1521/${ORACLE_PDB:-FREEPDB1}
+      SOURCE_DB_USERNAME: ${ORACLE_APP_USER:-migrator}
+      SOURCE_DB_PASSWORD: ${ORACLE_APP_PASSWORD:-migrator}
+
+      # 타겟 (MySQL 컨테이너)
+      TARGET_DB_HOST: mysql
+      TARGET_DB_PORT: "3306"
+      TARGET_DB_NAME: ${MYSQL_DATABASE:-demo_tobe}
+      TARGET_DB_USERNAME: root
+      TARGET_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+
+      # 여러 DB 예제 demo.xdb (소스 PostgreSQL · SQL Server, 타겟 MariaDB). 켜려면 ./run-scripts/run-docker.sh xdb (DEMO_XDB_ENABLED=true + profile xdb)
+      DEMO_XDB_ENABLED: ${DEMO_XDB_ENABLED:-false}
+      SOURCE2_DB_URL: jdbc:postgresql://postgres:5432/demo_pg
+      SOURCE2_DB_USERNAME: demo
+      SOURCE2_DB_PASSWORD: ${POSTGRES_PASSWORD:-demo}
+      SOURCE3_DB_URL: jdbc:sqlserver://mssql:1433;databaseName=demo_ms;encrypt=false
+      SOURCE3_DB_USERNAME: migrator
+      SOURCE3_DB_PASSWORD: ${MSSQL_APP_PASSWORD:-Migrator!2026}
+      TARGET2_DB_URL: jdbc:mariadb://mariadb:3306/demo_mart
+      TARGET2_DB_USERNAME: root
+      TARGET2_DB_PASSWORD: ${MARIADB_ROOT_PASSWORD:-password}
+
+      # 텔레그램 알림 (georu.notification.telegram.enabled=true 가 모든 프로파일 기본). 토큰·채팅방이 비어 있으면 보내지 못하고 로그에 남는다
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+
+      # 로그 레벨 덮어쓰기 (docker 프로파일 기본 DEBUG/DEBUG/INFO). 컨테이너 로그 양을 줄이려면 docker/.env 에서 조정
+      GEORU_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      GEORU_LOG_SQL_LEVEL: ${APP_LOG_SQL_LEVEL:-INFO}
+      # 서버 진단 화면 (Spring Boot Admin, /admin) 켜고 끄기. georu.admin-console.enabled
+      APP_ADMIN_CONSOLE_ENABLED: ${APP_ADMIN_CONSOLE_ENABLED:-true}
+      TZ: Asia/Seoul
+    volumes:
+      - ./docker/volumes/logs:/app/logs
+      - ./docker/volumes/data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/actuator/health/live"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3
+    depends_on:
+      mysql:
+        condition: service_healthy
+      oracle:
+        condition: service_healthy
+    mem_limit: ${APP_MEM_LIMIT:-3g}
+    stop_grace_period: 45s # server.shutdown=graceful (30s) + 여유
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # 소스 - Oracle (gvenzl/oracle-free, arm64 지원, 19c 매퍼 문법(OFFSET/FETCH) 호환)
+  #   최초 기동 시 docker/oracle/init/01_init.sh 가 docker/oracle/init-sql/*.sql 을 실행
+  #   (DEMO 스키마 12 테이블 + 데모 데이터, 앱 접속 계정 migrator 에 SELECT 권한)
+  # ---------------------------------------------------------------------------
+  oracle:
+    image: gvenzl/oracle-free:23-slim
+    container_name: georu-oracle
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_SYS_PASSWORD:-oracle}
+      APP_USER: ${ORACLE_APP_USER:-migrator}
+      APP_USER_PASSWORD: ${ORACLE_APP_PASSWORD:-migrator}
+      INIT_PDB: ${ORACLE_PDB:-FREEPDB1}
+      TZ: Asia/Seoul
+    ports:
+      - "${ORACLE_PORT:-1523}:1521"
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+      - ./docker/oracle/init:/container-entrypoint-initdb.d:ro
+      - ./docker/oracle/init-sql:/opt/init-sql:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      start_period: 180s
+      retries: 30
+    mem_limit: ${ORACLE_MEM_LIMIT:-3g}
+    shm_size: 1g
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # 타겟 - MySQL (데이터 없음, 이관 결과로 채움)
+  #   최초 기동 시 docker/mysql/init/20_demo_tobe_schema.sql 실행
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: georu-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-demo_tobe}
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --lower_case_table_names=1
+      - --max_allowed_packet=64M
+      - --innodb_buffer_pool_size=512M
+    ports:
+      - "${MYSQL_PORT:-3308}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD --silent",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 30s
+      retries: 12
+    mem_limit: ${MYSQL_MEM_LIMIT:-1g}
+    restart: unless-stopped
+
+  # ===========================================================================
+  # 여러 DB 예제 demo.xdb (profile xdb). 기본 up 에는 들어가지 않는다: ./run-scripts/run-docker.sh xdb
+  #   소스 PostgreSQL(source-2) · SQL Server(source-3), 타겟 MariaDB(target-2)
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: georu-postgres
+    profiles: ["xdb"]
+    environment:
+      POSTGRES_DB: demo_pg
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-demo}
+      TZ: Asia/Seoul
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demo -d demo_pg"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+
+  # SQL Server: arm64(Apple Silicon) 에서도 뜨는 Azure SQL Edge (엔진 15.0, SQL Server 2019 계열, JDBC · T-SQL 같음).
+  #   x86 서버라면 mcr.microsoft.com/mssql/server:2022-latest 로 바꿔도 된다 (MSSQL_PID: Developer)
+  mssql:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    container_name: georu-mssql
+    profiles: ["xdb"]
+    environment:
+      ACCEPT_EULA: "1"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Georu!Demo2026}
+      TZ: Asia/Seoul
+    ports:
+      - "${MSSQL_PORT:-1434}:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/1433'"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 30
+    mem_limit: 2g
+    restart: unless-stopped
+
+  # SQL Server 초기 데이터 (1회성). SQL Edge 이미지에는 sqlcmd 가 없어 도구 이미지로 넣는다 (amd64, arm64 에서는 에뮬레이션)
+  mssql-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    platform: linux/amd64
+    container_name: georu-mssql-init
+    profiles: ["xdb"]
+    environment:
+      SA_PASSWORD: ${MSSQL_SA_PASSWORD:-Georu!Demo2026}
+      APP_PASSWORD: ${MSSQL_APP_PASSWORD:-Migrator!2026}
+    volumes:
+      - ./docker/mssql/init:/init:ro
+    entrypoint:
+      - bash
+      - -c
+      - |
+        for i in $$(seq 1 60); do /opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P "$$SA_PASSWORD" -Q "SELECT 1" >/dev/null 2>&1 && break; sleep 2; done
+        sed "s|__APP_PASSWORD__|$$APP_PASSWORD|g" /init/01_demo_ms.sql > /tmp/init.sql
+        /opt/mssql-tools/bin/sqlcmd -S mssql -U sa -P "$$SA_PASSWORD" -b -i /tmp/init.sql
+    depends_on:
+      mssql:
+        condition: service_healthy
+    restart: "no"
+
+  mariadb:
+    image: mariadb:11
+    container_name: georu-mariadb
+    profiles: ["xdb"]
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-password}
+      MARIADB_DATABASE: demo_mart
+      TZ: Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --lower_case_table_names=1
+    ports:
+      - "${MARIADB_PORT:-3309}:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./docker/mariadb/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 20
+    mem_limit: 512m
+    restart: unless-stopped
+
+volumes:
+  oracle_data: {}
+  mysql_data: {}
+  postgres_data:
+  mssql_data:
+  mariadb_data:

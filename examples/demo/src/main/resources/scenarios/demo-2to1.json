@@ -1,0 +1,40 @@
+{
+  "id": "demo-2to1",
+  "name": "여러 DB 2:1",
+  "description": "소스 2곳(본사·지사) → 운영 DB 1곳: 테이블별 소스, 합치기(src_cd·countGroup), 결합(SourceLookup) (docker 프로파일, guides/demo.md 의 \"여러 DB\")",
+  "profiles": [
+    "docker"
+  ],
+  "onUnitFailure": "STOP",
+  "onStepStop": "STOP_ALL",
+  "common": {
+    "tenantLevel1": "DEMO",
+    "tenantLevel2": "DEMO",
+    "tenantLevel3": "DEMO",
+    "tenantLevel4": "DEMO",
+    "tenantLevel5": "DEMO",
+    "chunkSize": 500
+  },
+  "steps": [
+    {
+      "plugin": "demo.multi",
+      "table": "tb_branch",
+      "label": "지점 (2:1 테이블별 소스: source-1 → target-m)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "stg_member_hq",
+      "label": "회원 합치기 - 본사 (2:1 합치기, src_cd HQ)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "stg_member_br",
+      "label": "회원 합치기 - 지사 (2:1 합치기, src_cd BR)"
+    },
+    {
+      "plugin": "demo.multi",
+      "table": "tb_member_point",
+      "label": "회원 포인트 (2:1 결합: SourceLookup)"
+    }
+  ]
+}

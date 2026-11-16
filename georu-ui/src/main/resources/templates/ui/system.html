@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('시스템')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>시스템</h1><p class="page-desc">프로파일 <b th:text="${activeProfile}"></b> · 5분마다 자동 갱신</p><div class="page-acts"><span id="autoRefresh" class="page-refresh"></span></div></div>
+    <div class="card" data-collapse="load" data-collapse-sum="#nowCpu,#nowHeap,#nowThreads,#nowJobs">
+        <h2 class="card-head">부하 추이 <span class="small muted">5분마다 운영 저장소에 기록 · 7일 보관 · 마우스를 올리면 시각별 값</span>
+            <span class="inline small" data-refresh-ignore style="margin-left:auto;font-weight:normal">기간
+                <select id="range"><option value="6">6시간</option><option value="24" selected>24시간</option><option value="72">3일</option><option value="168">7일</option></select></span></h2>
+        <div class="grid c2 align-top">
+            <div class="chart-block"><h2>CPU 사용률 <span class="now" id="nowCpu"></span></h2><div id="chCpu"></div></div>
+            <div class="chart-block"><h2>힙 사용률 <span class="now" id="nowHeap"></span></h2><div id="chHeap"></div></div>
+            <div class="chart-block"><h2>커넥션 풀 사용률 <span class="small muted">사용 중 / 최대</span></h2><div id="chPool"></div></div>
+            <div class="chart-block"><h2>스레드 수 <span class="now" id="nowThreads"></span></h2><div id="chThreads"></div></div>
+            <div class="chart-block"><h2>실행 중 Job <span class="now" id="nowJobs"></span></h2><div id="chJobs"></div></div>
+        </div>
+    </div>
+    <div class="grid c2 align-top">
+        <div class="card" data-collapse="health"><h2>헬스</h2><div id="health"><div class="empty loading">조회 중…</div></div></div>
+        <div class="card" data-collapse="overview"><h2>요약</h2><div id="overview"><div class="empty loading">조회 중…</div></div></div>
+        <div class="card span-all" data-collapse="db"><h2>데이터베이스 / 커넥션 풀</h2><div id="db"><div class="empty loading">조회 중…</div></div></div>
+        <div class="card span-all" data-collapse="plugins"><h2>플러그인</h2><div id="plugins"><div class="empty loading">조회 중…</div></div></div>
+    </div>
+    <aside class="sp" data-panel="cleanup" data-title="운영 기록 정리" data-width="620" data-more-desc="오래된 실행 이력 · 알림 · 점검 · 지표 지우기 (자동으로 지우지 않음)" data-dock-label="기록 정리" data-dock-icon="trash">
+          <div class="small muted">운영 저장소(실행 이력·알림·점검·스케줄 주기·지표)의 오래된 기록을 지웁니다. 먼저 건수를 보고, 확인 후 실행합니다. 이관이 실행 중이면 거절됩니다.
+            실행 중 기록·스케줄 정의·시나리오 정의·엑셀 대장은 지우지 않습니다. 운영 환경은 지우기 전에 운영 저장소를 백업하세요(<span class="mono">mig-script/operation/04_h2_backup.sql</span>) · <a href="/ui/guide?name=operation-store">운영 테이블 보는 법</a></div>
+          <div class="inline" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+            <div class="field"><label>대상</label><select id="clTarget">
+              <option value="RUNS">끝난 실행 기록 (이력·로그·청크·요청/판정·묶음·Batch 메타)</option>
+              <option value="NOTIFICATIONS">알림</option>
+              <option value="CHECKS">실행 전 점검 결과</option>
+              <option value="SCHEDULE_RUNS">스케줄 주기 기록</option>
+              <option value="METRICS">시스템 지표</option></select></div>
+            <div class="field"><label>며칠 전 이전</label><input class="w-xs" id="clDays" type="number" min="1"></div>
+            <button class="btn" id="clPreview">건수 보기</button>
+            <button class="btn danger" id="clRun" disabled data-write>정리 실행</button>
+          </div>
+          <div id="clResult" class="mt-8"></div>
+    </aside>
+    <aside class="sp" data-panel="perf" data-title="성능 지표 (원본)" data-width="640" data-more-desc="지표 원문 JSON (5분마다 갱신)" data-dock-label="성능 지표" data-dock-icon="activity">
+        <div class="small"><a th:if="${adminConsoleEnabled}" class="small" th:href="@{/admin}" target="_blank" title="Spring Boot Admin - JVM 메모리·GC·스레드 덤프·지표 탐색">상세 진단: 서버 진단 ↗</a></div>
+        <pre id="perf">…</pre>
+    </aside>
+</main>
+<script th:inline="javascript">
+  const CATALOG = /*[[${catalog}]]*/ {};
+</script>
+<script>
+(function () {
+  const { get, fmtDate, num, badge, esc, $ } = UI;
+  async function raw(url) { const r = await fetch(url); return r.json(); }
+  async function health() {
+    try {
+      const [live, ready] = await Promise.all([raw('/actuator/health/live'), raw('/actuator/health/ready')]);
+      $('#health').innerHTML = `<table><tr><th>live (프로세스)</th><td>${badge(live.status)}</td></tr><tr><th>ready (운영저장소 H2)</th><td>${badge(ready.status)}</td></tr></table>
+        <div class="mt-6 small muted">ready 가 DOWN 이면 이관 상태 기록이 불가하므로 실행을 보류하세요.</div>`;
+    } catch (e) { $('#health').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  async function overview() {
+    try {
+      const o = await get('/api/status/overview');
+      const mem = o.memoryUsage || {};
+      $('#overview').innerHTML = `<table>
+        <tr><th>상태</th><td>${badge(o.systemStatus)}</td></tr><tr><th>Job (실행/완료/실패/전체)</th><td>${num(o.runningJobs)} / ${num(o.completedJobs)} / ${num(o.failedJobs)} / ${num(o.totalJobs)}</td></tr>
+        <tr><th>성공률</th><td>${esc(o.successRate)}</td></tr><tr><th>가동시간</th><td>${esc(o.uptime)}</td></tr>
+        <tr><th>메모리</th><td class="small mono">${esc(Object.entries(mem).map(([k, v]) => k + ' ' + v).join(' · '))}</td></tr><tr><th>CPU / 스레드</th><td>${esc(o.cpuUsage)} / ${esc(o.threadCount)}</td></tr>
+        <tr><th>플러그인 (등록)</th><td>${num(o.totalPlugins)}</td></tr></table>`;
+    } catch (e) { $('#overview').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  async function db() {
+    try {
+      const d = await get('/api/status/database');
+      const rows = Object.entries(d).filter(([k, v]) => v && typeof v === 'object' && 'healthy' in v);
+      $('#db').innerHTML = `<table class="list"><tr><th>이름</th><th>타입</th><th>상태</th><th>호스트</th><th>DB</th><th>응답</th><th>활성</th><th>유휴</th><th>최대</th><th>사용률</th><th>오류</th></tr>` +
+        rows.map(([k, v]) => `<tr><td><b>${esc(k)}</b></td><td>${esc(v.type)}</td><td>${badge(v.healthy ? 'UP' : 'DOWN')}</td><td class="small">${esc(v.host)}</td><td class="small">${esc(v.database)}</td><td>${esc(v.responseTime)}</td>
+          <td>${v.activeConnections ?? '-'}</td><td>${v.idleConnections ?? '-'}</td><td>${v.maxConnections ?? '-'}</td><td>${v.connectionPoolUsage != null ? Number(v.connectionPoolUsage).toFixed(0) + '%' : '-'}</td><td class="small mono">${esc(v.errorMessage || '')}</td></tr>`).join('') +
+        `</table><div class="mt-6 small muted">조회 ${fmtDate(d.lastChecked)} · 토글로 꺼진 DataSource 는 목록에 없습니다.</div>`;
+    } catch (e) { $('#db').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  /** 플러그인 요약 칩 (todo-task 33 G3). 아는 키는 이름 · 색, 모르는 키도 '키 값' 으로 남긴다 (값을 잃지 않게) */
+  const SUMMARY_KEYS = { totalPlugins: ['플러그인', 'primary'], activePlugins: ['활성', 'ok'], inactivePlugins: ['비활성', ''], errorPlugins: ['오류', 'bad'], domains: ['업무', ''] };
+  function summaryChips(s) {
+    const chip = (label, v, tone) => `<span class="sum-chip${tone ? ' ' + tone : ''}">${esc(label)} <b>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</b></span>`;
+    const known = Object.keys(SUMMARY_KEYS).filter(k => Object.prototype.hasOwnProperty.call(s, k))
+      .map(k => { const [label, tone] = SUMMARY_KEYS[k]; return chip(label, s[k], k === 'errorPlugins' && !Number(s[k]) ? '' : tone); });
+    const other = Object.keys(s).filter(k => !Object.prototype.hasOwnProperty.call(SUMMARY_KEYS, k)).map(k => chip(k, s[k], ''));
+    return `<div class="sum-chips">${known.concat(other).join('')}</div>`;
+  }
+  async function plugins() {
+    try {
+      const p = await get('/api/status/plugins');
+      const list = Array.isArray(p.plugins) ? p.plugins : [];
+      let html = '';
+      if (p.summary && typeof p.summary === 'object') html += summaryChips(p.summary);
+      else if (p.summary != null) html += `<div class="mb-6 small muted">${esc(JSON.stringify(p.summary))}</div>`;   // 객체가 아니면 전처럼 원문
+      if (list.length) {
+        const keys = ['pluginName', 'domain', 'domainName', 'version', 'status', 'enabled', 'description'].filter(k => list.some(x => x[k] !== undefined));
+        const nameOf = (x) => x.pluginName || x.domain || '';
+        const tcount = (x) => { const t = (typeof CATALOG === 'object' && CATALOG) ? CATALOG[nameOf(x)] : null; return Array.isArray(t) ? t.length : '-'; };
+        html += `<div class="mb-6 inline"><button class="btn sm" id="incAgg" type="button" title="플러그인마다 /api/ui/mapping-status 를 불러 TODO·원천 미지정 수를 모읍니다">미완 코드 집계</button><span class="small muted" id="incMeta"></span></div>`;
+        html += `<table><tr>${keys.map(k => `<th>${esc(k)}</th>`).join('')}<th>테이블 수</th><th>미완 코드</th></tr>` + list.map(x => `<tr>${keys.map(k => `<td class="small">${k === 'status' ? badge(x[k]) : esc(typeof x[k] === 'object' ? JSON.stringify(x[k]) : x[k])}</td>`).join('')}<td class="small mono">${tcount(x)}</td><td class="small" data-inc="${esc(nameOf(x))}">-</td></tr>`).join('') + '</table>';
+      } else html += `<pre>${esc(JSON.stringify(p, null, 2))}</pre>`;
+      $('#plugins').innerHTML = html;
+      const agg = $('#incAgg');
+      if (agg) agg.onclick = async () => {
+        agg.disabled = true; const cells = Array.from(document.querySelectorAll('[data-inc]')); let total = 0, blocked = 0;
+        for (const c of cells) {
+          const name = c.dataset.inc; if (!name || !(CATALOG[name] || []).length) { c.textContent = '-'; continue; }
+          try { const s = await get('/api/ui/mapping-status?pluginName=' + encodeURIComponent(name)); const inc = s.incompleteCount ?? 0, bl = s.blockedTables ?? 0; total += inc; blocked += bl;
+            c.innerHTML = inc || bl ? `<span class="badge ${bl ? 'BLOCKED' : 'WARNING'}">${inc}건${bl ? ' · 차단 ' + bl : ''}</span> <a class="small" href="/ui/execute?pluginName=${encodeURIComponent(name)}">보기</a>` : '<span class="badge COMPLETED">0</span>'; }
+          catch (e) { c.textContent = '?'; }
+        }
+        $('#incMeta').textContent = `미완 ${total}건 · 원천 미지정 테이블 ${blocked}개`; agg.disabled = false;
+      };
+    } catch (e) { $('#plugins').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  // ---- 부하 추이 (SVG 그래프)
+  async function trend() {
+    const hours = Number($('#range').value);
+    try {
+      const h = await get('/api/status/metrics/history?hours=' + hours) || [];
+      const to = new Date(), from = new Date(to.getTime() - hours * 3600 * 1000);
+      const pts = (key) => h.map(x => ({ t: x.collectedAt, v: x[key] }));
+      const pctFmt = (v) => Math.round(v) + '%';
+      UI.lineChart($('#chCpu'), [{ name: '앱 프로세스', points: pts('processCpu') }, { name: '시스템(컨테이너)', points: pts('systemCpu') }], { max: 100, fmt: pctFmt, from, to, label: 'CPU 사용률' });
+      UI.lineChart($('#chHeap'), [{ name: '힙', points: h.map(x => ({ t: x.collectedAt, v: x.heapUsage, note: x.heapUsedMb != null ? num(x.heapUsedMb) + '/' + num(x.heapMaxMb) + 'MB' : '' })) }], { max: 100, fmt: pctFmt, from, to, label: '힙 사용률' });
+      UI.lineChart($('#chThreads'), [{ name: '스레드', points: pts('threadCount') }], { fmt: (v) => String(Math.round(v)), integer: true, from, to, label: '스레드 수' });
+      UI.lineChart($('#chJobs'), [{ name: '실행 중 Job', points: pts('runningJobs') }], { fmt: (v) => String(Math.round(v)), integer: true, from, to, label: '실행 중 Job' });
+      // 풀: DataSource 별 한 선 (이름 순서 고정 → 색 고정)
+      const pools = {};
+      h.forEach(x => { let ps = {}; try { ps = JSON.parse(x.poolStats || '{}'); } catch (e) { /* ignore */ }
+        Object.entries(ps).forEach(([k, v]) => (pools[k] = pools[k] || []).push({ t: x.collectedAt, v: v.max ? v.active * 100 / v.max : 0, note: v.active + '/' + v.max })); });
+      UI.lineChart($('#chPool'), Object.keys(pools).sort().map(k => ({ name: k, points: pools[k] })), { max: 100, fmt: pctFmt, from, to, label: '커넥션 풀 사용률', noArea: true });
+    } catch (e) { $('#chCpu').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+    try {
+      const n = await get('/api/status/metrics/now');
+      const pc = (v) => v == null ? '-' : Math.round(v) + '%';
+      $('#nowCpu').textContent = '지금 ' + pc(n.processCpu) + ' / ' + pc(n.systemCpu); $('#nowHeap').textContent = '지금 ' + pc(n.heapUsage);
+      $('#nowThreads').textContent = '지금 ' + num(n.threadCount); $('#nowJobs').textContent = '지금 ' + num(n.runningJobs);
+    } catch (e) { /* 요약 바와 같은 값, 실패 시 생략 */ }
+  }
+  // ---- 운영 기록 정리 (수동). 건수 보기 → 확인 → 실행
+  const CL_DEFAULT = { RUNS: 90, NOTIFICATIONS: 90, CHECKS: 90, SCHEDULE_RUNS: 90, METRICS: 7 };
+  let clLast = null;
+  const clReset = () => { clLast = null; $('#clRun').disabled = true; $('#clResult').innerHTML = ''; };
+  $('#clTarget').onchange = () => { $('#clDays').value = CL_DEFAULT[$('#clTarget').value]; clReset(); };
+  $('#clDays').oninput = clReset;
+  $('#clDays').value = CL_DEFAULT.RUNS;
+  const clTable = (counts) => '<table class="small"><tr><th>테이블</th><th>건수</th></tr>' + Object.entries(counts).map(([k, v]) => `<tr><td class="mono">${esc(k)}</td><td>${num(v)}</td></tr>`).join('') + '</table>';
+  $('#clPreview').onclick = async () => {
+    try {
+      const r = await get('/api/operation/cleanup/preview?target=' + encodeURIComponent($('#clTarget').value) + '&days=' + encodeURIComponent($('#clDays').value));
+      clLast = r;
+      $('#clResult').innerHTML = `<div class="small">기준 <b>${fmtDate(r.cutoff)}</b> 이전 · 합계 <b>${num(r.total)}</b>건</div>` + clTable(r.counts);
+      $('#clRun').disabled = !r.total;
+    } catch (e) { $('#clResult').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  };
+  $('#clRun').onclick = async () => {
+    if (!clLast) return;
+    const label = $('#clTarget').selectedOptions[0].text;
+    if (!await UI.confirmModal('운영 기록 정리', `<b>${esc(label)}</b> 중 <b>${fmtDate(clLast.cutoff)}</b> 이전 기록 <b>${num(clLast.total)}</b>건을 지웁니다. 되돌릴 수 없습니다.` + clTable(clLast.counts), '정리', '정리')) return;
+    try {
+      const r = await UI.post('/api/operation/cleanup?target=' + encodeURIComponent(clLast.target) + '&days=' + encodeURIComponent(clLast.days));
+      UI.toast(`${num(r.total)}건 정리했습니다`, 'ok');
+      $('#clResult').innerHTML = `<div class="small">정리 완료 · ${num(r.total)}건 (요청자 ${esc(r.requestedBy)})</div>` + clTable(r.deleted);
+      clLast = null; $('#clRun').disabled = true;
+    } catch (e) { UI.toast(e.message, 'err'); }
+  };
+  $('#range').onchange = trend;
+  async function perf() { try { $('#perf').textContent = JSON.stringify(await get('/api/status/performance'), null, 2); } catch (e) { $('#perf').textContent = e.message; } }
+  // 전체 현황을 5분마다 갱신. 새로고침 버튼은 즉시 갱신, 정지 버튼은 자동 갱신만 멈춘다(재개 시 5분부터 다시 셈)
+  UI.autoRefresh($('#autoRefresh'), () => Promise.all([trend(), health(), overview(), db(), plugins(), perf()]), 5 * 60 * 1000);
+})();
+</script>
+</body>
+</html>

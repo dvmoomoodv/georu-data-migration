@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- [Target] target-1 demo_dw.tb_br_member (2:2). BR_MEMBER_SEQ 는 엔진이 채번 (target-1 자체의 demo_dw.seq_master, 키 TB_BR_MEMBER / BR_MEMBER_SEQ) -->
+<mapper namespace="georu.demo.multi.TbBrMemberTargetMapper">
+    <insert id="insertData" parameterType="com.georu.examples.demo.multi.dto.TbBrMemberDto">
+        INSERT INTO tb_br_member (BR_MEMBER_SEQ, MEMBER_ID, LOGIN_ID, MEMBER_NM, BRANCH_CD, GRADE_CD, JOIN_DATE)
+        VALUES (#{brMemberSeq}, #{memberId}, #{loginId}, #{memberNm}, #{branchCd}, #{gradeCd}, #{joinDate})
+    </insert>
+</mapper>

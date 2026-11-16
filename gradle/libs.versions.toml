@@ -1,0 +1,59 @@
+[versions]
+spring-boot = "3.2.4"
+spring-dependency-management = "1.1.4"
+mybatis-spring-boot = "3.0.3"
+spring-retry = "2.0.5"
+spring-aspects = "6.1.5"
+spring-data-commons = "3.1.5"
+springdoc = "2.2.0"
+swagger = "2.2.15"
+spring-boot-admin = "3.2.3"
+openhtmltopdf = "1.1.22"
+poi = "5.2.4"
+jsr305 = "3.0.2"
+archunit = "1.3.0"
+
+[libraries]
+spring-boot-starter-batch = { module = "org.springframework.boot:spring-boot-starter-batch" }
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-webflux = { module = "org.springframework.boot:spring-boot-starter-webflux" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-thymeleaf = { module = "org.springframework.boot:spring-boot-starter-thymeleaf" }
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-security-test = { module = "org.springframework.security:spring-security-test" }
+thymeleaf = { module = "org.thymeleaf:thymeleaf" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-configuration-processor = { module = "org.springframework.boot:spring-boot-configuration-processor" }
+spring-boot-autoconfigure = { module = "org.springframework.boot:spring-boot-autoconfigure" }
+spring-batch-test = { module = "org.springframework.batch:spring-batch-test" }
+mybatis-spring-boot-starter = { module = "org.mybatis.spring.boot:mybatis-spring-boot-starter", version.ref = "mybatis-spring-boot" }
+spring-retry = { module = "org.springframework.retry:spring-retry", version.ref = "spring-retry" }
+spring-aspects = { module = "org.springframework:spring-aspects", version.ref = "spring-aspects" }
+spring-data-commons = { module = "org.springframework.data:spring-data-commons", version.ref = "spring-data-commons" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind" }
+jackson-jsr310 = { module = "com.fasterxml.jackson.datatype:jackson-datatype-jsr310" }
+jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "jsr305" }
+swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations", version.ref = "swagger" }
+swagger-models = { module = "io.swagger.core.v3:swagger-models", version.ref = "swagger" }
+springdoc-webmvc-ui = { module = "org.springdoc:springdoc-openapi-starter-webmvc-ui", version.ref = "springdoc" }
+springdoc-webmvc-api = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api", version.ref = "springdoc" }
+spring-boot-admin-server = { module = "de.codecentric:spring-boot-admin-starter-server", version.ref = "spring-boot-admin" }
+spring-boot-admin-client = { module = "de.codecentric:spring-boot-admin-starter-client", version.ref = "spring-boot-admin" }
+openhtmltopdf-pdfbox = { module = "io.github.openhtmltopdf:openhtmltopdf-pdfbox", version.ref = "openhtmltopdf" }
+poi = { module = "org.apache.poi:poi", version.ref = "poi" }
+poi-ooxml = { module = "org.apache.poi:poi-ooxml", version.ref = "poi" }
+mysql-connector = { module = "com.mysql:mysql-connector-j" }   # 버전은 Spring Boot BOM (옛 좌표 mysql:mysql-connector-java:8.0.33 대신)
+ojdbc11 = { module = "com.oracle.database.jdbc:ojdbc11" }
+orai18n = { module = "com.oracle.database.nls:orai18n" }
+h2 = { module = "com.h2database:h2" }
+postgresql = { module = "org.postgresql:postgresql" }          # 버전은 Spring Boot BOM
+mssql-jdbc = { module = "com.microsoft.sqlserver:mssql-jdbc" }
+mariadb = { module = "org.mariadb.jdbc:mariadb-java-client" }
+lombok = { module = "org.projectlombok:lombok" }
+archunit-junit5 = { module = "com.tngtech.archunit:archunit-junit5", version.ref = "archunit" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+[plugins]
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('실행 전 점검')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<main>
+    <div class="page-head"><h1>실행 전 점검</h1><p class="page-desc">소스 샘플을 변환해 타겟 컬럼 정의(길이 · NOT NULL · 타입)와 대조 · 타겟 · 소스 어디에도 쓰지 않습니다</p></div>
+    <div id="envStrip"></div>
+    <div class="split">
+        <div class="stack">
+            <div class="card">
+                <form class="f" id="form" onsubmit="return false">
+                    <div class="field full"><label>점검 범위 <span class="muted">(둘 중 하나는 켜야 합니다)</span></label>
+                        <div class="inline">
+                            <label class="check" title="TOBE DB 만 읽습니다: 테이블 · 컬럼 정의(정보 스키마), 기존 건수(SELECT 1 · COUNT), INSERT 구조(빈 DTO)"><input type="checkbox" id="targetCheck" checked> 타겟 점검 <span class="db-tag TOBE">TOBE</span> <span class="muted small">테이블 · 컬럼 정의 · 기존 건수 · INSERT 구조</span></label>
+                            <label class="check" title="ASIS DB 에 COUNT 1회 + 구간 수 × 구간당 건수 만큼 SELECT 합니다"><input type="checkbox" id="sourceCheck" checked> 소스 점검 <span class="db-tag ASIS">ASIS</span> <span class="muted small">건수 · 샘플 · 변환 · 값 점검</span></label>
+                        </div>
+                        <div class="mt-6 inline"><button class="btn sm" type="button" id="scopeTarget" title="ASIS 서버에 쿼리를 한 건도 보내지 않습니다">타겟만 (ASIS 무접속)</button><button class="btn sm" type="button" id="scopeBoth">둘 다</button></div>
+                        <div class="hint" id="scopeHint"></div></div>
+                    <div class="field"><label>플러그인</label>
+                        <select id="pluginName"><option value="">선택</option>
+                            <option th:each="e : ${catalog}" th:value="${e.key}" th:text="${e.key} + ' (' + ${#lists.size(e.value)} + ')'"></option>
+                        </select></div>
+                    <div class="field"><label>테이블 <span class="muted">(비우면 플러그인 전체 · 쉼표/공백 구분)</span></label><textarea id="tables" rows="3" class="mono"></textarea>
+                        <div class="hint" id="stateHint"></div></div>
+                    <div class="field src-only"><label>샘플 구간 수</label><input id="segments" type="number" min="1" max="50" value="10"></div>
+                    <div class="field src-only"><label>구간당 건수</label><input id="segmentSize" type="number" min="1" max="1000" value="100"></div>
+                    <div class="field full src-only"><details id="srcCond"><summary>소스 조회 조건 (테넌트·기간·속성) <span class="muted small">증분 이관이면 기간 조건으로 그 기간만 읽습니다</span></summary>
+                        <div class="mt-8 tenant5"><input id="t1" value="DEFAULT" placeholder="그룹" title="tenantLevel1 (그룹)"><input id="t2" value="DEFAULT" placeholder="계열사" title="tenantLevel2 (계열사)"><input id="t3" value="DEFAULT" placeholder="사업부" title="tenantLevel3 (사업부)"><input id="t4" value="DEFAULT" placeholder="부서" title="tenantLevel4 (부서)"><input id="t5" value="DEFAULT" placeholder="팀" title="tenantLevel5 (팀)"></div><div class="hint">그룹 · 계열사 · 사업부 · 부서 · 팀 - 소스에 단위 컬럼이 없으면 회사명으로 모두 채웁니다</div>
+                        <div class="mt-6 inline"><input class="w-sm" id="startDate" placeholder="시작 YYYY-MM-DD"><input class="w-sm" id="endDate" placeholder="종료 YYYY-MM-DD"></div>
+                        <div class="mt-6 inline"><input class="w-sm" id="attribute1" placeholder="attribute1"><input class="w-sm" id="attribute2" placeholder="attribute2"><input class="w-sm" id="attribute3" placeholder="attribute3"></div>
+                    </details></div>
+                    <div class="full inline"><button class="btn primary" id="run" type="button" data-write>점검 시작</button>
+                        <span class="small muted">점검 흐름 · 쓰지 않는 근거 · 기준은 <a href="#" data-panel-open="help">? 도움말</a></span></div>
+                </form>
+            </div>
+        </div>
+        <div class="stack">
+            <div class="card"><div class="card-head"><h2 id="rTitle">결과</h2><div class="inline"><span class="inline" id="rDownloads"></span><button class="btn sm" type="button" data-panel-open="recent" title="최근 점검 20건 (고르면 결과를 여기에)">최근 점검</button></div></div>
+                <div id="result"><div class="empty">점검을 시작하거나 최근 점검을 선택하세요.</div></div></div>
+        </div>
+    </div>
+    <aside class="sp" data-panel="recent" data-title="최근 점검" data-width="720" data-dock-label="최근 점검" data-dock-icon="clock">
+        <div class="small muted">고르면 그 점검 결과를 본문에 열고 닫힙니다</div>
+        <div id="recent"><div class="empty small loading">불러오는 중…</div></div>
+    </aside>
+    <div data-help-move>
+        <p class="small">수동 점검 화면입니다. NORMAL 실행 직전 자동 점검은 기본 켜짐이며(georu.precheck.auto-enabled), 실행마다 "자동 실행 전 점검 끄기"로만 건너뜁니다.</p>
+            <div class="card">
+                <h2>점검 흐름 <span class="small muted">테이블마다 위에서 아래로. ■ 에서 멈추면 아래 단계는 하지 않습니다</span></h2>
+                <ol class="pc-flow" id="flow"></ol>
+            </div>
+            <div class="card">
+                <h2>이 점검은 쓰지 않습니다 <span class="small muted">어느 DB 에 무엇을 보내는지</span></h2>
+                <table class="nowrite list">
+                    <tr><th>하는 일</th><th>DB</th><th>보내는 것</th><th>쓰기</th></tr>
+                    <tr><td>테이블 · 컬럼 정의</td><td><span class="db-tag TOBE">TOBE</span></td><td>JDBC 메타데이터 (정보 스키마 조회)</td><td class="no">✕</td></tr>
+                    <tr><td>기존 데이터 · 건수</td><td><span class="db-tag TOBE">TOBE</span></td><td><code>SELECT 1</code> (최대 1행) · <code>SELECT COUNT(*)</code></td><td class="no">✕</td></tr>
+                    <tr><td>소스 건수 · 샘플</td><td><span class="db-tag ASIS">ASIS</span></td><td>Source XML 의 <code>selectTotalCount</code> · <code>selectPageData</code> (SELECT)</td><td class="no">✕</td></tr>
+                    <tr><td>변환</td><td><span class="db-tag MEM">메모리</span></td><td>Processor 를 메모리에서만 실행</td><td class="no">✕</td></tr>
+                    <tr><td>채번</td><td><span class="db-tag TOBE">TOBE</span></td><td>DRY_RUN: 관리 테이블 현재값 · 타겟 MAX 를 <code>SELECT</code> 만, 번호는 메모리에서 (세션을 닫을 때 COMMIT 이 찍히지만 바뀐 행 없음)</td><td class="no">✕</td></tr>
+                    <tr><td>INSERT 점검</td><td><span class="db-tag MEM">없음</span></td><td>MyBatis <code>getBoundSql</code> 로 <b>문장 글자만 만들고 실행하지 않음</b> → 컬럼 ↔ 값 비교</td><td class="no">✕</td></tr>
+                    <tr><td>결과 저장</td><td>운영 저장소</td><td>점검 결과 행 (georu 자체 DB · TOBE / ASIS 아님)</td><td>결과만</td></tr>
+                </table>
+                <div class="mt-6 small muted">결과마다 <b>접속 기록</b>(실제로 보낸 쿼리 수)과 <b>실행하지 않은 INSERT 문</b>을 함께 보여 줍니다. 엔진은 쓰지 않지만, 업체가 직접 쓴 Processor 안에서 다른 DB 를 부르는 코드는 막지 못합니다 (코드 생성기가 만든 Processor 는 메모리 변환만).</div>
+            </div>
+            <div class="card">
+                <h2>NORMAL 실행 전 확인 <span class="small muted">실행 버튼을 누르면 이 순서로 확인합니다</span></h2>
+                <div id="guardFlow"></div>
+            </div>
+            <div class="card">
+                <h2>점검 기준</h2>
+                <ul class="small">
+                    <li><b>차단</b>: NOT NULL 위반, 길이 초과, 타입 변환 불가, 숫자·날짜 범위 초과, INSERT 에 빠진 NOT NULL 컬럼, 타겟에 없는 컬럼, 변환 오류, 원천 미지정</li>
+                    <li><b>경고</b>: 소수 자릿수 반올림, 샘플 내 PK 중복, 타겟 기존 데이터, 조회 불가(권한 또는 테이블 없음), 판단 불가(DB 규칙 없음), INSERT 해석 불가</li>
+                    <li>샘플은 기존 페이징 쿼리로 전체를 구간으로 나눠 구간마다 읽습니다 (모든 DB 공통). 구간마다 시간 제한이 있어 넘기면 그 구간은 건너뜁니다.</li>
+                    <li>DB 규칙이 없는 타겟은 길이·날짜 범위를 "판단 불가"로 표시합니다 → <a href="/ui/guide?name=manual-verification" target="_blank">수작업 확인 가이드</a></li>
+                </ul>
+            </div>
+    </div>
+</main>
+<script th:inline="javascript">
+(function () {
+  const { get, post, esc, badge, num, fmtDate, toast, $ } = UI;
+  const PRECHECK_AUTO = /*[[${precheckAuto}]]*/ false;
+  $('#guardFlow').innerHTML = UI.guardFlow({ auto: PRECHECK_AUTO, mode: 'NORMAL' });
+  const v = (id) => $('#' + id).value.trim();
+  let timer = null, current = null, tilesTimer = null;
+
+  // ---------- 점검 흐름 (PrecheckService.checkTable 순서와 같다) ----------
+  // stop: 이 단계의 유형이 나오면 아래 단계는 하지 않는다
+  const FLOW = [
+    { key: 'usage', title: '사용 중 확인', desc: '같은 테이블을 이관 중이면 점검하지 않음', types: ['TABLE_IN_USE'], stop: ['TABLE_IN_USE'] },
+    { key: 'state', title: '이관 상태', desc: '이관 제외 테이블은 건너뜀 (대기는 매핑 준비를 위해 점검)', types: ['TABLE_EXCLUDED'], stop: ['TABLE_EXCLUDED'] },
+    { key: 'code', title: '미완 코드', desc: '원천 미지정(WHERE 1 = 0)이면 소스가 0건이라 멈춤', types: ['INCOMPLETE_CODE'], stop: ['INCOMPLETE_CODE'] },
+    { key: 'target', title: '타겟 확인', db: 'TOBE', desc: '타겟 테이블 메타 · 기존 데이터 건수', types: ['TARGET_NOT_FOUND', 'EXISTING_DATA', 'TARGET_COUNT_OFF'],
+      off: (sc) => !sc.target ? '건수 꺼짐 · 컬럼 정의만 (값 비교용)' : null },
+    { key: 'source', title: '소스 샘플', db: 'ASIS', desc: '페이징 쿼리로 구간마다 샘플 읽기', types: ['SOURCE_ERROR', 'SAMPLE_SKIPPED', 'SOURCE_CHECK_OFF'], stop: ['SOURCE_ERROR'],
+      off: (sc) => !sc.source ? '꺼짐 · ASIS 쿼리 0' : null, offAll: (sc) => !sc.source },
+    { key: 'process', title: '변환 (Processor · 채번)', db: 'MEM', desc: '샘플을 점검 전용 Processor 로 변환 · 채번 정책 확인 (타겟에 쓰지 않음). 참조(SourceLookup)는 SELECT 만, 시간 초과면 경고', types: ['PROCESS_ERROR', 'PROCESS_TIMEOUT', 'FILTERED', 'SEQUENCE_DISABLED', 'SEQUENCE_POLICY'],
+      off: (sc) => !sc.source ? '변환 꺼짐 · 채번 정책 확인만' : null },
+    { key: 'values', title: '값 점검', db: 'MEM', desc: 'INSERT 문을 만들기만 하고(실행 안 함) 컬럼 ↔ 타겟 정의: NOT NULL · 길이 · 타입 · 범위 · PK 중복', types: ['INSERT_NOT_PARSED', 'UNKNOWN_COLUMN', 'MISSING_NOT_NULL_COLUMN', 'NOT_NULL', 'LENGTH', 'TYPE_MISMATCH', 'NUMERIC_RANGE', 'DATE_RANGE', 'DECIMAL_SCALE', 'PK_DUPLICATE', 'LENGTH_UNKNOWN', 'DATE_UNKNOWN', 'SAMPLE_INFO'] },
+    { key: 'verdict', title: '판정', desc: '차단 1건이라도 → 차단 · 경고만 → 경고 · 없으면 통과', types: [] }
+  ];
+  const SEV = { BLOCK: 3, WARN: 2, INFO: 1 };
+  const DB_LABEL = { TOBE: 'TOBE', ASIS: 'ASIS', MEM: '메모리' };
+  // 값 점검은 소스를 끄면 구조만 (빈 DTO)
+  FLOW.find(f => f.key === 'values').off = (sc) => !sc.source ? '구조만 (빈 DTO: 타겟에 없는 컬럼 · 빠진 NOT NULL)' : null;
+  const scopeNow = () => ({ target: $('#targetCheck').checked, source: $('#sourceCheck').checked });
+  function renderFlow() {
+    const sc = scopeNow();
+    $('#flow').innerHTML = FLOW.map((f, i) => {
+      const off = f.off ? f.off(sc) : null;
+      return `<li class="${f.offAll && f.offAll(sc) ? 'off' : ''}"><span class="pc-num">${i + 1}</span><div><b>${esc(f.title)}</b>${f.db ? `<span class="db-tag ${f.db}">${DB_LABEL[f.db]}</span>` : ''}${f.stop ? ' <span class="pc-stop" title="여기서 문제가 나오면 아래 단계는 하지 않습니다">■ 멈춤</span>' : ''}${off ? ` <span class="gf-tag">${esc(off)}</span>` : ''}<div class="small muted">${esc(f.desc)}</div></div></li>`;
+    }).join('');
+  }
+  function applyScope() {
+    const sc = scopeNow();
+    document.querySelectorAll('.src-only input, .src-only textarea').forEach(el => el.disabled = !sc.source);
+    document.querySelectorAll('.src-only').forEach(el => el.style.opacity = sc.source ? '' : '.5');
+    $('#scopeHint').innerHTML = !sc.target && !sc.source ? '<span class="t-danger">둘 다 끄면 점검을 시작하지 않습니다</span>'
+      : !sc.source ? 'ASIS 서버에 쿼리를 보내지 않습니다. 값 오류(NOT NULL · 길이 · 타입)는 찾지 못하고, INSERT 구조는 빈 DTO 로 봅니다'
+      : `ASIS 에 COUNT 1회 + 구간 ${num(Number(v('segments') || 10))} × ${num(Number(v('segmentSize') || 100))}건 조회. 민감한 서버면 기간 조건과 작은 구간(예: 2 × 20)으로` + (!sc.target ? ' · 타겟은 컬럼 정의만 읽고 건수는 세지 않습니다' : '');
+    renderFlow();
+  }
+  ['targetCheck', 'sourceCheck', 'segments', 'segmentSize'].forEach(id => $('#' + id).addEventListener('input', applyScope));
+  ['targetCheck', 'sourceCheck'].forEach(id => $('#' + id).addEventListener('change', applyScope));
+  $('#scopeTarget').onclick = () => { $('#targetCheck').checked = true; $('#sourceCheck').checked = false; applyScope(); };
+  $('#scopeBoth').onclick = () => { $('#targetCheck').checked = true; $('#sourceCheck').checked = true; applyScope(); };
+
+  /** 테이블 한 개의 단계별 상태: block / warn / info / ok / skip(멈춘 뒤라 하지 않음) */
+  /** 결과에서 범위 읽기 (꺼짐 줄이 있으면 그쪽을 끈 것) */
+  const scopeOf = (t) => { const ty = (t.issues || []).map(i => i.type); return { target: !ty.includes('TARGET_COUNT_OFF'), source: !ty.includes('SOURCE_CHECK_OFF') }; };
+  function tableFlow(t) {
+    const issues = t.issues || [], sc = scopeOf(t);
+    let stopped = false;
+    return FLOW.map(f => {
+      if (stopped) return { f, state: 'skip' };
+      if (f.offAll && f.offAll(sc)) return { f, state: 'off' };
+      if (f.key === 'process' && !sc.source && !issues.some(i => f.types.includes(i.type))) return { f, state: 'off' };
+      if (f.key === 'verdict') return { f, state: { BLOCK: 'block', WARN: 'warn' }[t.result] || 'ok' };
+      const mine = issues.filter(i => f.types.includes(i.type));
+      const worst = mine.reduce((m, i) => Math.max(m, SEV[i.severity] || 0), 0);
+      if (mine.some(i => (f.stop || []).includes(i.type))) stopped = true;
+      return { f, state: worst === 3 ? 'block' : worst === 2 ? 'warn' : worst === 1 ? 'info' : 'ok', n: mine.length };
+    });
+  }
+  const STEP_TIP = { block: '차단', warn: '경고', info: '안내', ok: '통과', skip: '하지 않음 (앞 단계에서 멈춤)', off: '꺼짐 (점검 범위에서 뺌)' };
+  const flowStrip = (t) => `<span class="pc-strip">${tableFlow(t).map(s => `<span class="pc-step ${s.state}" title="${esc(s.f.title + ' · ' + STEP_TIP[s.state] + (s.n ? ' ' + s.n + '건' : ''))}">${esc(s.f.title)}</span>`).join('')}</span>`;
+
+  // ---------- 이관 상태: 플러그인 전체 점검이면 이관 제외 테이블은 빠진다 ----------
+  async function stateHint() {
+    $('#stateHint').textContent = '';
+    if (!v('pluginName')) return;
+    try {
+      const rows = (await get('/api/ui/mapping-status?pluginName=' + encodeURIComponent(v('pluginName')))).tables || [];
+      const ex = rows.filter(r => r.state === 'EXCLUDED').map(r => r.tableName), hold = rows.filter(r => r.state === 'HOLD').map(r => r.tableName);
+      $('#stateHint').textContent = [ex.length ? `이관 제외 ${ex.length}개는 점검하지 않습니다 (${ex.join(', ')})` : '', hold.length ? `대기 ${hold.length}개는 점검합니다 (${hold.join(', ')})` : ''].filter(Boolean).join(' · ');
+    } catch (e) { /* 안내만 */ }
+  }
+  $('#pluginName').addEventListener('change', stateHint);
+
+  $('#run').onclick = async () => {
+    if (!v('pluginName')) { toast('플러그인을 선택하세요', 'err'); return; }
+    const sc = scopeNow();
+    if (!sc.target && !sc.source) { toast('타겟 점검 · 소스 점검 중 하나는 켜세요', 'err'); return; }
+    const body = { pluginName: v('pluginName'), tableNames: v('tables').split(/[\s,]+/).filter(Boolean), targetCheck: sc.target, sourceCheck: sc.source,
+      segments: Number(v('segments') || 10), segmentSize: Number(v('segmentSize') || 100),
+      tenantLevel1: v('t1'), tenantLevel2: v('t2'), tenantLevel3: v('t3'), tenantLevel4: v('t4'), tenantLevel5: v('t5') };
+    ['startDate', 'endDate', 'attribute1', 'attribute2', 'attribute3'].forEach(k => { if (v(k)) body[k] = v(k); });
+    try { const r = await post('/api/precheck', body); open(r.runId); history.replaceState(null, '', '?runId=' + encodeURIComponent(r.runId)); loadRecent(); }
+    catch (e) { toast(e.message, 'err'); }
+  };
+
+  function open(runId) {
+    current = runId; if (timer) clearInterval(timer);
+    const tick = async () => {
+      try { const r = await get('/api/precheck/' + encodeURIComponent(runId)); render(r); if (r.status !== 'RUNNING') { clearInterval(timer); timer = null; loadRecent(); } }
+      catch (e) { $('#result').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; clearInterval(timer); timer = null; }
+    };
+    tick(); timer = setInterval(tick, 2000);
+  }
+
+  function render(r) {
+    $('#rTitle').innerHTML = `결과 <span class="small muted mono">${esc(r.runId)}</span>`;
+    const ex = '/api/precheck/' + encodeURIComponent(r.runId) + '/export';
+    $('#rDownloads').innerHTML = r.status === 'RUNNING' ? '' : `<a class="btn sm" href="${ex}?format=xlsx">엑셀</a><a class="btn sm" href="${ex}?format=csv">CSV</a>`;
+    const tables = r.tables || [];
+    const SPECIAL = ['DB_ACCESS', 'INSERT_PREVIEW'];   // 문제 표가 아니라 아래 근거 칸에 보인다
+    const all = tables.flatMap(t => (t.issues || []).filter(i => !SPECIAL.includes(i.type)));
+    const sc0 = tables.length ? scopeOf(tables[0]) : { target: true, source: true };
+    const scopeLabel = sc0.target && sc0.source ? '타겟 + 소스' : sc0.target ? '타겟만 (ASIS 무접속)' : '소스만';
+    const writesOf = (db) => tables.flatMap(t => t.issues || []).filter(i => i.type === 'DB_ACCESS' && i.column === db)
+      .reduce((n, i) => n + Number((/쓰기 (\d+)/.exec(i.message) || [0, 0])[1]), 0);
+    const block = all.filter(i => i.severity === 'BLOCK').length, warn = all.filter(i => i.severity === 'WARN').length;
+    let html = `<div class="alert ${r.status === 'RUNNING' ? 'info' : block ? 'err' : warn ? 'warn' : 'ok'}">${badge(r.status)} ${esc(r.pluginName || '')} · 테이블 ${num(r.doneTables)}/${num(r.totalTables)} · 차단 <b>${block}</b> · 경고 <b>${warn}</b>
+      · <span class="badge INFO">${esc(scopeLabel)}</span>
+      ${r.migrationId ? ` · <a href="/ui/history?migrationId=${encodeURIComponent(r.migrationId)}">실행 이력</a>` : ''}<br><span class="small">${fmtDate(r.startedAt)} → ${fmtDate(r.finishedAt)}</span>${r.error ? `<br>${esc(r.error)}` : ''}
+      ${r.status !== 'RUNNING' && tables.length ? `<br><span class="small"><b>TOBE 쓰기 ${num(writesOf('TOBE'))}건 · ASIS 쓰기 ${num(writesOf('ASIS'))}건</b> · 결과는 운영 저장소에만 저장 · 테이블마다 접속 기록과 실행하지 않은 INSERT 문을 펼쳐 보세요</span>` : ''}</div>`;
+    const order = { BLOCK: 0, WARN: 1, OK: 2 };
+    tables.slice().sort((a, b) => (order[a.result] ?? 3) - (order[b.result] ?? 3) || a.tableName.localeCompare(b.tableName)).forEach(t => {
+      const issues = (t.issues || []).filter(i => !SPECIAL.includes(i.type)).slice().sort((a, b) => ({ BLOCK: 0, WARN: 1, INFO: 2 }[a.severity] - { BLOCK: 0, WARN: 1, INFO: 2 }[b.severity]));
+      html += `<details ${t.result === 'BLOCK' ? 'open' : ''} class="mt-8"><summary>${badge(t.result)} <b>${esc(t.tableName)}</b>
+        <span class="small muted">${t.targetTable ? '→ ' + esc(t.targetTable) : ''} ${t.dialect ? '· ' + esc(t.dialect) : ''} · 샘플 ${num(t.sampled)} / 변환 ${num(t.processed)} / 제외 ${num(t.filtered)}${t.existingCount ? ' · 타겟 기존 ' + esc(t.existingCount) : ''}</span>
+        <div>${flowStrip(t)}</div></summary>`;
+      html += issues.length ? `<table class="small list"><tr><th>심각도</th><th>유형</th><th>컬럼</th><th>사유</th><th>건수</th><th>샘플 값</th></tr>` +
+        issues.map(i => `<tr><td>${badge(i.severity)}</td><td>${esc(i.label)}</td><td class="mono">${esc(i.column || '')}</td><td style="white-space:pre-wrap">${esc(i.message)}</td><td>${num(i.occurrences)}</td><td class="mono" style="white-space:pre-wrap;word-break:break-all">${(i.samples || []).map(esc).join('<br>')}</td></tr>`).join('') + '</table>'
+        : '<div class="small muted">문제 없음</div>';
+      html += evidence(t);
+      html += '</details>';
+    });
+    $('#result').innerHTML = html;
+  }
+
+  /** 쓰지 않았다는 근거: 접속 기록 + 실행하지 않은 INSERT 문 */
+  function evidence(t) {
+    const acc = (t.issues || []).filter(i => i.type === 'DB_ACCESS');
+    let h = '';
+    if (acc.length) {
+      h += `<div class="mt-8"><b class="small">접속 기록</b> <span class="small muted">이 점검이 실제로 보낸 쿼리 (읽기만)</span><table class="small list nowrite">`
+        + acc.map(i => `<tr><td style="width:70px"><span class="db-tag ${esc(i.column)}">${esc(i.column)}</span></td><td>${esc(i.message)}</td></tr>`).join('') + '</table></div>';
+    }
+    const pv = (t.issues || []).find(i => i.type === 'INSERT_PREVIEW');
+    if (pv) {
+      const [sql, cols] = String(pv.message).split('\n--\n');
+      const rows = (cols || '').split('\n').filter(Boolean).map(l => { const k = l.indexOf(' = '); return `<tr><td class="mono">${esc(l.slice(0, k))}</td><td class="mono" style="word-break:break-all">${esc(l.slice(k + 3))}</td></tr>`; }).join('');
+      h += `<details class="mt-6"><summary class="small"><b>실행하지 않은 INSERT 문</b> <span class="badge NOT_RUN" title="MyBatis getBoundSql 로 문장 글자와 바인딩 값만 만들었습니다. DB 로 보내지 않았습니다">미실행 · 문장만 만들어 비교</span> <span class="muted">${esc((pv.samples || [])[0] || '')} · ${esc(pv.column || '')}</span></summary>
+        <div class="ins-sql">${esc(sql)}</div>${rows ? `<table class="small list" style="max-width:640px"><tr><th>컬럼</th><th>들어갈 값</th></tr>${rows}</table>` : ''}</details>`;
+    }
+    return h;
+  }
+
+  async function loadRecent() {
+    try {
+      const list = await get('/api/precheck/runs?limit=20') || [];
+      $('#recent').innerHTML = list.length ? `<table class="small list"><tr><th>점검 ID</th><th>플러그인</th><th>상태</th><th>범위</th><th>테이블</th><th>차단</th><th>경고</th><th>시작</th></tr>` +
+        list.map(x => `<tr class="clickable" data-run="${esc(x.runId)}" data-panel-close><td class="mono">${esc(x.runId)}</td><td>${esc(x.pluginName || '')}</td><td>${badge(x.status)}</td><td class="small">${esc(x.scope || '')}</td><td>${num(x.doneTables)}/${num(x.totalTables)}</td><td>${num(x.block)}</td><td>${num(x.warn)}</td><td>${UI.fmtShort(x.startedAt)}</td></tr>`).join('') + '</table>'
+        : '<div class="empty small">아직 점검 이력이 없습니다.</div>';
+      document.querySelectorAll('[data-run]').forEach(tr => tr.onclick = () => openRun(tr.dataset.run));
+      if (!current && list.length) latestTiles(list[0]);   // 아직 아무 결과도 열지 않았으면 맨 위 한 건을 색 타일로
+    } catch (e) { $('#recent').innerHTML = `<div class="alert err small">${esc(e.message)}</div>`; }
+  }
+  function openRun(runId) { open(runId); history.replaceState(null, '', '?runId=' + encodeURIComponent(runId)); }
+
+  /**
+   * 최근 점검 색 타일 (todo-task 33 C1 · T22). /api/precheck/runs 요약 값만 쓴다 (서버가 센 값 그대로):
+   * blockTables · warnTables 는 테이블 수(테이블 결과 BLOCK · WARN), block · warn 은 문제 항목 수
+   */
+  function latestTiles(x) {
+    const done = Number(x.doneTables) || 0, bt = Number(x.blockTables) || 0, wt = Number(x.warnTables) || 0;
+    const block = Number(x.block) || 0, warn = Number(x.warn) || 0, pass = Math.max(0, done - bt - wt);
+    const running = x.status === 'RUNNING', finished = x.status === 'DONE';   // FAILED 등 중간에 멈춘 점검은 "완료" 로 쓰지 않는다
+    const state = running ? '진행 중' : finished ? '완료' : '끝나지 않음 (' + esc(x.status || '-') + ')';
+    const tile = (tone, ico, label, v, foot) => `<div class="tile ${tone}"><div class="t-top">${UI.ico(ico)}<div><span>${label}</span><b>${num(v)}</b></div></div><div class="t-foot"><span>${foot}</span></div></div>`;
+    $('#result').innerHTML = `<div class="tiles-cap">최근 점검 <b class="mono">${esc(x.runId)}</b> · ${esc(x.pluginName || '-')} · ${esc(x.scope || '')} · ${badge(x.status)} · ${UI.fmtShort(x.startedAt)}
+        <button class="btn sm" type="button" id="openLatest">결과 열기</button></div>
+      <div class="tiles">`
+      + tile('primary', 'table', '점검한 테이블', done, `${num(done)} / ${num(x.totalTables)} ${state}`)
+      + tile(pass ? 'ok' : 'gray', 'check', '통과', pass, finished ? '바로 실행 가능' : '점검이 끝난 뒤 판단')
+      + tile(wt ? 'warn' : 'gray', 'x', '경고', wt, wt ? `경고 항목 ${num(warn)}건 · 확인 후 실행` : '경고 없음')
+      + tile(bt ? 'bad' : 'gray', 'block', '차단', bt, bt ? `차단 항목 ${num(block)}건 · 실행 안 됨` : '실행이 막히는 테이블 없음')
+      + `</div><div class="small muted mt-10">테이블별 결과는 결과 열기 · 최근 점검을 누르거나 점검을 시작하면 여기에 나옵니다.</div>`;
+    $('#openLatest').onclick = () => openRun(x.runId);
+    clearTimeout(tilesTimer);
+    if (running) tilesTimer = setTimeout(refreshTiles, 5000);
+  }
+  /**
+   * 진행 중인 점검의 타일만 5초마다: 최근 한 건 요약(/api/precheck/runs?limit=1)만 다시 읽는다 -
+   * 보고서 전체를 받지 않고, 숫자는 서버 요약 그대로. 탭이 숨으면 쉬고, 결과를 열면 멈춘다
+   */
+  async function refreshTiles() {
+    if (current) return;
+    if (document.hidden) { tilesTimer = setTimeout(refreshTiles, 5000); return; }
+    try {
+      const list = await get('/api/precheck/runs?limit=1') || [];
+      if (!current && list.length) latestTiles(list[0]);
+    } catch (e) { tilesTimer = setTimeout(refreshTiles, 15000); }   // 잠깐 실패하면 늦춰서 다시
+  }
+
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('pluginName')) { $('#pluginName').value = qp.get('pluginName'); stateHint(); }
+  // 테이블 현황 등에서 넘긴 테넌트 "L1.L2.L3.L4.L5" → 테넌트 5칸 (비면 기존 값 유지)
+  if (qp.get('tenant')) qp.get('tenant').split('.').slice(0, 5).forEach((v, i) => { if (v) $('#t' + (i + 1)).value = v; });
+  if (qp.get('tables')) $('#tables').value = qp.get('tables');
+  if (qp.get('targetCheck') === '0') $('#targetCheck').checked = false;
+  if (qp.get('sourceCheck') === '0') $('#sourceCheck').checked = false;
+  applyScope();
+  if (qp.get('runId')) open(qp.get('runId'));
+  loadRecent();
+  UI.panel.on('recent', loadRecent);   // 열 때마다 새로
+})();
+</script>
+</body>
+</html>

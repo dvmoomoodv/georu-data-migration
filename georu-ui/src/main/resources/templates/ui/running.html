@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{ui/layout :: head('실행 현황')}"></head>
+<body>
+<header th:replace="~{ui/layout :: nav}"></header>
+<div th:replace="~{ui/layout :: gate}"></div>
+<main>
+    <div class="page-head"><h1>실행 현황</h1><p class="page-desc">3초마다 갱신</p></div>
+    <div id="groups"></div>
+    <div id="list" class="stack"><div class="empty loading">조회 중…</div></div>
+    <div class="card">
+        <div class="card-head"><h2>실행 게이트 <span class="small muted">(단일 실행 규칙: 한 번에 한 실행 단위)</span></h2><button class="btn sm danger" id="gateRelease" data-write>강제 해제</button></div>
+        <div id="gate" class="mt-8"><div class="empty small loading">조회 중…</div></div>
+    </div>
+    <div class="card" data-collapse="schedules">
+        <div class="card-head"><h2>등록된 스케줄 <span class="small muted">(운영 저장소에 저장, 재기동하면 일시정지 상태로 복원. 등록은 테이블 이관 실행 화면의 cron)</span></h2><span class="inline"><button class="btn sm" id="schPauseAll" data-write>전체 일시정지</button><button class="btn sm" id="schResumeAll" data-write>전체 재개</button><button class="btn sm" id="schReload">새로고침</button></span></div>
+        <div class="mt-4 small muted">활성 스케줄이 하나라도 있으면 테이블·시나리오 이관은 실행되지 않습니다(409). 이관하려면 스케줄을 일시정지하고, 끝나면 재개합니다. 다른 이관이 도는 동안 온 스케줄 주기는 건너뜁니다.</div>
+        <div id="schBanner"></div>
+        <div id="schedules" class="mt-8"><div class="empty small loading">조회 중…</div></div>
+    </div>
+</main>
+<script>
+(function () {
+  const { get, post, fmtDate, fmtMs, num, badge, esc, progress, poll, confirmModal, toast, $ } = UI;
+  const progressCache = {};
+  const reqOpen = new Set();   // 3초마다 다시 그려도 펼친 "요청 JSON" 은 펼친 채로
+  async function fetchProgress(migrationId) {
+    try { progressCache[migrationId] = await get('/api/migration/chunks/' + encodeURIComponent(migrationId) + '/progress'); }
+    catch (e) { /* 청크 기록 전이면 404/오류 가능 */ }
+    return progressCache[migrationId];
+  }
+  async function load() {
+    const list = await get('/api/status/running') || [];
+    if (!list.length) { $('#list').innerHTML = '<div class="alert info" style="margin:0">실행 중인 작업이 없습니다. <a href="/ui/execute">테이블 이관 실행</a> · <a href="/ui/scenario">시나리오 이관 실행</a> · <a href="/ui/history">최근 이력</a></div>'; return; }
+    await Promise.all(list.filter(j => j.migrationId).map(j => fetchProgress(j.migrationId)));
+    const reqs = {}, paces = {};
+    await Promise.all(list.filter(j => j.migrationId).map(async j => { reqs[j.migrationId] = await UI.requestJson(j.migrationId); }));
+    // 처리 속도·예상 종료 (청크 기록은 15초마다 다시 읽음)
+    await Promise.all(list.filter(j => j.migrationId).map(async j => {
+      try { paces[j.migrationId] = await UI.pace({ migrationId: j.migrationId, pluginName: j.domain, tableName: j.tableName, tenant: j.tenantId, testMode: j.testMode, testMaxItems: j.testMaxItems, readerTotal: progressCache[j.migrationId] && progressCache[j.migrationId].readerTotalCount,
+        startTime: j.startTime, elapsedMs: j.executionTimeMs, terminal: false, status: j.status }); } catch (e) { /* 속도 표시만 생략 */ }
+    }));
+    $('#list').innerHTML = list.map(j => {
+      const p = j.migrationId ? progressCache[j.migrationId] : null;
+      const pr = j.migrationId ? paces[j.migrationId] : null;
+      return `<div class="card">
+        <div class="inline" style="justify-content:space-between">
+          <div><b>${esc(j.domain || j.jobName)}</b> · <b>${esc(j.tableName || '-')}</b> ${badge(j.testMode || 'NORMAL')} ${badge(j.status)}
+            <span class="small muted">실행ID ${j.jobExecutionId} · 테넌트 ${esc(j.tenantId || '-')}</span></div>
+          <div>${j.stoppable ? `<button data-write class="btn danger sm" data-stop="${j.jobExecutionId}">중지</button>` : `<span class="small muted">${esc(j.stopDisabledReason || '')}</span>`}</div>
+        </div>
+        ${UI.paceBar(pr)}
+        <div class="mt-6 small muted">시작 ${fmtDate(j.startTime)} · 경과 ${fmtMs(j.executionTimeMs)} · 단계 ${esc(j.currentStep || '-')}
+          ${p ? ` · 청크 ${p.completedChunks}개 완료${p.processingChunks ? ', 처리 중 ' + p.processingChunks : ''}${p.failedChunks ? ', 실패 ' + p.failedChunks : ''}` : ''}
+          ${j.testMaxItems ? ` · 테스트 상한 ${j.testMaxItems}건` : ''}</div>
+        ${pr ? `<div class="mt-4 small">${UI.paceLine(pr)}</div>` : ''}
+        ${j.migrationId ? `<div class="mt-4 small"><a href="/ui/history?migrationId=${encodeURIComponent(j.migrationId)}&jobExecutionId=${j.jobExecutionId}">청크 상세</a> <span class="mono muted">${esc(j.migrationId)}</span></div>` : ''}
+        ${reqBlock(j.migrationId, reqs[j.migrationId])}
+      </div>`;
+    }).join('');
+    document.querySelectorAll('details[data-req]').forEach(d => d.addEventListener('toggle', () => { d.open ? reqOpen.add(d.dataset.req) : reqOpen.delete(d.dataset.req); }));
+    document.querySelectorAll('[data-reuse]').forEach(b => b.onclick = (e) => { e.preventDefault(); UI.openInExecute(reqs[b.dataset.reuse]); });
+    document.querySelectorAll('[data-stop]').forEach(b => b.onclick = async () => {
+      const id = b.dataset.stop;
+      if (!await confirmModal('작업 중지', `실행ID <b>${id}</b> 를 중지합니다. 현재 청크까지 처리된 뒤 STOPPED 로 전이됩니다.`, '중지')) return;
+      b.disabled = true;
+      try { const r = await post('/api/migrate/stop/' + id); toast(r.message || '중지 요청 완료', 'ok'); }
+      catch (e) { toast(e.message, 'err'); b.disabled = false; }
+    });
+  }
+  /** 실행 요청 JSON (실행 당시 API 로 보낸 내용). 요약 한 줄 + 펼치면 전체 */
+  function reqBlock(mid, json) {
+    if (!mid) return '';
+    if (!json) return `<div class="mt-4 small muted">요청 JSON 기록 없음 (스케줄·시나리오 실행 등)</div>`;
+    const sum = UI.requestSummary(json);
+    return `<details data-req="${esc(mid)}" ${reqOpen.has(mid) ? 'open' : ''} class="mt-6"><summary class="small">요청 JSON${sum ? ' <span class="muted mono">' + esc(sum) + '</span>' : ''}</summary>
+      <div class="inline" style="justify-content:flex-end;margin:4px 0"><a class="btn sm" href="#" data-reuse="${esc(mid)}" title="테이블 이관 실행 화면에 이 요청을 채웁니다 (실행은 직접)">이 조건으로 다시 실행</a></div>
+      <pre>${esc(json)}</pre></details>`;
+  }
+  poll(async () => { try { await load(); } catch (e) { $('#list').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; } }, 3000);
+  const SCH_STATE = { ACTIVE: ['RUNNING', '활성'], PAUSED: ['STOPPED', '일시정지'], ENDED: ['NOT_RUN', '종료'] };
+  const RUN_LABEL = { STARTED: ['COMPLETED', '실행'], BLOCKED: ['BLOCKED', '실행 전 차단'], FAILED: ['FAILED', '실패'], SKIPPED_BUSY: ['WARNING', '건너뜀(실행 중)'], SKIPPED_PAUSED: ['NOT_RUN', '건너뜀(일시정지)'], RUNNING: ['RUNNING', '실행 중'], INTERRUPTED: ['FAILED', '중단(앱 종료)'], MISSED: ['WARNING', '놓침(꺼져 있음)'] };
+  const TRIGGER_LABEL = { CRON: '주기', MANUAL: '즉시 실행', RESTORE: '재기동 대조' };
+  async function showScheduleRuns(s) {
+    const bg = document.createElement('div'); bg.className = 'modal-bg open';
+    bg.innerHTML = `<div class="modal" style="max-width:1000px"><h2>주기 기록 <span class="small muted mono">${esc(s.scheduleId)}</span></h2>
+      <div class="mb-6 small muted">최근 30건 (최신순). 일시정지 중 건너뛴 주기는 남기지 않습니다. 놓침 = 앱이 꺼져 있던 동안 지나간 주기(실행하지 않음), 중단 = 실행 도중 앱 종료</div>
+      <div id="srBody"><div class="empty small loading">조회 중…</div></div>
+      <div class="inline" style="justify-content:flex-end;margin-top:12px"><button class="btn primary" id="srClose">닫기</button></div></div>`;
+    document.body.appendChild(bg);
+    bg.querySelector('#srClose').onclick = () => bg.remove();
+    bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+    try {
+      const runs = await get('/api/migrate/schedules/' + encodeURIComponent(s.scheduleId) + '/runs?limit=30') || [];
+      bg.querySelector('#srBody').innerHTML = runs.length ? `<table class="list"><tr><th>주기 시각</th><th>종류</th><th>결과</th><th>메시지</th><th>시작</th><th>종료</th><th></th></tr>` + runs.map(r => {
+        const rl = RUN_LABEL[r.status] || ['NOT_RUN', r.status];
+        return `<tr><td class="small">${fmtDate(r.fireTime)}</td><td class="small">${esc(TRIGGER_LABEL[r.triggerType] || r.triggerType)}</td><td><span class="badge ${rl[0]}">${esc(rl[1])}</span></td><td class="small wrap">${esc(r.message || '')}</td><td class="small">${fmtDate(r.startedAt)}</td><td class="small">${fmtDate(r.finishedAt)}</td><td>${r.migrationId ? `<a class="small" href="/ui/history?migrationId=${encodeURIComponent(r.migrationId)}">이력</a>` : ''}</td></tr>`;
+      }).join('') + '</table>' : '<div class="empty small">기록이 없습니다</div>';
+    } catch (e) { bg.querySelector('#srBody').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  let schList = [];
+  async function schAction(path, okMsg) {
+    try { await post(path); toast(okMsg, 'ok'); loadSchedules(); UI.gate && UI.gate(); } catch (e) { toast(e.message, 'err'); }
+  }
+  function showScheduleJson(s) {
+    const bg = document.createElement('div'); bg.className = 'modal-bg open';
+    bg.innerHTML = `<div class="modal" style="max-width:900px"><h2>스케줄 등록 JSON <span class="small muted mono">${esc(s.scheduleId)}</span></h2>
+      <div class="api-line"><span class="method">POST</span><span class="url">${esc(location.origin)}/api/migrate/table</span></div>
+      <div class="mb-6 small muted">등록 요청 전체 (cron·기간 포함). 주기마다 이 요청이 즉시 실행으로 들어가고, 이력의 실행자는 <span class="mono">SCHEDULE:${esc(s.scheduleId)}</span></div>
+      <pre style="max-height:55vh">${esc(s.requestJson || '')}</pre>
+      <div class="inline" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="sjCopy">복사</button><button class="btn primary" id="sjClose">닫기</button></div></div>`;
+    document.body.appendChild(bg);
+    bg.querySelector('#sjClose').onclick = () => bg.remove();
+    bg.onclick = (e) => { if (e.target === bg) bg.remove(); };
+    bg.querySelector('#sjCopy').onclick = async () => { try { await navigator.clipboard.writeText(s.requestJson || ''); toast('JSON 복사됨', 'ok'); } catch (e) { toast('클립보드 복사 실패 (HTTPS/localhost 에서만 동작)', 'err'); } };
+  }
+  async function loadSchedules() {
+    try {
+      schList = await get('/api/migrate/schedules') || [];
+      const active = schList.filter(s => s.state === 'ACTIVE').length, pausedN = schList.filter(s => s.state === 'PAUSED').length;
+      const restored = schList.filter(s => s.state === 'PAUSED' && (s.stateReason || '').startsWith('재기동 복원')).length;
+      $('#schBanner').innerHTML = (active ? `<div class="mt-8 alert warn">활성 스케줄 ${active}개 · 지금은 테이블·시나리오 이관을 실행할 수 없습니다 (전체 일시정지 후 실행)</div>` : '')
+        + (restored ? `<div class="mt-8 alert warn">재기동으로 일시정지 상태로 복원된 스케줄 ${restored}개 · 주기 기록(놓침·중단)을 확인한 뒤 재개하세요</div>` : '');
+      $('#schPauseAll').disabled = !active; $('#schResumeAll').disabled = !pausedN;
+      $('#schedules').innerHTML = schList.length ? `<table class="list"><tr><th>ID</th><th>플러그인</th><th>테이블</th><th>모드</th><th>cron</th><th>이름</th><th>다음 실행</th><th>상태</th><th>마지막 주기</th><th></th></tr>` +
+        schList.map(s => {
+          const st = SCH_STATE[s.state] || ['NOT_RUN', s.state];
+          const lr = s.lastRun, rl = lr ? (RUN_LABEL[lr.status] || ['NOT_RUN', lr.status]) : null;
+          const last = lr ? `<span class="badge ${rl[0]}" title="${esc(lr.message || '')}">${esc(rl[1])}</span> <span class="small muted">${fmtDate(lr.at)}</span>${lr.migrationId ? ` <a class="small" href="/ui/history?migrationId=${encodeURIComponent(lr.migrationId)}">이력</a>` : ''}` : '<span class="small muted">-</span>';
+          const toggle = s.state === 'ACTIVE' ? `<button class="btn sm" data-write data-pause="${esc(s.scheduleId)}">일시정지</button>` : (s.state === 'PAUSED' ? `<button class="btn sm primary" data-write data-resume="${esc(s.scheduleId)}">재개</button>` : '');
+          return `<tr><td class="mono small">${esc(s.scheduleId)}</td><td>${esc(s.pluginName)}</td><td><b>${esc(s.tableName)}</b></td><td>${badge(s.testMode)}</td><td class="mono">${esc(s.cronExpression)}</td><td>${esc(s.scheduleName || '')}</td><td class="small">${fmtDate(s.nextExecutionTime)}</td><td><span class="badge ${st[0]}">${esc(st[1])}</span>${s.stateReason ? `<div class="small muted">${esc(s.stateReason)}</div>` : ''}</td><td>${last}</td>
+          <td class="nowrap">${toggle} <button class="btn sm" data-sjson="${esc(s.scheduleId)}">JSON</button> <button class="btn sm" data-sruns="${esc(s.scheduleId)}">기록</button> <button class="btn sm" data-write data-trigger="${esc(s.scheduleId)}">즉시 실행</button> <button class="btn sm danger" data-write data-cancel="${esc(s.scheduleId)}">취소</button></td></tr>`;
+        }).join('') + '</table>'
+        : '<div class="empty small">등록된 스케줄이 없습니다</div>';
+      document.querySelectorAll('[data-pause]').forEach(b => b.onclick = () => schAction('/api/migrate/schedules/' + encodeURIComponent(b.dataset.pause) + '/pause', '일시정지했습니다'));
+      document.querySelectorAll('[data-resume]').forEach(b => b.onclick = async () => { if (!await confirmModal('스케줄 재개', `<span class="mono">${esc(b.dataset.resume)}</span> 을 재개합니다. 재개하면 테이블·시나리오 이관이 막힙니다.`, '재개')) return; schAction('/api/migrate/schedules/' + encodeURIComponent(b.dataset.resume) + '/resume', '재개했습니다'); });
+      document.querySelectorAll('[data-sruns]').forEach(b => b.onclick = () => { const s = schList.find(x => x.scheduleId === b.dataset.sruns); if (s) showScheduleRuns(s); });
+      document.querySelectorAll('[data-sjson]').forEach(b => b.onclick = () => { const s = schList.find(x => x.scheduleId === b.dataset.sjson); if (s) showScheduleJson(s); });
+      document.querySelectorAll('[data-trigger]').forEach(b => b.onclick = async () => { if (!await confirmModal('스케줄 즉시 실행', `<span class="mono">${esc(b.dataset.trigger)}</span> 을 지금 실행합니다. 실행 전 확인(기존 데이터 등)은 그대로 적용됩니다.`, '실행')) return; try { await post('/api/migrate/schedules/' + encodeURIComponent(b.dataset.trigger) + '/trigger'); toast('실행 요청 완료', 'ok'); setTimeout(loadSchedules, 3000); } catch (e) { toast(e.message, 'err'); } });
+      document.querySelectorAll('[data-cancel]').forEach(b => b.onclick = async () => { if (!await confirmModal('스케줄 취소', `<span class="mono">${esc(b.dataset.cancel)}</span> 을 취소합니다. 목록에서 빠지고 재기동해도 복원되지 않습니다(운영 저장소에는 취소 기록으로 남음). 실행 중인 주기의 Job 은 멈추지 않습니다.`, '취소')) return; try { await UI.del('/api/migrate/schedules/' + encodeURIComponent(b.dataset.cancel)); toast('취소됨', 'ok'); loadSchedules(); } catch (e) { toast(e.message, 'err'); } });
+    } catch (e) { $('#schedules').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  $('#schPauseAll').onclick = async () => { if (!await confirmModal('전체 일시정지', '활성 스케줄을 모두 일시정지합니다. 그 뒤 테이블·시나리오 이관을 실행할 수 있습니다.', '일시정지')) return; schAction('/api/migrate/schedules/pause-all', '전체 일시정지했습니다'); };
+  $('#schResumeAll').onclick = async () => { if (!await confirmModal('전체 재개', '일시정지한 스케줄을 모두 재개합니다. 재개하면 테이블·시나리오 이관이 막힙니다.', '재개')) return; schAction('/api/migrate/schedules/resume-all', '전체 재개했습니다'); };
+  $('#schReload').onclick = loadSchedules; loadSchedules(); setInterval(loadSchedules, 30000);
+  async function loadGate() {
+    try {
+      const g = await get('/api/migrate/gate');
+      const r = g.running;
+      let html = r ? `<table><tr><th>단위</th><td>[${esc(r.type)}] ${esc(r.description)} <span class="mono small">${esc(r.unitId)}</span></td></tr>
+        <tr><th>요청자 / 시작</th><td>${esc(r.requestedBy)} · ${fmtDate(r.acquiredAt)} (${fmtMs(r.elapsedMs)} 경과)</td></tr>
+        <tr><th>하위 Job</th><td>${(r.jobExecutionIds || []).join(', ') || '-'} · 실행 중 ${r.runningJobCount} · ${r.closed ? '제출 완료(종료 대기)' : '제출 중'}</td></tr></table>`
+        : `<div class="small">${g.enabled ? '비어 있음 — 새 실행을 받을 수 있습니다' : '게이트 비활성(georu.batch.single-execution.enabled=false)'}</div>`;
+      const recent = g.recent || [];
+      if (recent.length) html += `<details class="mt-6 small"><summary>최근 해제 이력 (${recent.length})</summary><table class="list"><tr><th>단위</th><th>요청자</th><th>획득</th><th>해제</th><th>Job</th><th>결과</th></tr>` +
+        recent.map(x => `<tr><td>[${esc(x.type)}] ${esc(x.description)}</td><td>${esc(x.requestedBy)}</td><td>${fmtDate(x.acquiredAt)}</td><td>${fmtDate(x.releasedAt)}</td><td>${x.jobCount}</td><td>${esc(x.outcome)}</td></tr>`).join('') + '</table></details>';
+      $('#gate').innerHTML = html; $('#gateRelease').disabled = !r;
+    } catch (e) { $('#gate').innerHTML = `<div class="alert err">${esc(e.message)}</div>`; }
+  }
+  $('#gateRelease').onclick = async () => {
+    if (!await confirmModal('게이트 강제 해제', '비정상 상황(앱은 살아 있는데 실행 단위가 안 풀림)에서만 사용하세요. 실행 중인 Job 이 남아 있으면 거부됩니다.', '해제', 'RELEASE')) return;
+    try { await post('/api/migrate/gate/release'); toast('게이트 해제됨', 'ok'); loadGate(); } catch (e) { toast(e.message, 'err'); }
+  };
+  loadGate(); setInterval(loadGate, 3000);
+  // 실행 중인 그룹 (날짜 분할 DIV- · 시나리오 SCF-): 진행 n/m 과 중지
+  async function loadGroups() {
+    try {
+      const list = await get('/api/migrate/groups?status=RUNNING&limit=5') || [];
+      $('#groups').innerHTML = list.map(g => {
+        const done = g.unitSuccess + g.unitFailed + g.unitBlocked + g.unitNotRun;
+        const link = g.groupType === 'SCENARIO' ? '/ui/scenario?groupId=' + encodeURIComponent(g.groupId) : '/ui/history?groupId=' + encodeURIComponent(g.groupId);
+        return `<div class="alert info inline" style="justify-content:space-between"><span>${g.groupType === 'SCENARIO' ? '시나리오' : '날짜 분할'} 실행 중 <b>${esc(g.name || '')}</b> <span class="mono">${esc(g.groupId)}</span> · ${num(done)}/${num(g.unitTotal)} 단위 (성공 ${num(g.unitSuccess)} · 실패 ${num(g.unitFailed)})</span>`
+          + `<span><a class="btn sm" href="${link}">진행 보기</a> <button class="btn sm" data-write data-group-stop="${esc(g.groupId)}">중지 요청</button></span></div>`;
+      }).join('');
+      UI.bindGroupStop($('#groups'));
+    } catch (e) { $('#groups').innerHTML = ''; }
+  }
+  loadGroups(); setInterval(loadGroups, 3000);
+})();
+</script>
+</body>
+</html>
