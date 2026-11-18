@@ -3,7 +3,9 @@
 #   docker build -f examples/demo/Dockerfile -t georu-demo:local .
 #   docker compose 는 examples/demo/docker-compose.yml 이 context: ../.. 로 지정한다
 # =============================================================================
-FROM eclipse-temurin:17-jdk AS build
+# JDK 버전 고정 (CVE-2026-114938 대응). Temurin 17.0.21.1 이 나오면 두 FROM 의 태그를 그 버전으로 바꾸고
+# 아래 ENTRYPOINT 의 -XX:-UseBASE64Intrinsics 를 지운다
+FROM eclipse-temurin:17.0.21_9-jdk AS build
 WORKDIR /workspace
 COPY . .
 RUN printf 'org.gradle.jvmargs=-Xmx2g -Dfile.encoding=UTF-8\norg.gradle.daemon=false\norg.gradle.parallel=true\norg.gradle.caching=true\n' > gradle.properties \
@@ -12,7 +14,7 @@ RUN --mount=type=cache,target=/root/.gradle ./gradlew --no-daemon -p examples/de
     && JAR=$(ls examples/demo/build/libs/*.jar | grep -v plain | head -1) \
     && java -Djarmode=layertools -jar "$JAR" extract --destination extracted
 
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17.0.21_9-jre
 ENV TZ=Asia/Seoul \
     LANG=C.UTF-8 \
     LC_ALL=C.UTF-8
@@ -34,4 +36,5 @@ ENV JAVA_OPTS="-XX:MaxRAMPercentage=70.0 -XX:+UseZGC -Dfile.encoding=UTF-8 -Duse
  -Xlog:gc*:file=/app/logs/gc.log:time,uptime,level,tags:filecount=5,filesize=10m"
 HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
   CMD curl -fs http://localhost:${SERVER_PORT:-8081}/actuator/health/live || exit 1
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]
+# -XX:-UseBASE64Intrinsics: CVE-2026-114938 임시 완화. docker-compose 가 JAVA_OPTS 를 덮어써도 빠지지 않도록 여기에 둔다
+ENTRYPOINT ["sh", "-c", "exec java -XX:-UseBASE64Intrinsics $JAVA_OPTS org.springframework.boot.loader.launch.JarLauncher"]
