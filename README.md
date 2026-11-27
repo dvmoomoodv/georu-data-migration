@@ -1,8 +1,8 @@
 <div align="center">
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/georu-logo-dark.svg">
-  <img src="docs/assets/georu-logo-light.svg" alt="Georu" width="420">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/georu-data-migration-logo-dark.svg">
+  <img src="docs/assets/georu-data-migration-logo-light.svg" alt="Georu Data Migration" width="540">
 </picture>
 
 **거룻배처럼, 데이터를 조금씩 나눠 안전하게 나르는 DB 이관 프레임워크**
