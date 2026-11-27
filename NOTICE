@@ -12,11 +12,6 @@ NanumGothic font (src/main/resources/fonts/NanumGothic-*.ttf)
   Licensed under the SIL Open Font License, Version 1.1
   (src/main/resources/fonts/OFL.txt). Used to render Korean text in PDF reports.
 
-Wanted Sans font (georu-ui/src/main/resources/static/ui-assets/fonts/WantedSans-SemiBold.subset.woff2)
-  Copyright 2024 The Wanted Sans Project Authors (https://github.com/wanteddev/wanted-sans)
-  Licensed under the SIL Open Font License, Version 1.1
-  (georu-ui/src/main/resources/static/ui-assets/fonts/OFL.txt). Subset of v1.0.3 SemiBold
-  (KS X 1001 Hangul + Latin), formerly used for headings in the operations UI.
 
 Libre Franklin font (georu-ui/src/main/resources/static/ui-assets/fonts/LibreFranklin-SemiBold.woff)
   Copyright 2020 The Libre Franklin Project Authors (https://github.com/googlefonts/Libre-Franklin)
